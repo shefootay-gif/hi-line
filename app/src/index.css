@@ -1,0 +1,218 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 275 55% 99%;
+    --foreground: 275 60% 28%;
+    --card: 0 0% 100%;
+    --card-foreground: 275 60% 28%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 275 60% 28%;
+    --primary: 276 56% 68%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 276 56% 96%;
+    --secondary-foreground: 275 60% 28%;
+    --muted: 276 38% 95%;
+    --muted-foreground: 274 11% 43%;
+    --accent: 276 56% 82%;
+    --accent-foreground: 275 60% 28%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 276 38% 89%;
+    --input: 276 38% 89%;
+    --ring: 276 56% 68%;
+    --radius: 0.625rem;
+    --beauty-ink: #4b1c71;
+    --beauty-muted: #6f6178;
+    --beauty-blush: #b57edc;
+    --beauty-blush-soft: #f7ecff;
+    --beauty-cream: #fcf8ff;
+    --beauty-nude: #e7d8f1;
+    --beauty-peach: #c9a2e2;
+    --beauty-rose-gold: #7f4ca5;
+    --beauty-lavender: #dbb6ee;
+    --beauty-shadow: 0 18px 45px rgba(75, 28, 113, 0.12);
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 275 60% 28%;
+    --foreground: 0 0% 98%;
+    --card: 275 60% 28%;
+    --card-foreground: 0 0% 98%;
+    --popover: 275 60% 28%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    color: var(--beauty-ink);
+    background:
+      radial-gradient(circle at top left, rgba(181, 126, 220, 0.12), transparent 32rem),
+      linear-gradient(180deg, #fcf8ff 0%, #ffffff 46%, #faf4ff 100%);
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(181, 126, 220, 0.22);
+  }
+
+  :focus-visible {
+    outline: 3px solid rgba(181, 126, 220, 0.42);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .beauty-shell {
+    background:
+      radial-gradient(circle at 12% 0%, rgba(181, 126, 220, 0.16), transparent 28rem),
+      radial-gradient(circle at 88% 8%, rgba(219, 182, 238, 0.22), transparent 26rem),
+      linear-gradient(180deg, #fcf8ff 0%, #ffffff 58%, #faf4ff 100%);
+  }
+
+  .beauty-section {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .beauty-eyebrow {
+    color: var(--beauty-rose-gold);
+    letter-spacing: 0.16em;
+  }
+
+  .beauty-card {
+    border: 1px solid rgba(127, 76, 165, 0.18);
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 10px 35px rgba(75, 28, 113, 0.08);
+    backdrop-filter: blur(10px);
+    transition: transform 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
+  }
+
+  .beauty-card:hover {
+    border-color: rgba(181, 126, 220, 0.32);
+    box-shadow: var(--beauty-shadow);
+    transform: translateY(-4px);
+  }
+
+  .beauty-button {
+    background: linear-gradient(135deg, var(--beauty-blush), var(--beauty-peach));
+    color: #4b1c71;
+    box-shadow: 0 12px 26px rgba(181, 126, 220, 0.22);
+    transition: transform 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+  }
+
+  .beauty-button:hover {
+    filter: saturate(1.05);
+    transform: translateY(-2px);
+    box-shadow: 0 18px 34px rgba(181, 126, 220, 0.28);
+  }
+
+  .beauty-pill {
+    background: rgba(247, 236, 255, 0.9);
+    border: 1px solid rgba(181, 126, 220, 0.18);
+    color: var(--beauty-ink);
+  }
+
+  .beauty-image {
+    background:
+      radial-gradient(circle at 50% 24%, rgba(255, 255, 255, 0.9), transparent 42%),
+      linear-gradient(145deg, #f7ecff, #fcf8ff);
+  }
+
+  .reveal-up {
+    animation: reveal-up 700ms ease both;
+  }
+
+  .float-soft {
+    animation: float-soft 5.5s ease-in-out infinite;
+  }
+
+  .shimmer-soft {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer-soft::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-120%);
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.44), transparent 70%);
+    animation: shimmer-soft 4.8s ease-in-out infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-soft {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer-soft {
+  0%, 52% {
+    transform: translateX(-120%);
+  }
+  78%, 100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
