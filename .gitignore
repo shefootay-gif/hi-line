@@ -1,43 +1,11 @@
-# Dependencies
 node_modules/
-vendor/
-
-# Environment files
-.env
-.env.local
-.env.development
-.env.production
-.env.test
-
-# Build output
+.npm-cache/
+app/.npm-cache/
 dist/
 build/
 out/
-.next/
-.nuxt/
+.env
+.env.local
 .cache/
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-
-# OS / Editor
-.DS_Store
-Thumbs.db
 .vscode/
-.idea/
-
-# Database / backups
-*.sqlite
-*.sqlite3
-*.db
-*.bak
-*.backup
-
-# Uploads / temp
-tmp/
-temp/
-uploads/
+.DS_Store
