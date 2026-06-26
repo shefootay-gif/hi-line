@@ -18,7 +18,7 @@ import {
   returnRequests,
   adminNotifications,
 } from "@db/schema";
-import { eq, desc, and, or, like, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, like, sql, inArray, notInArray } from "drizzle-orm";
 
 const categoryAliases: Record<string, string> = {
   all: "all",
@@ -145,10 +145,20 @@ export const storeRouter = createRouter({
   // Categories
   getCategories: publicQuery.query(async () => {
     const db = getDb();
+    const hiddenMarketingCategories = [
+      "all-products",
+      "fresh-scents",
+      "fruity-scents",
+      "fragrance-free",
+      "summer-collection",
+      "best-sellers",
+      "offers",
+    ];
+
     return db
       .select()
       .from(categories)
-      .where(eq(categories.isActive, true))
+      .where(and(eq(categories.isActive, true), notInArray(categories.slug, hiddenMarketingCategories)))
       .orderBy(categories.sortOrder);
   }),
 
