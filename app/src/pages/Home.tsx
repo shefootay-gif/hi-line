@@ -231,13 +231,13 @@ export default function Home() {
             {/* Text Content */}
             <div className="flex-1 text-center lg:text-left max-w-xl">
               <p className="hero-text text-xs sm:text-sm uppercase beauty-eyebrow font-semibold mb-4">
-                Lebanese Formula
+                {lang === "ar" ? "التركيبة اللبنانية" : "Lebanese Formula"}
               </p>
               <h1 className="hero-text text-5xl sm:text-6xl lg:text-7xl font-black text-[#4B1C71] leading-none mb-3">
-                Hi Line
+                {lang === "ar" ? "هاي لاين" : "Hi Line"}
               </h1>
               <h2 className="hero-text text-3xl sm:text-4xl font-semibold text-[#B57EDC] mb-6">
-                Pro Care
+                {lang === "ar" ? "برو كير" : "Pro Care"}
               </h2>
               <h3 className="sr-only">
                 {storeName}
@@ -250,7 +250,7 @@ export default function Home() {
               </p>
               <p className="hero-text text-base sm:text-lg text-[#6F6178] leading-relaxed mb-8">
                 {lang === "ar"
-                  ? "اختاري منتجات Hi Line Pro Care للعناية اليومية بروائح مميزة، ملمس لطيف، وانتعاش يدوم طوال اليوم."
+                  ? "اختاري منتجات هاي لاين برو كير للعناية اليومية بروائح مميزة، ملمس لطيف، وانتعاش يدوم طوال اليوم."
                   : "Discover Hi Line Pro Care daily essentials with elegant scents, gentle formulas, and freshness that lasts."}
               </p>
               <div
@@ -266,7 +266,9 @@ export default function Home() {
                 </button>
                 <a
                   href={`https://wa.me/201223863092?text=${encodeURIComponent(
-                    "Hello! I'm interested in ordering Hi Line Pro Care products."
+                    lang === "ar"
+                      ? "مرحبًا، أرغب في طلب منتجات هاي لاين برو كير."
+                      : "Hello! I'm interested in ordering Hi Line Pro Care products."
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -301,7 +303,7 @@ export default function Home() {
               <div className="hero-product relative beauty-card rounded-[2rem] p-3 sm:p-4 float-soft">
                 <img
                   src="/campaign/beach-collection.jpg"
-                  alt="Hi Line Deodorant"
+                  alt={lang === "ar" ? "هاي لاين برو كير" : "Hi Line Deodorant"}
                   loading="eager"
                   className="w-72 sm:w-96 lg:w-[28rem] aspect-[4/5] object-cover rounded-[1.5rem] drop-shadow-2xl"
                 />
@@ -381,9 +383,6 @@ export default function Home() {
                     <p className="mt-1 text-xs font-medium text-[#7F4CA5]">
                       {lang === "ar" ? `برائحة ${variant.scentAr}` : variant.scent}
                     </p>
-                    <p className="hidden">
-                      {lang === "ar" ? "رول أون مزيل عرق" : "Deodorant Roll On"}
-                    </p>
                     <div className="mt-3 flex flex-wrap items-baseline justify-center gap-2">
                       <span className="text-base font-black text-[#D71920]">
                         LE {getProductPrice(product)}.00
@@ -428,7 +427,7 @@ export default function Home() {
           <div className="relative max-w-4xl mx-auto rounded-3xl overflow-hidden beauty-card">
             <img
               src="/campaign/tropical-48h.jpg"
-              alt="Hi Line Lifestyle"
+              alt={lang === "ar" ? "أسلوب حياة هاي لاين" : "Hi Line Lifestyle"}
               loading="lazy"
               className="w-full aspect-video object-cover transition-transform duration-700 hover:scale-[1.03]"
             />
@@ -588,7 +587,7 @@ export default function Home() {
           <div className="rounded-3xl overflow-hidden beauty-card">
             <img
               src="/campaign/collection-pool.jpg"
-              alt="Hi Line Collection"
+              alt={lang === "ar" ? "مجموعة هاي لاين" : "Hi Line Collection"}
               loading="lazy"
               className="w-full aspect-[16/9] object-cover transition-transform duration-700 hover:scale-[1.03]"
             />
@@ -630,7 +629,9 @@ export default function Home() {
 
           <a
             href={`https://wa.me/201223863092?text=${encodeURIComponent(
-              "Hello! I'm interested in ordering Hi Line Pro Care products."
+              lang === "ar"
+                ? "مرحبًا، أرغب في طلب منتجات هاي لاين برو كير."
+                : "Hello! I'm interested in ordering Hi Line Pro Care products."
             )}`}
             target="_blank"
             rel="noopener noreferrer"
