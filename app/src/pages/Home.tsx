@@ -318,8 +318,9 @@ export default function Home() {
             {rollOnProducts.map((product) => {
               const variant = {
                 id: product.id,
-                name: product.scent,
-                nameAr: product.scent,
+                name: product.nameEn,
+                nameAr: product.nameAr || product.nameEn,
+                scent: product.scent,
                 color: product.scentColor,
                 image: product.images[0],
                 slug: product.slug,
@@ -341,7 +342,7 @@ export default function Home() {
                       </span>
                       <img
                         src={variant.image}
-                        alt={variant.name}
+                        alt={lang === "ar" ? variant.nameAr : variant.name}
                         loading="lazy"
                         className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
                       />
@@ -356,7 +357,7 @@ export default function Home() {
                     </span>
                     <h3 className="min-h-[3.4rem] text-sm font-semibold leading-snug text-[#241A2E]">
                       <span className="block">Hi Line Pro Care</span>
-                      <span className="block">{variant.name}</span>
+                      <span className="block">{lang === "ar" ? variant.nameAr : variant.name}</span>
                     </h3>
                     <p className="hidden">
                       {lang === "ar" ? "رول أون مزيل عرق" : "Deodorant Roll On"}
