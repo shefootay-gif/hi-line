@@ -17,7 +17,6 @@ import {
   Twitter,
   Send,
   Image,
-  Loader2,
   Check,
   ChevronDown,
   ChevronUp,

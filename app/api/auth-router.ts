@@ -6,7 +6,7 @@ import { Session } from "@contracts/constants";
 import { getSessionCookieOptions } from "./lib/cookies";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
 import { env } from "./lib/env";
-import { signSessionToken } from "./kimi/session";
+import { signSessionToken } from "./lib/session";
 import { getDb } from "./queries/connection";
 import { users, passwordResetTokens } from "@db/schema";
 
@@ -34,7 +34,7 @@ export const authRouter = createRouter({
       const unionId = `local-admin:${env.localAdminUsername}`;
       const token = await signSessionToken({
         unionId,
-        clientId: env.appId || "local-admin",
+        clientId: "local-admin",
       });
       const opts = getSessionCookieOptions(ctx.req.headers);
       ctx.resHeaders.append(

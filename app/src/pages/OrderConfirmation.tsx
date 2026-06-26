@@ -9,10 +9,11 @@ export default function OrderConfirmation() {
   const t = useTranslations(lang);
   const [searchParams] = useSearchParams();
   const orderNumber = searchParams.get("order");
+  const customerPhone = searchParams.get("phone") || "";
 
   const { data: order, isLoading } = trpc.store.getOrderByNumber.useQuery(
-    { orderNumber: orderNumber || "" },
-    { enabled: !!orderNumber, retry: false }
+    { orderNumber: orderNumber || "", customerPhone },
+    { enabled: !!orderNumber && !!customerPhone, retry: false }
   );
 
   if (isLoading) {

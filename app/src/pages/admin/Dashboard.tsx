@@ -34,7 +34,6 @@ function MetricCard({
   color,
   trend,
   trendLabel,
-  isRTL,
 }: {
   label: string;
   value: string | number;
@@ -42,7 +41,6 @@ function MetricCard({
   color: string;
   trend?: number;
   trendLabel?: string;
-  isRTL: boolean;
 }) {
   const isPositive = (trend ?? 0) >= 0;
   return (
@@ -179,7 +177,7 @@ export default function AdminDashboard() {
 
   // Build a small bar chart for scents
   const scentData = Array.isArray(salesByScent)
-    ? (salesByScent as Array<{ scent: string; total_sold: string | number }>
+    ? (salesByScent as unknown as Array<{ scent: string; total_sold: string | number }>
       ).slice(0, 5)
     : [];
 
@@ -260,7 +258,7 @@ export default function AdminDashboard() {
         {/* Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           {metricCards.map((card) => (
-            <MetricCard key={card.label} {...card} isRTL={isRTL} />
+            <MetricCard key={card.label} {...card} />
           ))}
         </div>
 

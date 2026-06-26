@@ -110,7 +110,7 @@ export default function MyOrders() {
                 
                 <div className="flex items-center md:items-end flex-col justify-end">
                   <Link
-                    to={`/order-confirmation?order=${order.orderNumber}`}
+                    to={`/order-confirmation?order=${order.orderNumber}&phone=${encodeURIComponent(order.customerPhone)}`}
                     className="px-6 py-2.5 border border-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#F7ECFF] transition-colors w-full md:w-auto text-center"
                   >
                     {lang === "ar" ? "التفاصيل" : "View Details"}

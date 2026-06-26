@@ -43,18 +43,19 @@ export default function TrackOrder() {
   const t = useTranslations(lang);
   const ar = lang === "ar";
   const [orderNumber, setOrderNumber] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [searched, setSearched] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: order, isLoading } = trpc.store.getOrderByNumber.useQuery(
-    { orderNumber },
-    { enabled: searched && orderNumber.length > 0 }
+    { orderNumber, customerPhone },
+    { enabled: searched && orderNumber.trim().length > 0 && customerPhone.trim().length > 0 }
   );
 
   const cancelMutation = trpc.store.cancelOrder.useMutation({
     onSuccess: () => {
       toast.success(ar ? "تم إلغاء الطلب بنجاح" : "Order cancelled successfully");
-      utils.store.getOrderByNumber.invalidate({ orderNumber });
+      utils.store.getOrderByNumber.invalidate({ orderNumber, customerPhone });
     },
     onError: (err) => {
       toast.error(err.message);
@@ -129,7 +130,7 @@ export default function TrackOrder() {
 
   const handleCancelOrder = () => {
     if (confirm(ar ? "هل أنت متأكد من إلغاء هذا الطلب؟" : "Are you sure you want to cancel this order?")) {
-      cancelMutation.mutate({ orderNumber: order!.orderNumber });
+      cancelMutation.mutate({ orderNumber: order!.orderNumber, customerPhone: customerPhone.trim() });
     }
   };
 
@@ -145,7 +146,7 @@ export default function TrackOrder() {
           <p className="text-[#6F6178]">{t.enterOrderNumber}</p>
         </div>
 
-        <form onSubmit={handleSearch} className="flex gap-3 mb-10 max-w-xl mx-auto">
+        <form onSubmit={handleSearch} className="grid gap-3 mb-10 max-w-xl mx-auto sm:grid-cols-[1fr_1fr_auto]">
           <input
             type="text"
             value={orderNumber}
@@ -154,11 +155,21 @@ export default function TrackOrder() {
               setSearched(false);
             }}
             placeholder="HL..."
-            className="flex-1 px-4 py-3 rounded-xl border border-[#E7D8F1] focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30 font-mono bg-white"
+            className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30 font-mono bg-white"
+          />
+          <input
+            type="tel"
+            value={customerPhone}
+            onChange={(e) => {
+              setCustomerPhone(e.target.value);
+              setSearched(false);
+            }}
+            placeholder={ar ? "رقم الهاتف" : "Phone number"}
+            className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30 bg-white"
           />
           <button
             type="submit"
-            disabled={isLoading || orderNumber.trim() === ""}
+            disabled={isLoading || orderNumber.trim() === "" || customerPhone.trim() === ""}
             className="px-6 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#A66DCC] transition-colors disabled:opacity-50"
           >
             {isLoading ? (

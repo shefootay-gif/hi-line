@@ -26,6 +26,22 @@ const categoryAliases: Record<string, string> = {
 
 const groupedCollectionImage = "/products/collection-flatlay.jpg";
 
+type ShopProduct = {
+  id: number;
+  nameEn: string;
+  nameAr: string;
+  slug: string;
+  scent: string;
+  scentColor: string;
+  price: string;
+  salePrice: string;
+  originalPrice: string;
+  images: string[];
+  discountLabel: string;
+  brand: string;
+  section: string;
+};
+
 function normalizeCategory(value?: string | null) {
   if (!value) return "all";
   const normalized = value.toLowerCase();

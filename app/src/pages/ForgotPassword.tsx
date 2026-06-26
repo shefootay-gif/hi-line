@@ -1,5 +1,4 @@
 import { useLanguage } from "@/hooks/useLanguage";
-import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { Link } from "react-router";
 import { Mail, ArrowRight, CheckCircle, ArrowLeft } from "lucide-react";
@@ -8,7 +7,6 @@ import { useState } from "react";
 
 export default function ForgotPassword() {
   const { lang, isRTL } = useLanguage();
-  const t = useTranslations(lang);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const forgotPassword = trpc.auth.forgotPassword.useMutation();

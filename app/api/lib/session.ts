@@ -1,11 +1,14 @@
 import * as jose from "jose";
-import { env } from "../lib/env";
-import type { SessionPayload } from "./types";
+import { env } from "./env";
+
+export type SessionPayload = {
+  unionId: string;
+  clientId: string;
+};
 
 const JWT_ALG = "HS256";
 
 function getSecret() {
-  // Use jwtSecret (JWT_SECRET env) as primary, fallback to appSecret
   return new TextEncoder().encode(env.jwtSecret);
 }
 
@@ -35,7 +38,7 @@ export async function verifySessionToken(
       console.warn("[session] JWT payload missing unionId field.");
       return null;
     }
-    return { unionId, clientId: clientId ?? "local" } as SessionPayload;
+    return { unionId, clientId: clientId ?? "local" };
   } catch (error) {
     console.warn(
       "[session] JWT verification failed:",

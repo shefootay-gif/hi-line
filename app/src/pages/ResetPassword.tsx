@@ -1,14 +1,12 @@
 import { useLanguage } from "@/hooks/useLanguage";
-import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { Lock, ArrowRight, ArrowLeft } from "lucide-react";
+import { Lock } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { useState } from "react";
 
 export default function ResetPassword() {
   const { lang, isRTL } = useLanguage();
-  const t = useTranslations(lang);
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const navigate = useNavigate();
