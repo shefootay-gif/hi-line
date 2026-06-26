@@ -9,7 +9,7 @@ import { Search, ShoppingBag } from "lucide-react";
 
 const categoryFilters = [
   { key: "all", labelEn: "All", labelAr: "الكل" },
-  { key: "roll-on", labelEn: "Roll On", labelAr: "رول أون" },
+  { key: "roll-on", labelEn: "Deodorant", labelAr: "مزيل العرق" },
 ];
 
 const categoryKeys = new Set(categoryFilters.map((category) => category.key));
@@ -152,27 +152,82 @@ export default function Shop() {
 
   return (
     <div className={isRTL ? "font-[Cairo]" : "font-[Inter]"}>
-      <section className="bg-white pt-24 pb-8 sm:pt-28 sm:pb-10">
-        <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-          <p className="beauty-eyebrow mb-3 text-xs font-semibold uppercase">
-            {lang === "ar" ? "المتجر" : "MARKET"}
-          </p>
-          <div className="mx-auto flex max-w-2xl items-center justify-center rounded-lg bg-white px-4 py-3">
-            <img
-              src="/brand/logo.jpg"
-              alt="Hi Line Pro Care"
-              className="h-24 w-auto object-contain sm:h-32 lg:h-40"
-            />
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#FCF8FF] via-white to-[#F7ECFF] pt-24 pb-10 sm:pt-28 sm:pb-12">
+        <div className="absolute -top-24 start-10 h-56 w-56 rounded-full bg-[#B57EDC]/20 blur-3xl" />
+        <div className="absolute -bottom-28 end-10 h-64 w-64 rounded-full bg-[#F6B6D6]/20 blur-3xl" />
+
+        <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
+          <div className={isRTL ? "text-right" : "text-left"}>
+            <p className="beauty-eyebrow mb-4 text-xs font-semibold uppercase tracking-[0.35em]">
+              {lang === "ar" ? "تسوق العناية اليومية" : "DAILY CARE SHOP"}
+            </p>
+
+            <h1 className="max-w-3xl text-4xl font-extrabold leading-tight text-[#241A2E] sm:text-5xl lg:text-6xl">
+              {lang === "ar" ? (
+                <>
+                  عناية يومية بروائح مميزة
+                  <span className="block text-[#7F4CA5]">وانتعاش يدوم</span>
+                </>
+              ) : (
+                <>
+                  Fresh care essentials
+                  <span className="block text-[#7F4CA5]">for every day</span>
+                </>
+              )}
+            </h1>
+
+            <p className="mt-5 max-w-2xl text-base leading-8 text-[#6F6178] sm:text-lg">
+              {lang === "ar"
+                ? "اختاري منتجات Hi Line Pro Care بتجربة تسوق سهلة، عروض واضحة، وخطوات طلب سريعة وآمنة."
+                : "Discover Hi Line Pro Care with a smooth shopping experience, clear offers, and fast secure checkout."}
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <span className="rounded-full border border-[#E7D8F1] bg-white/80 px-4 py-2 text-sm font-medium text-[#4B1678] shadow-sm">
+                {lang === "ar" ? "منتجات أصلية" : "Original Products"}
+              </span>
+              <span className="rounded-full border border-[#E7D8F1] bg-white/80 px-4 py-2 text-sm font-medium text-[#4B1678] shadow-sm">
+                {lang === "ar" ? "عروض متجددة" : "Fresh Offers"}
+              </span>
+              <span className="rounded-full border border-[#E7D8F1] bg-white/80 px-4 py-2 text-sm font-medium text-[#4B1678] shadow-sm">
+                {lang === "ar" ? "طلب سريع وآمن" : "Fast & Secure Order"}
+              </span>
+            </div>
           </div>
-          <h1 className="sr-only">Hi Line Pro Care</h1>
-          <h2 className="mt-5 text-2xl font-semibold text-[#7F4CA5] sm:text-3xl">
-            Roll On
-          </h2>
-          <p className="mt-2 text-sm text-[#6F6178]">
-            {lang === "ar"
-              ? "كل المنتجات الحالية داخل قسم Roll On، ويمكن إضافة أقسام جديدة من لوحة التحكم."
-              : "All current products sit under Roll On, with new sections ready to add from admin."}
-          </p>
+
+          <div className="flex justify-center lg:justify-end">
+            <div className="relative w-full max-w-md rounded-[2rem] border border-[#E7D8F1] bg-white/80 p-8 text-center shadow-[0_24px_70px_rgba(75,28,113,0.13)] backdrop-blur sm:p-10">
+              <div className="absolute -end-4 -top-4 rounded-2xl bg-[#7F4CA5] px-4 py-2 text-xs font-bold text-white shadow-lg">
+                Hi Line
+              </div>
+
+              <p className="text-xs font-semibold uppercase tracking-[0.45em] text-[#7F4CA5]">
+                LEBANESE FORMULA
+              </p>
+              <h2 className="mt-4 text-6xl font-black leading-none text-[#4B1C71] sm:text-7xl">
+                Hi Line
+              </h2>
+              <p className="mt-3 text-3xl font-semibold text-[#B57EDC] sm:text-4xl">
+                Pro Care
+              </p>
+              <p className="mx-auto mt-5 max-w-xs text-sm leading-7 text-[#6F6178]">
+                {lang === "ar"
+                  ? "هوية عناية أنيقة، منتجات مختارة، وتجربة تسوق بسيطة وواضحة."
+                  : "Elegant care identity, curated products, and a simple premium shopping experience."}
+              </p>
+
+              <div className="mt-6 grid grid-cols-2 gap-3 text-center">
+                <div className="rounded-2xl bg-[#FCF8FF] p-3">
+                  <p className="text-lg font-bold text-[#4B1678]">{filteredProducts.length}</p>
+                  <p className="text-xs text-[#6F6178]">{lang === "ar" ? "منتج متاح" : "Products"}</p>
+                </div>
+                <div className="rounded-2xl bg-[#FCF8FF] p-3">
+                  <p className="text-lg font-bold text-[#4B1678]">Pro Care</p>
+                  <p className="text-xs text-[#6F6178]">{lang === "ar" ? "عناية يومية" : "Daily Care"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -287,17 +342,19 @@ export default function Shop() {
                   <div className="grid items-center md:grid-cols-[1.2fr_0.8fr]">
                     <img
                       src={groupedCollectionImage}
-                      alt="Hi Line Roll On collection"
+                      alt="Hi Line Pro Care collection"
                       loading="lazy"
                       className="h-full max-h-[360px] w-full object-cover"
                     />
                     <div className="p-6 sm:p-8">
                       <p className="text-sm font-semibold text-[#7F4CA5]">Hi Line</p>
                       <h3 className="mt-2 text-2xl font-black text-[#4B1C71] sm:text-3xl">
-                        Roll On Collection
+                        {lang === "ar" ? "مجموعة Hi Line Pro Care" : "Hi Line Pro Care Collection"}
                       </h3>
                       <p className="mt-3 text-[#6F6178]">
-                        Full Hi Line Roll On collection in one clean promotional view.
+                        {lang === "ar"
+                          ? "تشكيلة عناية يومية بروائح مميزة وتجربة تسوق منظمة."
+                          : "A clean promotional view of Hi Line Pro Care daily essentials."}
                       </p>
                     </div>
                   </div>
