@@ -76,6 +76,18 @@ const howToSteps = [
   },
 ];
 
+const scentNameAr: Record<string, string> = {
+  "Sweet mango": "سويت مانجو",
+  "Tropical Breeze": "تروبيكال بريز",
+  Voyage: "فوياج",
+  "Candy pop": "كاندي بوب",
+  "Fragrance free": "بدون عطر",
+};
+
+function getArabicScentName(scent: string) {
+  return scentNameAr[scent] || scent;
+}
+
 type HomeProduct = CatalogProduct;
 
 export default function Home() {
@@ -321,6 +333,7 @@ export default function Home() {
                 name: product.nameEn,
                 nameAr: product.nameAr || product.nameEn,
                 scent: product.scent,
+                scentAr: getArabicScentName(product.scent),
                 color: product.scentColor,
                 image: product.images[0],
                 slug: product.slug,
@@ -356,9 +369,18 @@ export default function Home() {
                       {lang === "ar" ? variant.nameAr : variant.name}
                     </span>
                     <h3 className="min-h-[3.4rem] text-sm font-semibold leading-snug text-[#241A2E]">
-                      <span className="block">Hi Line Pro Care</span>
-                      <span className="block">{lang === "ar" ? variant.nameAr : variant.name}</span>
+                      {lang === "ar" ? (
+                        <span className="block">{variant.nameAr}</span>
+                      ) : (
+                        <>
+                          <span className="block">Hi Line Pro Care</span>
+                          <span className="block">{variant.name}</span>
+                        </>
+                      )}
                     </h3>
+                    <p className="mt-1 text-xs font-medium text-[#7F4CA5]">
+                      {lang === "ar" ? `برائحة ${variant.scentAr}` : variant.scent}
+                    </p>
                     <p className="hidden">
                       {lang === "ar" ? "رول أون مزيل عرق" : "Deodorant Roll On"}
                     </p>
