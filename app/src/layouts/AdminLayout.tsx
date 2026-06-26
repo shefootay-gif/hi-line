@@ -47,8 +47,10 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className={`min-h-screen bg-[#F7ECFF] ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
-      {/* Mobile Header */}
+<div
+  dir={isRTL ? "rtl" : "ltr"}
+  className={`min-h-screen w-full overflow-x-hidden bg-[#F7ECFF] ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}
+>      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[#4B1C71] text-white h-16 flex items-center justify-between px-4">
         <button onClick={() => setSidebarOpen(!sidebarOpen)}>
           {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -123,9 +125,11 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main Content */}
-      <div className={`lg:${isRTL ? "mr-64" : "ml-64"} pt-16 lg:pt-0 min-h-screen`}>
+      <main className={`min-h-screen min-w-0 overflow-x-hidden pt-16 lg:pt-0 ${isRTL ? "lg:mr-64" : "lg:ml-64"}`}>
+  <div className="w-full min-w-0 max-w-full overflow-x-hidden">
         <Outlet />
-      </div>
+        </div>
+</main>
 
       {/* Mobile overlay */}
       {sidebarOpen && (
