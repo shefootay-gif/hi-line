@@ -224,12 +224,9 @@ export default function Home() {
               <h1 className="hero-text text-5xl sm:text-6xl lg:text-7xl font-black text-[#4B1C71] leading-none mb-3">
                 Hi Line
               </h1>
-              <h2 className="hero-text text-2xl sm:text-3xl font-semibold text-[#B57EDC] mb-2">
+              <h2 className="hero-text text-3xl sm:text-4xl font-semibold text-[#B57EDC] mb-6">
                 Pro Care
               </h2>
-              <p className="hero-text text-lg sm:text-xl font-semibold text-[#7F4CA5] mb-6">
-                Roll On
-              </p>
               <h3 className="sr-only">
                 {storeName}
               </h3>
@@ -241,8 +238,8 @@ export default function Home() {
               </p>
               <p className="hero-text text-base sm:text-lg text-[#6F6178] leading-relaxed mb-8">
                 {lang === "ar"
-                  ? "منتجات Hi Line Roll On بسعر 285 جنيه بدل 570 جنيه."
-                  : "Hi Line Roll On products for LE 285.00 instead of LE 570.00."}
+                  ? "اختاري منتجات Hi Line Pro Care للعناية اليومية بروائح مميزة، ملمس لطيف، وانتعاش يدوم طوال اليوم."
+                  : "Discover Hi Line Pro Care daily essentials with elegant scents, gentle formulas, and freshness that lasts."}
               </p>
               <div
                 className={`hero-text flex flex-col sm:flex-row gap-4 ${
@@ -310,10 +307,10 @@ export default function Home() {
               {lang === "ar" ? "مجموعتنا" : "OUR COLLECTION"}
             </p>
             <h2 className="mb-2 text-2xl font-semibold text-[#7F4CA5] sm:text-3xl">
-              Roll On
+              {lang === "ar" ? "مجموعة العناية اليومية" : "Daily Care Collection"}
             </h2>
             <p className="mx-auto max-w-md text-[#6F6178]">
-              {lang === "ar" ? "كل منتجات الرول أون تحت قسم واحد" : "All roll-on products under one section"}
+              {lang === "ar" ? "منتجات مختارة بعناية لتجربة انتعاش يومية أنيقة" : "A curated care collection for a fresh, elegant daily routine"}
             </p>
           </div>
 
@@ -358,7 +355,7 @@ export default function Home() {
                       {lang === "ar" ? variant.nameAr : variant.name}
                     </span>
                     <h3 className="min-h-[3.4rem] text-sm font-semibold leading-snug text-[#241A2E]">
-                      <span className="block">Hi Line roll on whiting deodorant</span>
+                      <span className="block">Hi Line Pro Care</span>
                       <span className="block">{variant.name}</span>
                     </h3>
                     <p className="hidden">

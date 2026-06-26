@@ -18,6 +18,12 @@ import {
   Activity,
   PackageSearch,
   BarChart3,
+  CreditCard,
+  Bell,
+  Image,
+  SearchCode,
+  Users,
+  Database,
 } from "lucide-react";
 
 const adminNav = [
@@ -31,6 +37,12 @@ const adminNav = [
   { label: "Inventory",    labelAr: "حركة المخزون", href: "/admin/inventory-movements", icon: PackageSearch },
   { label: "Analytics",    labelAr: "تحليل البيانات", href: "/admin/analytics", icon: BarChart3 },
   { label: "Activity Log", labelAr: "سجل النشاط", href: "/admin/activity-logs", icon: Activity },
+  { label: "Fulfillment",  labelAr: "التشغيل", href: "/admin/fulfillment", icon: CreditCard },
+  { label: "Notifications", labelAr: "الإشعارات", href: "/admin/notifications", icon: Bell },
+  { label: "Media Library", labelAr: "مكتبة الوسائط", href: "/admin/media-library", icon: Image },
+  { label: "SEO Tools", labelAr: "أدوات SEO", href: "/admin/seo", icon: SearchCode },
+  { label: "Admin Users", labelAr: "صلاحيات الفريق", href: "/admin/admin-users", icon: Users },
+  { label: "Export/Backup", labelAr: "تصدير ونسخ", href: "/admin/export-backup", icon: Database },
   { label: "Settings",     labelAr: "الإعدادات",    href: "/admin/settings",     icon: Settings },
 ];
 
@@ -69,18 +81,18 @@ export default function AdminLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 ${isRTL ? "right-0" : "left-0"} z-40 h-full w-64 bg-[#4B1C71] text-white transition-transform duration-300 ${
+        className={`fixed top-0 ${isRTL ? "right-0" : "left-0"} z-40 flex h-full w-64 flex-col bg-[#4B1C71] text-white transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : isRTL ? "translate-x-full lg:translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        <div className="p-6 border-b border-white/10">
+        <div className="shrink-0 p-6 border-b border-white/10">
           <h2 className="text-xl font-bold text-[#B57EDC]">Hi Line Admin</h2>
           <p className="text-xs text-white/50 mt-1">
             {lang === "ar" ? "لوحة تحكم المتجر" : "Store Dashboard"}
           </p>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
           {adminNav.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -101,7 +113,7 @@ export default function AdminLayout() {
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
+        <div className="shrink-0 p-4 border-t border-white/10 bg-[#4B1C71]">
           <div className="flex items-center gap-3 mb-3 px-4">
             <div className="w-8 h-8 rounded-full bg-[#B57EDC] flex items-center justify-center text-[#4B1C71] font-bold text-sm">
               {user.name?.[0]?.toUpperCase() || "A"}

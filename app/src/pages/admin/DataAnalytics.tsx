@@ -98,7 +98,8 @@ type FunnelAnalytics = {
 };
 
 function num(value: string | number | null | undefined) {
-  return Number(value ?? 0) || 0;
+  const parsed = typeof value === "number" ? value : Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function money(value: string | number | null | undefined, ar: boolean) {
@@ -137,7 +138,9 @@ function StatCard({
 }
 
 function MiniBar({ value, max }: { value: number; max: number }) {
-  const width = max > 0 ? Math.max(4, Math.min(100, (value / max) * 100)) : 0;
+  const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+  const safeMax = Number.isFinite(max) && max > 0 ? max : 0;
+  const width = safeMax > 0 ? Math.max(4, Math.min(100, (safeValue / safeMax) * 100)) : 0;
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-[#F3E8FF]">
       <div className="h-full rounded-full bg-[#7C3AED]" style={{ width: `${width}%` }} />
@@ -269,7 +272,7 @@ export default function DataAnalytics() {
               { label: ar ? "تحويلات" : "Conversions", value: funnel.conversions },
               { label: ar ? "طلبات الحملات" : "Campaign Orders", value: funnel.campaignOrders },
               { label: ar ? "طلبات المتجر" : "Store Orders", value: funnel.storeOrders },
-           ].map((step, _unusedIndex, arr) => (
+            ].map((step, _index, arr) => (
               <div key={step.label}>
                 <div className="mb-1 flex justify-between text-sm">
                   <span className="text-[#6F6178]">{step.label}</span>
