@@ -24,15 +24,9 @@ export const authRouter = createRouter({
         throw new Error("Local admin login is not configured.");
       }
 
-      const allowedPasswords = new Set([
-        env.localAdminPassword,
-        "123456",
-        "HiLine@2026",
-      ]);
-
       if (
         input.username.trim() !== env.localAdminUsername ||
-        !allowedPasswords.has(input.password.trim())
+        input.password !== env.localAdminPassword
       ) {
         throw new Error("Invalid username or password.");
       }
@@ -176,9 +170,11 @@ export const authRouter = createRouter({
         expiresAt,
       });
       
-      // In a real app, send an email here with the token
-      // For now, we'll log it and the user can see it in server logs
-      console.log(`[PASSWORD RESET] Link: /reset-password?token=${token}`);
+      // TODO: send this token through an email provider.
+      // Never print password reset links in production logs.
+      if (!env.isProduction) {
+        console.log(`[PASSWORD RESET] Link: /reset-password?token=${token}`);
+      }
       
       return { success: true, message: "If an account with that email exists, a reset link has been sent." };
     }),

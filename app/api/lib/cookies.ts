@@ -11,7 +11,10 @@ export function getSessionCookieOptions(headers: Headers): CookieOptions {
   return {
     httpOnly: true,
     path: "/",
-    sameSite: localhost ? "Lax" : "None",
+    // Keep session cookies protected from cross-site form/script requests.
+    // If the API is intentionally hosted on a different domain from the frontend,
+    // add CSRF protection before changing this back to SameSite=None.
+    sameSite: "Lax",
     secure: !localhost,
   };
 }

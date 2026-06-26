@@ -13,6 +13,14 @@ function optionalNonEmpty(name: string): string | undefined {
   return value ? value : undefined;
 }
 
+function requiredJwtSecret(): string {
+  const value = optionalNonEmpty("JWT_SECRET") ?? optionalNonEmpty("APP_SECRET");
+  if (!value && process.env.NODE_ENV === "production") {
+    throw new Error("Missing required environment variable: JWT_SECRET");
+  }
+  return value ?? "local-dev-secret-change-in-production";
+}
+
 function databaseUrl(): string {
   const value = required("DATABASE_URL").trim();
   if (!value || value.startsWith("#") || !value.includes("://")) {
@@ -25,10 +33,7 @@ function databaseUrl(): string {
 
 export const env = {
   // Primary JWT secret (new, preferred)
-  jwtSecret:
-    optionalNonEmpty("JWT_SECRET") ??
-    optionalNonEmpty("APP_SECRET") ??
-    "local-dev-secret-change-in-production",
+  jwtSecret: requiredJwtSecret(),
 
   // Legacy compat — used in kimi/session.ts via appSecret fallback
   appId: process.env.APP_ID ?? "",
@@ -50,5 +55,5 @@ export const env = {
     (process.env.NODE_ENV === "production" ? "" : "admin"),
   localAdminPassword:
     process.env.LOCAL_ADMIN_PASSWORD ??
-    (process.env.NODE_ENV === "production" ? "" : "123456"),
+    (process.env.NODE_ENV === "production" ? "" : "admin-dev-password"),
 };

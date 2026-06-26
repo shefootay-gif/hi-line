@@ -212,180 +212,188 @@ export const storeRouter = createRouter({
   createOrder: publicQuery
     .input(
       z.object({
-        customerName: z.string().min(1),
-        customerPhone: z.string().min(1),
-        customerWhatsapp: z.string().optional(),
+        customerName: z.string().trim().min(1).max(255),
+        customerPhone: z.string().trim().min(1).max(50),
+        customerWhatsapp: z.string().trim().max(50).optional(),
         customerEmail: z.string().email().optional(),
-        shippingAddress: z.string().min(1),
-        governorate: z.string().optional(),
-        city: z.string().optional(),
-        postalCode: z.string().optional(),
+        shippingAddress: z.string().trim().min(1).max(2000),
+        governorate: z.string().trim().max(100).optional(),
+        city: z.string().trim().max(100).optional(),
+        postalCode: z.string().trim().max(20).optional(),
         paymentMethod: z.enum([
           "cash_on_delivery",
           "vodafone_cash",
           "instapay",
           "bank_transfer",
         ]),
-        notes: z.string().optional(),
+        notes: z.string().max(2000).optional(),
         source: z.enum(["website", "whatsapp"]).default("website"),
         items: z.array(
           z.object({
-            productId: z.number(),
-            quantity: z.number().min(1),
+            productId: z.number().int().positive(),
+            quantity: z.number().int().min(1).max(99),
           })
-        ),
-        couponCode: z.string().optional(),
+        ).min(1),
+        couponCode: z.string().trim().max(50).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      const { nanoid } = await import("nanoid");
+      const orderNumber = `HL${Date.now().toString(36).toUpperCase()}${nanoid(4).toUpperCase()}`;
 
-      // Get product details for each item
-      const productIds = input.items.map((item) => item.productId);
-      const productDetails = await db
-        .select()
-        .from(products)
-        .where(inArray(products.id, productIds));
+      const getAffectedRows = (result: unknown) => {
+        const packet = Array.isArray(result) ? result[0] : result;
+        return Number((packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+      };
 
-      // Validate stock availability
-      for (const item of input.items) {
-        const product = productDetails.find((p) => p.id === item.productId);
-        if (!product) throw new Error(`Product ${item.productId} not found`);
-        if (product.stock < item.quantity) {
-          throw new Error(
-            `Insufficient stock for "${product.nameEn}". Available: ${product.stock}, Requested: ${item.quantity}`
-          );
-        }
-      }
-
-      // Calculate totals
-      let subtotal = 0;
-      const orderItemsData = input.items.map((item) => {
-        const product = productDetails.find((p) => p.id === item.productId)!;
-        const unitPrice = parseFloat(product.price);
-        const totalPrice = unitPrice * item.quantity;
-        subtotal += totalPrice;
-
-        return {
-          productId: item.productId,
-          productName: product.nameEn,
-          productNameAr: product.nameAr,
-          scent: product.scent,
-          quantity: item.quantity,
-          unitPrice: product.price,
-          totalPrice: totalPrice.toFixed(2),
-        };
-      });
-
-      // Get shipping fee
-      let shippingFee = 0;
-      if (input.governorate) {
-        const shipping = await db
+      const result = await db.transaction(async (tx) => {
+        // Fetch products and calculate all financial values server-side.
+        const productIds = input.items.map((item) => item.productId);
+        const productDetails = await tx
           .select()
-          .from(shippingSettings)
-          .where(eq(shippingSettings.governorate, input.governorate))
-          .limit(1);
-        if (shipping[0]) {
-          shippingFee = parseFloat(shipping[0].baseFee ?? "0");
+          .from(products)
+          .where(inArray(products.id, productIds));
+
+        if (productDetails.length !== new Set(productIds).size) {
+          throw new Error("One or more products were not found");
         }
-      }
 
-      // Check free shipping threshold
-      const freeShippingSetting = await db
-        .select()
-        .from(storeSettings)
-        .where(eq(storeSettings.key, "free_shipping_threshold"))
-        .limit(1);
-      if (freeShippingSetting[0]) {
-        const threshold = parseFloat(freeShippingSetting[0].value ?? "999999");
-        if (subtotal >= threshold) {
-          shippingFee = 0;
-        }
-      }
-      // Process coupon if provided
-      let discountAmount = 0;
-      let appliedCouponId = null;
+        let subtotal = 0;
+        const orderItemsData = input.items.map((item) => {
+          const product = productDetails.find((p) => p.id === item.productId);
+          if (!product) throw new Error(`Product ${item.productId} not found`);
+          if (!product.isActive) throw new Error(`Product ${product.nameEn} is not available`);
+          if (product.stock < item.quantity) {
+            throw new Error(
+              `Insufficient stock for "${product.nameEn}". Available: ${product.stock}, Requested: ${item.quantity}`
+            );
+          }
 
-      if (input.couponCode) {
-        const [coupon] = await db
-          .select()
-          .from(coupons)
-          .where(eq(coupons.code, input.couponCode))
-          .limit(1);
+          const unitPrice = parseFloat(product.salePrice ?? product.price);
+          const totalPrice = unitPrice * item.quantity;
+          subtotal += totalPrice;
 
-        if (coupon) {
-          const isValid =
-            coupon.isActive &&
-            (!coupon.expiresAt || new Date(coupon.expiresAt) > new Date()) &&
-            (coupon.maxUsage === null || coupon.currentUsage! < coupon.maxUsage) &&
-            subtotal >= parseFloat(coupon.minOrderValue ?? "0");
+          return {
+            productId: item.productId,
+            productName: product.nameEn,
+            productNameAr: product.nameAr,
+            scent: product.scent,
+            quantity: item.quantity,
+            unitPrice: unitPrice.toFixed(2),
+            totalPrice: totalPrice.toFixed(2),
+          };
+        });
 
-          if (isValid) {
-            const val = parseFloat(coupon.discountValue);
-            if (coupon.discountType === "percentage") {
-              discountAmount = (subtotal * val) / 100;
-            } else {
-              discountAmount = val;
-            }
-            appliedCouponId = coupon.id;
+        // Shipping is calculated server-side from the selected governorate.
+        let shippingFee = 0;
+        if (input.governorate) {
+          const shipping = await tx
+            .select()
+            .from(shippingSettings)
+            .where(and(eq(shippingSettings.governorate, input.governorate), eq(shippingSettings.isActive, true)))
+            .limit(1);
+          if (shipping[0]) {
+            shippingFee = parseFloat(shipping[0].baseFee ?? "0");
           }
         }
-      }
 
-      // Ensure discount doesn't exceed subtotal
-      if (discountAmount > subtotal) discountAmount = subtotal;
+        const freeShippingSetting = await tx
+          .select()
+          .from(storeSettings)
+          .where(eq(storeSettings.key, "free_shipping_threshold"))
+          .limit(1);
+        if (freeShippingSetting[0]) {
+          const threshold = parseFloat(freeShippingSetting[0].value ?? "999999");
+          if (subtotal >= threshold) shippingFee = 0;
+        }
 
-      const total = subtotal - discountAmount + shippingFee;
-      // Generate order number
-      const orderNumber = `HL${Date.now().toString(36).toUpperCase()}`;
+        let discountAmount = 0;
+        let appliedCouponId: number | null = null;
+        const normalizedCouponCode = input.couponCode?.trim().toUpperCase();
 
-      // Create order
-      const orderResult = await db.insert(orders).values({
-        orderNumber,
-        customerName: input.customerName,
-        customerPhone: input.customerPhone,
-        customerWhatsapp: input.customerWhatsapp,
-        customerEmail: input.customerEmail,
-        shippingAddress: input.shippingAddress,
-        governorate: input.governorate,
-        city: input.city,
-        postalCode: input.postalCode,
-        subtotal: subtotal.toFixed(2),
-        shippingFee: shippingFee.toFixed(2),
-        discountAmount: discountAmount.toFixed(2),
-        couponCode: input.couponCode || null,
-        total: total.toFixed(2),
-        paymentMethod: input.paymentMethod,
-        notes: input.notes,
-        source: input.source,
+        if (normalizedCouponCode) {
+          const [coupon] = await tx
+            .select()
+            .from(coupons)
+            .where(eq(coupons.code, normalizedCouponCode))
+            .limit(1);
+
+          if (coupon) {
+            const isValid =
+              coupon.isActive &&
+              (!coupon.expiresAt || new Date(coupon.expiresAt) > new Date()) &&
+              (coupon.maxUsage === null || (coupon.currentUsage ?? 0) < coupon.maxUsage) &&
+              subtotal >= parseFloat(coupon.minOrderValue ?? "0");
+
+            if (isValid) {
+              const val = parseFloat(coupon.discountValue);
+              discountAmount = coupon.discountType === "percentage" ? (subtotal * val) / 100 : val;
+              appliedCouponId = coupon.id;
+            }
+          }
+        }
+
+        if (discountAmount > subtotal) discountAmount = subtotal;
+        const total = subtotal - discountAmount + shippingFee;
+
+        const orderResult = await tx.insert(orders).values({
+          orderNumber,
+          customerName: input.customerName,
+          customerPhone: input.customerPhone,
+          customerWhatsapp: input.customerWhatsapp,
+          customerEmail: input.customerEmail,
+          shippingAddress: input.shippingAddress,
+          governorate: input.governorate,
+          city: input.city,
+          postalCode: input.postalCode,
+          subtotal: subtotal.toFixed(2),
+          shippingFee: shippingFee.toFixed(2),
+          discountAmount: discountAmount.toFixed(2),
+          couponCode: normalizedCouponCode || null,
+          total: total.toFixed(2),
+          paymentMethod: input.paymentMethod,
+          notes: input.notes,
+          source: input.source,
+          userId: ctx.user?.id || null,
+        });
+
+        const orderId = Number(orderResult[0].insertId);
+
+        // Atomic stock deduction: prevents stock from going below zero in concurrent orders.
+        for (const item of input.items) {
+          const stockUpdate = await tx
+            .update(products)
+            .set({ stock: sql`${products.stock} - ${item.quantity}` })
+            .where(and(eq(products.id, item.productId), sql`${products.stock} >= ${item.quantity}`));
+
+          if (getAffectedRows(stockUpdate) !== 1) {
+            throw new Error("Insufficient stock. Please refresh your cart and try again.");
+          }
+        }
+
+        await tx.insert(orderItems).values(
+          orderItemsData.map((item) => ({ orderId, ...item }))
+        );
+
+        if (appliedCouponId) {
+          const couponUpdate = await tx
+            .update(coupons)
+            .set({ currentUsage: sql`${coupons.currentUsage} + 1` })
+            .where(and(
+              eq(coupons.id, appliedCouponId),
+              or(sql`${coupons.maxUsage} IS NULL`, sql`${coupons.currentUsage} < ${coupons.maxUsage}`)
+            ));
+
+          if (getAffectedRows(couponUpdate) !== 1) {
+            throw new Error("Coupon usage limit reached. Please remove the coupon and try again.");
+          }
+        }
+
+        return { orderId, orderNumber, total: total.toFixed(2), discountAmount: discountAmount.toFixed(2) };
       });
 
-      const orderId = Number(orderResult[0].insertId);
-
-      // Create order items (batch insert)
-      await db.insert(orderItems).values(
-        orderItemsData.map((item) => ({ orderId, ...item }))
-      );
-
-      // Update product stock
-      for (const item of input.items) {
-        await db
-          .update(products)
-          .set({
-            stock: sql`${products.stock} - ${item.quantity}`,
-          })
-          .where(eq(products.id, item.productId));
-      }
-
-      // Update coupon usage
-      if (appliedCouponId) {
-        await db
-          .update(coupons)
-          .set({ currentUsage: sql`${coupons.currentUsage} + 1` })
-          .where(eq(coupons.id, appliedCouponId));
-      }
-
-      return { orderId, orderNumber, total: total.toFixed(2), discountAmount: discountAmount.toFixed(2) };
+      return result;
     }),
 
   validateCoupon: publicQuery
@@ -433,7 +441,10 @@ export const storeRouter = createRouter({
     }),
 
   getOrderByNumber: publicQuery
-    .input(z.object({ orderNumber: z.string() }))
+    .input(z.object({
+      orderNumber: z.string().trim().min(1),
+      customerPhone: z.string().trim().min(1),
+    }))
     .query(async ({ input }) => {
       const db = getDb();
       const orderResult = await db
@@ -445,6 +456,10 @@ export const storeRouter = createRouter({
       if (orderResult.length === 0) return null;
 
       const order = orderResult[0];
+      if (order.customerPhone.trim() !== input.customerPhone.trim()) {
+        return null;
+      }
+
       const items = await db
         .select()
         .from(orderItems)
@@ -454,50 +469,62 @@ export const storeRouter = createRouter({
     }),
 
   cancelOrder: publicQuery
-    .input(z.object({ orderNumber: z.string() }))
+    .input(z.object({
+      orderNumber: z.string().trim().min(1),
+      customerPhone: z.string().trim().min(1),
+    }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      const orderResult = await db
-        .select()
-        .from(orders)
-        .where(eq(orders.orderNumber, input.orderNumber))
-        .limit(1);
+      const getAffectedRows = (result: unknown) => {
+        const packet = Array.isArray(result) ? result[0] : result;
+        return Number((packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+      };
 
-      if (orderResult.length === 0) {
-        throw new Error("Order not found");
-      }
+      await db.transaction(async (tx) => {
+        const orderResult = await tx
+          .select()
+          .from(orders)
+          .where(eq(orders.orderNumber, input.orderNumber))
+          .limit(1);
 
-      const order = orderResult[0];
+        if (orderResult.length === 0) {
+          throw new Error("Order not found");
+        }
 
-      if (
-        order.orderStatus === "shipped" ||
-        order.orderStatus === "delivered" ||
-        order.orderStatus === "refunded" ||
-        order.orderStatus === "cancelled"
-      ) {
-        throw new Error("Cannot cancel order at this stage");
-      }
+        const order = orderResult[0];
 
-      const items = await db
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, order.id));
+        if (order.customerPhone.trim() !== input.customerPhone.trim()) {
+          throw new Error("Order phone number does not match");
+        }
 
-      // Restore stock
-      for (const item of items) {
-        await db
-          .update(products)
-          .set({
-            stock: sql`${products.stock} + ${item.quantity}`,
-          })
-          .where(eq(products.id, item.productId));
-      }
+        const statusUpdate = await tx
+          .update(orders)
+          .set({ orderStatus: "cancelled" })
+          .where(and(eq(orders.id, order.id), inArray(orders.orderStatus, ["pending", "processing"])));
 
-      // Update status to cancelled
-      await db
-        .update(orders)
-        .set({ orderStatus: "cancelled" })
-        .where(eq(orders.id, order.id));
+        if (getAffectedRows(statusUpdate) !== 1) {
+          throw new Error("Cannot cancel order at this stage");
+        }
+
+        const items = await tx
+          .select()
+          .from(orderItems)
+          .where(eq(orderItems.orderId, order.id));
+
+        for (const item of items) {
+          await tx
+            .update(products)
+            .set({ stock: sql`${products.stock} + ${item.quantity}` })
+            .where(eq(products.id, item.productId));
+        }
+
+        if (order.couponCode) {
+          await tx
+            .update(coupons)
+            .set({ currentUsage: sql`GREATEST(${coupons.currentUsage} - 1, 0)` })
+            .where(eq(coupons.code, order.couponCode));
+        }
+      });
 
       return { success: true };
     }),
@@ -511,10 +538,8 @@ export const storeRouter = createRouter({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      // Extract numeric ID from unionId like "local:12"
-      const userIdStr = ctx.user.unionId.split(":")[1];
-      if (!userIdStr) throw new Error("Invalid user session for review");
-      const userId = parseInt(userIdStr, 10);
+      const userId = ctx.user.id;
+      if (!userId) throw new Error("Invalid user session for review");
       
       await db.insert(reviews).values({
         productId: input.productId,
@@ -539,9 +564,8 @@ export const storeRouter = createRouter({
     .input(z.object({ productId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const userIdStr = ctx.user.unionId.split(":")[1];
-      if (!userIdStr) throw new Error("Invalid user session");
-      const userId = parseInt(userIdStr, 10);
+      const userId = ctx.user.id;
+      if (!userId) throw new Error("Invalid user session");
 
       const existing = await db
         .select()
@@ -563,9 +587,8 @@ export const storeRouter = createRouter({
 
   getWishlist: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
-    const userIdStr = ctx.user.unionId.split(":")[1];
-    if (!userIdStr) return [];
-    const userId = parseInt(userIdStr, 10);
+    const userId = ctx.user.id;
+    if (!userId) return [];
 
     const res = await db
       .select({
@@ -601,9 +624,8 @@ export const storeRouter = createRouter({
   // My Orders endpoint
   getMyOrders: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
-    const userIdStr = ctx.user.unionId.split(":")[1];
-    if (!userIdStr) return [];
-    const userId = parseInt(userIdStr, 10);
+    const userId = ctx.user.id;
+    if (!userId) return [];
 
     const myOrders = await db
       .select()
