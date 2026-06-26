@@ -46,6 +46,7 @@ type CatalogProduct = {
   suggestedPrice?: string | null;
   stock?: number | null;
   status?: CatalogStatus | null;
+  approvedProductId?: number | null;
 };
 
 const emptySupplier = {
@@ -115,7 +116,7 @@ export default function Dropshipping() {
     onSuccess: () => {
       utils.admin.listDropshippingSuppliers.invalidate();
       utils.admin.listSupplierCatalog.invalidate();
-      toast.success(ar ? "تم حذف المورد" : "Supplier deleted");
+      toast.success(ar ? "تم تعطيل المورد" : "Supplier deactivated");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -124,8 +125,17 @@ export default function Dropshipping() {
     onSuccess: (data) => {
       utils.admin.listSupplierCatalog.invalidate();
       utils.admin.listDropshippingSuppliers.invalidate();
-      toast.success(ar ? `تم استيراد ${data.importedCount} منتجات` : `${data.importedCount} products imported`);
+      toast.success(ar ? `تم استيراد ${data.importedCount} منتجات وتخطي ${data.skippedCount ?? 0} مكرر` : `${data.importedCount} imported, ${data.skippedCount ?? 0} skipped`);
       setActiveTab("catalog");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const approveCatalogProduct = trpc.admin.approveSupplierCatalogProduct.useMutation({
+    onSuccess: (data) => {
+      utils.admin.listSupplierCatalog.invalidate();
+      utils.admin.listProducts.invalidate();
+      toast.success(data.alreadyApproved ? (ar ? "المنتج معتمد بالفعل" : "Already approved") : (ar ? "تم اعتماد المنتج وإضافته للمتجر" : "Product approved and added to store"));
     },
     onError: (err) => toast.error(err.message),
   });
@@ -296,7 +306,15 @@ export default function Dropshipping() {
                       {importCatalog.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
                       {ar ? "استيراد الكتالوج" : "Import Catalog"}
                     </button>
-                    <button onClick={() => deleteSupplier.mutate({ id: supplier.id })} className="rounded-lg p-2 text-red-500 hover:bg-red-50">
+                    <button
+                      title={ar ? "تعطيل المورد بدل الحذف النهائي" : "Deactivate supplier instead of hard delete"}
+                      onClick={() => {
+                        if (confirm(ar ? "سيتم تعطيل المورد بدل حذفه نهائيًا. هل تريد المتابعة؟" : "The supplier will be deactivated, not permanently deleted. Continue?")) {
+                          deleteSupplier.mutate({ id: supplier.id });
+                        }
+                      }}
+                      className="rounded-lg p-2 text-red-500 hover:bg-red-50"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -328,10 +346,11 @@ export default function Dropshipping() {
                     <th className="px-4 py-3 text-start">{ar ? "السعر المقترح" : "Suggested"}</th>
                     <th className="px-4 py-3 text-start">{ar ? "المخزون" : "Stock"}</th>
                     <th className="px-4 py-3 text-start">{ar ? "الحالة" : "Status"}</th>
+                    <th className="px-4 py-3 text-start">{ar ? "اعتماد" : "Approve"}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {catalogLoading && <tr><td colSpan={6} className="p-6 text-center text-[#6F6178]">{ar ? "جاري التحميل..." : "Loading..."}</td></tr>}
+                  {catalogLoading && <tr><td colSpan={7} className="p-6 text-center text-[#6F6178]">{ar ? "جاري التحميل..." : "Loading..."}</td></tr>}
                   {(catalog as CatalogProduct[]).map((item) => (
                     <tr key={item.id}>
                       <td className="px-4 py-3 font-medium text-[#1A0533]">{item.name}</td>
@@ -339,7 +358,21 @@ export default function Dropshipping() {
                       <td className="px-4 py-3">{item.costPrice}</td>
                       <td className="px-4 py-3">{item.suggestedPrice ?? "-"}</td>
                       <td className="px-4 py-3">{item.stock ?? 0}</td>
-                      <td className="px-4 py-3">{item.status ?? "available"}</td>
+                      <td className="px-4 py-3">{item.approvedProductId ? (ar ? "معتمد" : "Approved") : item.status ?? "available"}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => approveCatalogProduct.mutate({
+                            id: item.id,
+                            price: item.suggestedPrice ?? item.costPrice,
+                            stock: item.stock ?? 0,
+                            isActive: true,
+                          })}
+                          disabled={approveCatalogProduct.isPending || Boolean(item.approvedProductId)}
+                          className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white disabled:bg-gray-300"
+                        >
+                          {item.approvedProductId ? (ar ? "تم" : "Done") : approveCatalogProduct.isPending ? (ar ? "جاري..." : "Saving...") : (ar ? "إضافة للمتجر" : "Add to store")}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

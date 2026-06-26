@@ -15,6 +15,9 @@ import {
   Zap,
   TrendingUp,
   Tag,
+  Activity,
+  PackageSearch,
+  BarChart3,
 } from "lucide-react";
 
 const adminNav = [
@@ -25,6 +28,9 @@ const adminNav = [
   { label: "Coupons",      labelAr: "الكوبونات",    href: "/admin/coupons",      icon: Tag },
   { label: "Media Buyer",  labelAr: "ميديا باير",   href: "/admin/media-buyer",  icon: Zap },
   { label: "Dropshipping", labelAr: "دروب شوبينج",  href: "/admin/dropshipping", icon: TrendingUp },
+  { label: "Inventory",    labelAr: "حركة المخزون", href: "/admin/inventory-movements", icon: PackageSearch },
+  { label: "Analytics",    labelAr: "تحليل البيانات", href: "/admin/analytics", icon: BarChart3 },
+  { label: "Activity Log", labelAr: "سجل النشاط", href: "/admin/activity-logs", icon: Activity },
   { label: "Settings",     labelAr: "الإعدادات",    href: "/admin/settings",     icon: Settings },
 ];
 

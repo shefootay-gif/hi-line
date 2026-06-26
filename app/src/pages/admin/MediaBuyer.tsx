@@ -34,6 +34,11 @@ type Campaign = {
   impressions?: number | null;
   clicks?: number | null;
   conversions?: number | null;
+  ordersCount?: number | null;
+  revenue?: string | null;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
   linkUrl?: string | null;
   notes?: string | null;
 };
@@ -48,6 +53,11 @@ const emptyCampaign = {
   impressions: 0,
   clicks: 0,
   conversions: 0,
+  ordersCount: 0,
+  revenue: "0",
+  utmSource: "",
+  utmMedium: "",
+  utmCampaign: "",
   linkUrl: "",
   notes: "",
 };
@@ -144,7 +154,7 @@ export default function MediaBuyer() {
   const totalImpressions = rows.reduce((sum, campaign) => sum + numberValue(campaign.impressions), 0);
   const totalClicks = rows.reduce((sum, campaign) => sum + numberValue(campaign.clicks), 0);
   const totalConversions = rows.reduce((sum, campaign) => sum + numberValue(campaign.conversions), 0);
-  const totalRevenue = rows.reduce((sum, campaign) => sum + numberValue(campaign.conversions) * 250, 0);
+  const totalRevenue = rows.reduce((sum, campaign) => sum + numberValue(campaign.revenue), 0);
   const avgRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
   const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
 
@@ -167,6 +177,11 @@ export default function MediaBuyer() {
       impressions: campaign.impressions ?? 0,
       clicks: campaign.clicks ?? 0,
       conversions: campaign.conversions ?? 0,
+      ordersCount: campaign.ordersCount ?? 0,
+      revenue: campaign.revenue ?? "0",
+      utmSource: campaign.utmSource ?? "",
+      utmMedium: campaign.utmMedium ?? "",
+      utmCampaign: campaign.utmCampaign ?? "",
       linkUrl: campaign.linkUrl ?? "",
       notes: campaign.notes ?? "",
     });
@@ -176,6 +191,14 @@ export default function MediaBuyer() {
   const saveCampaign = () => {
     if (!editing.name.trim()) {
       toast.error(ar ? "اكتب اسم الحملة" : "Campaign name is required");
+      return;
+    }
+    if (editing.clicks > editing.impressions || editing.conversions > editing.clicks || editing.ordersCount > editing.conversions) {
+      toast.error(ar ? "تأكد من منطق الأرقام: النقرات ≤ الظهور، التحويلات ≤ النقرات، الطلبات ≤ التحويلات" : "Check metrics: clicks ≤ impressions, conversions ≤ clicks, orders ≤ conversions");
+      return;
+    }
+    if (numberValue(editing.budget) > 0 && numberValue(editing.spend) > numberValue(editing.budget)) {
+      toast.error(ar ? "الإنفاق لا يجب أن يتجاوز الميزانية" : "Spend cannot exceed budget");
       return;
     }
 
@@ -188,6 +211,11 @@ export default function MediaBuyer() {
       impressions: Number(editing.impressions) || 0,
       clicks: Number(editing.clicks) || 0,
       conversions: Number(editing.conversions) || 0,
+      ordersCount: Number(editing.ordersCount) || 0,
+      revenue: editing.revenue.trim() || "0",
+      utmSource: editing.utmSource.trim(),
+      utmMedium: editing.utmMedium.trim(),
+      utmCampaign: editing.utmCampaign.trim(),
       linkUrl: editing.linkUrl.trim(),
       notes: editing.notes.trim(),
     };
@@ -219,11 +247,12 @@ export default function MediaBuyer() {
         </button>
       </div>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-6">
         <StatCard icon={DollarSign} label={ar ? "إجمالي الإنفاق" : "Total Spend"} value={`${totalSpend.toLocaleString()} ${ar ? "ج" : "EGP"}`} color="#7C3AED" />
         <StatCard icon={Eye} label={ar ? "الظهورات" : "Impressions"} value={totalImpressions.toLocaleString()} color="#0EA5E9" />
         <StatCard icon={MousePointer} label={ar ? "النقرات" : "Clicks"} value={totalClicks.toLocaleString()} color="#059669" sub={`CTR ${ctr.toFixed(1)}%`} />
         <StatCard icon={Target} label={ar ? "التحويلات" : "Conversions"} value={totalConversions.toLocaleString()} color="#D97706" />
+        <StatCard icon={DollarSign} label={ar ? "الإيراد" : "Revenue"} value={`${totalRevenue.toLocaleString()} ${ar ? "ج" : "EGP"}`} color="#059669" />
         <StatCard icon={TrendingUp} label="ROAS" value={`${avgRoas.toFixed(1)}x`} color="#EC4899" />
       </div>
 
@@ -256,17 +285,20 @@ export default function MediaBuyer() {
                 <th className="px-4 py-3 text-start font-medium">{ar ? "الظهورات" : "Impressions"}</th>
                 <th className="px-4 py-3 text-start font-medium">{ar ? "النقرات" : "Clicks"}</th>
                 <th className="px-4 py-3 text-start font-medium">CTR</th>
+                <th className="px-4 py-3 text-start font-medium">{ar ? "الإيراد" : "Revenue"}</th>
+                <th className="px-4 py-3 text-start font-medium">ROAS</th>
                 <th className="px-4 py-3 text-start font-medium">{ar ? "إجراءات" : "Actions"}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F0EAF8]">
-              {isLoading && <tr><td colSpan={8} className="p-8 text-center text-sm text-[#6F6178]">{ar ? "جاري التحميل..." : "Loading..."}</td></tr>}
+              {isLoading && <tr><td colSpan={10} className="p-8 text-center text-sm text-[#6F6178]">{ar ? "جاري التحميل..." : "Loading..."}</td></tr>}
               {filtered.map((campaign) => {
                 const platform = campaign.platform ?? "facebook";
                 const platformColor = platformColors[platform];
                 const status = statusConfig[campaign.status ?? "draft"];
                 const campaignCtr = numberValue(campaign.impressions) > 0 ? (numberValue(campaign.clicks) / numberValue(campaign.impressions)) * 100 : 0;
                 const spendPct = numberValue(campaign.budget) > 0 ? Math.min(100, Math.round((numberValue(campaign.spend) / numberValue(campaign.budget)) * 100)) : 0;
+                const campaignRoas = numberValue(campaign.spend) > 0 ? numberValue(campaign.revenue) / numberValue(campaign.spend) : 0;
                 return (
                   <tr key={campaign.id} className="transition-colors hover:bg-[#FAFAFA]">
                     <td className="px-6 py-4">
@@ -298,6 +330,8 @@ export default function MediaBuyer() {
                     <td className="px-4 py-4 text-sm text-[#1A0533]">{numberValue(campaign.impressions).toLocaleString()}</td>
                     <td className="px-4 py-4 text-sm text-[#1A0533]">{numberValue(campaign.clicks).toLocaleString()}</td>
                     <td className="px-4 py-4 text-sm font-medium text-[#1A0533]">{campaignCtr.toFixed(1)}%</td>
+                    <td className="px-4 py-4 text-sm text-[#1A0533]">{numberValue(campaign.revenue).toLocaleString()}</td>
+                    <td className="px-4 py-4 text-sm font-bold text-[#1A0533]">{campaignRoas.toFixed(1)}x</td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         <button
@@ -358,6 +392,11 @@ export default function MediaBuyer() {
                 ["impressions", ar ? "الظهورات" : "Impressions"],
                 ["clicks", ar ? "النقرات" : "Clicks"],
                 ["conversions", ar ? "التحويلات" : "Conversions"],
+                ["ordersCount", ar ? "الطلبات" : "Orders"],
+                ["revenue", ar ? "الإيراد" : "Revenue"],
+                ["utmSource", "UTM Source"],
+                ["utmMedium", "UTM Medium"],
+                ["utmCampaign", "UTM Campaign"],
                 ["linkUrl", ar ? "رابط الحملة" : "Campaign link"],
               ].map(([key, label]) => (
                 <label key={key} className="text-sm font-medium text-[#1A0533]">
@@ -365,7 +404,7 @@ export default function MediaBuyer() {
                   <input
                     value={String(editing[key as keyof CampaignForm])}
                     onChange={(event) => {
-                      const numericKeys = ["impressions", "clicks", "conversions"];
+                      const numericKeys = ["impressions", "clicks", "conversions", "ordersCount"];
                       setEditing({ ...editing, [key]: numericKeys.includes(key) ? Number(event.target.value) || 0 : event.target.value });
                     }}
                     className="mt-1 w-full rounded-xl border border-[#EDE5F7] px-3 py-2 text-sm outline-none focus:border-[#7C3AED]"

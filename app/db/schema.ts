@@ -377,6 +377,8 @@ export const dropshippingSupplierProducts = mysqlTable("dropshipping_supplier_pr
   imageUrl: text("image_url"),
   sourceUrl: text("source_url"),
   status: mysqlEnum("status", ["available", "out_of_stock", "draft"]).default("available"),
+  approvedProductId: bigint("approved_product_id", { mode: "number", unsigned: true }),
+  approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -410,6 +412,11 @@ export const mediaBuyerCampaigns = mysqlTable("media_buyer_campaigns", {
   impressions: int("impressions").default(0),
   clicks: int("clicks").default(0),
   conversions: int("conversions").default(0),
+  ordersCount: int("orders_count").default(0),
+  revenue: decimal("revenue", { precision: 12, scale: 2 }).default("0"),
+  utmSource: varchar("utm_source", { length: 100 }),
+  utmMedium: varchar("utm_medium", { length: 100 }),
+  utmCampaign: varchar("utm_campaign", { length: 150 }),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   linkUrl: text("link_url"),
@@ -422,3 +429,34 @@ export const mediaBuyerCampaigns = mysqlTable("media_buyer_campaigns", {
 });
 
 export type MediaBuyerCampaign = typeof mediaBuyerCampaigns.$inferSelect;
+
+// Inventory movement audit table
+export const inventoryMovements = mysqlTable("inventory_movements", {
+  id: serial("id").primaryKey(),
+  productId: bigint("product_id", { mode: "number", unsigned: true }).notNull(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }),
+  supplierProductId: bigint("supplier_product_id", { mode: "number", unsigned: true }),
+  type: mysqlEnum("type", ["sale", "restock", "adjustment", "return", "import", "cancel"]).notNull(),
+  quantity: int("quantity").notNull(),
+  previousStock: int("previous_stock"),
+  newStock: int("new_stock"),
+  reason: varchar("reason", { length: 255 }),
+  reference: varchar("reference", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type InventoryMovement = typeof inventoryMovements.$inferSelect;
+
+// Admin activity log table
+export const adminActivityLogs = mysqlTable("admin_activity_logs", {
+  id: serial("id").primaryKey(),
+  adminUserId: bigint("admin_user_id", { mode: "number", unsigned: true }),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 100 }).notNull(),
+  entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  details: json("details").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AdminActivityLog = typeof adminActivityLogs.$inferSelect;
+

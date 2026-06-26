@@ -26,6 +26,9 @@ import AdminSettings from "./pages/admin/Settings";
 import AdminCoupons from "./pages/admin/Coupons";
 import MediaBuyer from "./pages/admin/MediaBuyer";
 import Dropshipping from "./pages/admin/Dropshipping";
+import ActivityLogs from "./pages/admin/ActivityLogs";
+import InventoryMovements from "./pages/admin/InventoryMovements";
+import DataAnalytics from "./pages/admin/DataAnalytics";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -66,6 +69,9 @@ export default function App() {
             <Route path="/admin/coupons" element={<AdminCoupons />} />
             <Route path="/admin/media-buyer" element={<MediaBuyer />} />
             <Route path="/admin/dropshipping" element={<Dropshipping />} />
+            <Route path="/admin/inventory-movements" element={<InventoryMovements />} />
+            <Route path="/admin/analytics" element={<DataAnalytics />} />
+            <Route path="/admin/activity-logs" element={<ActivityLogs />} />
           </Route>
 
           {/* 404 */}

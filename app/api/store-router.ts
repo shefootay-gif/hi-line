@@ -14,6 +14,7 @@ import {
   reviews,
   wishlists,
   contactMessages,
+  inventoryMovements,
 } from "@db/schema";
 import { eq, desc, and, or, like, sql, inArray } from "drizzle-orm";
 
@@ -362,6 +363,9 @@ export const storeRouter = createRouter({
 
         // Atomic stock deduction: prevents stock from going below zero in concurrent orders.
         for (const item of input.items) {
+          const product = productDetails.find((p) => p.id === item.productId);
+          if (!product) throw new Error(`Product ${item.productId} not found`);
+
           const stockUpdate = await tx
             .update(products)
             .set({ stock: sql`${products.stock} - ${item.quantity}` })
@@ -370,6 +374,17 @@ export const storeRouter = createRouter({
           if (getAffectedRows(stockUpdate) !== 1) {
             throw new Error("Insufficient stock. Please refresh your cart and try again.");
           }
+
+          await tx.insert(inventoryMovements).values({
+            productId: item.productId,
+            orderId,
+            type: "sale",
+            quantity: -item.quantity,
+            previousStock: product.stock,
+            newStock: product.stock - item.quantity,
+            reason: "Order stock deduction",
+            reference: orderNumber,
+          });
         }
 
         await tx.insert(orderItems).values(
@@ -512,10 +527,27 @@ export const storeRouter = createRouter({
           .where(eq(orderItems.orderId, order.id));
 
         for (const item of items) {
+          const [product] = await tx
+            .select({ stock: products.stock })
+            .from(products)
+            .where(eq(products.id, item.productId))
+            .limit(1);
+
           await tx
             .update(products)
             .set({ stock: sql`${products.stock} + ${item.quantity}` })
             .where(eq(products.id, item.productId));
+
+          await tx.insert(inventoryMovements).values({
+            productId: item.productId,
+            orderId: order.id,
+            type: "cancel",
+            quantity: item.quantity,
+            previousStock: product?.stock ?? null,
+            newStock: product ? product.stock + item.quantity : null,
+            reason: "Order cancellation stock return",
+            reference: order.orderNumber,
+          });
         }
 
         if (order.couponCode) {
