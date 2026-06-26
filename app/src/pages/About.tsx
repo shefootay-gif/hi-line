@@ -1,6 +1,6 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTranslations } from "@/lib/translations";
-import { Award, Leaf, Shield, Sparkles } from "lucide-react";
+import { Award, Shield, Sparkles } from "lucide-react";
 
 export default function About() {
   const { lang, isRTL } = useLanguage();
@@ -12,7 +12,7 @@ export default function About() {
       <div
         className="pt-32 pb-20"
         style={{
-          background: "linear-gradient(135deg, #B57EDC 0%, #B57EDC 100%)",
+          background: "linear-gradient(135deg, #4B1C71 0%, #B57EDC 50%, #dbb6ee 100%)",
         }}
       >
         <div className="max-w-4xl mx-auto px-4 text-center">

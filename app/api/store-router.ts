@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, publicQuery } from "./middleware";
+import { createRouter, publicQuery, adminQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   products,
@@ -10,8 +10,27 @@ import {
   shippingSettings,
   orders,
   orderItems,
+  coupons,
+  reviews,
+  wishlists,
+  contactMessages,
 } from "@db/schema";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, like, sql, inArray } from "drizzle-orm";
+
+const categoryAliases: Record<string, string> = {
+  all: "all",
+  "all-products": "all",
+  "roll-on": "deodorant-roll-on",
+  "deodorant-roll-on": "deodorant-roll-on",
+  fresh: "fresh-scents",
+  "fresh-scents": "fresh-scents",
+  fruity: "fruity-scents",
+  "fruity-scents": "fruity-scents",
+  "fragrance-free": "fragrance-free",
+  "summer-collection": "all",
+  "best-sellers": "best-sellers",
+  offers: "all",
+};
 
 export const storeRouter = createRouter({
   // Products
@@ -37,6 +56,36 @@ export const storeRouter = createRouter({
       }
       if (input?.scent) {
         conditions.push(eq(products.scent, input.scent));
+      }
+      if (input?.search?.trim()) {
+        const term = `%${input.search.trim()}%`;
+        const searchCondition = or(
+          like(products.nameEn, term),
+          like(products.nameAr, term),
+          like(products.scent, term),
+        );
+        if (searchCondition) conditions.push(searchCondition);
+      }
+      if (input?.category) {
+        const categorySlug = categoryAliases[input.category.toLowerCase()] || input.category;
+        if (categorySlug === "best-sellers") {
+          conditions.push(eq(products.isBestSeller, true));
+        } else if (categorySlug === "fresh-scents") {
+          conditions.push(inArray(products.scent, ["Tropical Breeze", "Voyage"]));
+        } else if (categorySlug === "fruity-scents") {
+          conditions.push(inArray(products.scent, ["Candy Pop", "Sweet Mango"]));
+        } else if (categorySlug === "fragrance-free") {
+          conditions.push(eq(products.scent, "Fragrance Free"));
+        } else if (categorySlug !== "all") {
+          const [category] = await db
+            .select({ id: categories.id })
+            .from(categories)
+            .where(eq(categories.slug, categorySlug))
+            .limit(1);
+          if (category) {
+            conditions.push(eq(products.categoryId, category.id));
+          }
+        }
       }
 
       const query = db
@@ -185,6 +234,7 @@ export const storeRouter = createRouter({
             quantity: z.number().min(1),
           })
         ),
+        couponCode: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -197,12 +247,21 @@ export const storeRouter = createRouter({
         .from(products)
         .where(inArray(products.id, productIds));
 
+      // Validate stock availability
+      for (const item of input.items) {
+        const product = productDetails.find((p) => p.id === item.productId);
+        if (!product) throw new Error(`Product ${item.productId} not found`);
+        if (product.stock < item.quantity) {
+          throw new Error(
+            `Insufficient stock for "${product.nameEn}". Available: ${product.stock}, Requested: ${item.quantity}`
+          );
+        }
+      }
+
       // Calculate totals
       let subtotal = 0;
       const orderItemsData = input.items.map((item) => {
-        const product = productDetails.find((p) => p.id === item.productId);
-        if (!product) throw new Error(`Product ${item.productId} not found`);
-
+        const product = productDetails.find((p) => p.id === item.productId)!;
         const unitPrice = parseFloat(product.price);
         const totalPrice = unitPrice * item.quantity;
         subtotal += totalPrice;
@@ -243,9 +302,40 @@ export const storeRouter = createRouter({
           shippingFee = 0;
         }
       }
+      // Process coupon if provided
+      let discountAmount = 0;
+      let appliedCouponId = null;
 
-      const total = subtotal + shippingFee;
+      if (input.couponCode) {
+        const [coupon] = await db
+          .select()
+          .from(coupons)
+          .where(eq(coupons.code, input.couponCode))
+          .limit(1);
 
+        if (coupon) {
+          const isValid =
+            coupon.isActive &&
+            (!coupon.expiresAt || new Date(coupon.expiresAt) > new Date()) &&
+            (coupon.maxUsage === null || coupon.currentUsage! < coupon.maxUsage) &&
+            subtotal >= parseFloat(coupon.minOrderValue ?? "0");
+
+          if (isValid) {
+            const val = parseFloat(coupon.discountValue);
+            if (coupon.discountType === "percentage") {
+              discountAmount = (subtotal * val) / 100;
+            } else {
+              discountAmount = val;
+            }
+            appliedCouponId = coupon.id;
+          }
+        }
+      }
+
+      // Ensure discount doesn't exceed subtotal
+      if (discountAmount > subtotal) discountAmount = subtotal;
+
+      const total = subtotal - discountAmount + shippingFee;
       // Generate order number
       const orderNumber = `HL${Date.now().toString(36).toUpperCase()}`;
 
@@ -262,6 +352,8 @@ export const storeRouter = createRouter({
         postalCode: input.postalCode,
         subtotal: subtotal.toFixed(2),
         shippingFee: shippingFee.toFixed(2),
+        discountAmount: discountAmount.toFixed(2),
+        couponCode: input.couponCode || null,
         total: total.toFixed(2),
         paymentMethod: input.paymentMethod,
         notes: input.notes,
@@ -270,13 +362,10 @@ export const storeRouter = createRouter({
 
       const orderId = Number(orderResult[0].insertId);
 
-      // Create order items
-      for (const item of orderItemsData) {
-        await db.insert(orderItems).values({
-          orderId,
-          ...item,
-        });
-      }
+      // Create order items (batch insert)
+      await db.insert(orderItems).values(
+        orderItemsData.map((item) => ({ orderId, ...item }))
+      );
 
       // Update product stock
       for (const item of input.items) {
@@ -288,7 +377,59 @@ export const storeRouter = createRouter({
           .where(eq(products.id, item.productId));
       }
 
-      return { orderId, orderNumber, total: total.toFixed(2) };
+      // Update coupon usage
+      if (appliedCouponId) {
+        await db
+          .update(coupons)
+          .set({ currentUsage: sql`${coupons.currentUsage} + 1` })
+          .where(eq(coupons.id, appliedCouponId));
+      }
+
+      return { orderId, orderNumber, total: total.toFixed(2), discountAmount: discountAmount.toFixed(2) };
+    }),
+
+  validateCoupon: publicQuery
+    .input(z.object({ code: z.string(), subtotal: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [coupon] = await db
+        .select()
+        .from(coupons)
+        .where(eq(coupons.code, input.code))
+        .limit(1);
+
+      if (!coupon) {
+        throw new Error("Invalid coupon code");
+      }
+      if (!coupon.isActive) {
+        throw new Error("This coupon is no longer active");
+      }
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+        throw new Error("This coupon has expired");
+      }
+      if (coupon.maxUsage !== null && coupon.currentUsage! >= coupon.maxUsage) {
+        throw new Error("This coupon has reached its usage limit");
+      }
+      if (input.subtotal < parseFloat(coupon.minOrderValue ?? "0")) {
+        throw new Error(`Minimum order value to use this coupon is ${coupon.minOrderValue}`);
+      }
+
+      const val = parseFloat(coupon.discountValue);
+      let discountAmount = 0;
+      if (coupon.discountType === "percentage") {
+        discountAmount = (input.subtotal * val) / 100;
+      } else {
+        discountAmount = val;
+      }
+
+      if (discountAmount > input.subtotal) discountAmount = input.subtotal;
+
+      return {
+        valid: true,
+        discountType: coupon.discountType,
+        discountValue: val,
+        discountAmount: discountAmount,
+      };
     }),
 
   getOrderByNumber: publicQuery
@@ -312,8 +453,169 @@ export const storeRouter = createRouter({
       return { ...order, items };
     }),
 
+  cancelOrder: publicQuery
+    .input(z.object({ orderNumber: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const orderResult = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.orderNumber, input.orderNumber))
+        .limit(1);
+
+      if (orderResult.length === 0) {
+        throw new Error("Order not found");
+      }
+
+      const order = orderResult[0];
+
+      if (
+        order.orderStatus === "shipped" ||
+        order.orderStatus === "delivered" ||
+        order.orderStatus === "refunded" ||
+        order.orderStatus === "cancelled"
+      ) {
+        throw new Error("Cannot cancel order at this stage");
+      }
+
+      const items = await db
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, order.id));
+
+      // Restore stock
+      for (const item of items) {
+        await db
+          .update(products)
+          .set({
+            stock: sql`${products.stock} + ${item.quantity}`,
+          })
+          .where(eq(products.id, item.productId));
+      }
+
+      // Update status to cancelled
+      await db
+        .update(orders)
+        .set({ orderStatus: "cancelled" })
+        .where(eq(orders.id, order.id));
+
+      return { success: true };
+    }),
+
+  // Reviews endpoints
+  addReview: authedQuery
+    .input(z.object({
+      productId: z.number(),
+      rating: z.number().min(1).max(5),
+      comment: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      // Extract numeric ID from unionId like "local:12"
+      const userIdStr = ctx.user.unionId.split(":")[1];
+      if (!userIdStr) throw new Error("Invalid user session for review");
+      const userId = parseInt(userIdStr, 10);
+      
+      await db.insert(reviews).values({
+        productId: input.productId,
+        userId: userId,
+        rating: input.rating,
+        comment: input.comment,
+        status: "pending", // require admin approval by default
+      });
+      return { success: true };
+    }),
+
+  getReviews: publicQuery
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const res = await db.select().from(reviews).where(and(eq(reviews.productId, input.productId), eq(reviews.status, "approved")));
+      return res;
+    }),
+
+  // Wishlist endpoints
+  toggleWishlist: authedQuery
+    .input(z.object({ productId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const userIdStr = ctx.user.unionId.split(":")[1];
+      if (!userIdStr) throw new Error("Invalid user session");
+      const userId = parseInt(userIdStr, 10);
+
+      const existing = await db
+        .select()
+        .from(wishlists)
+        .where(and(eq(wishlists.productId, input.productId), eq(wishlists.userId, userId)))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db.delete(wishlists).where(eq(wishlists.id, existing[0].id));
+        return { added: false };
+      } else {
+        await db.insert(wishlists).values({
+          userId,
+          productId: input.productId,
+        });
+        return { added: true };
+      }
+    }),
+
+  getWishlist: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const userIdStr = ctx.user.unionId.split(":")[1];
+    if (!userIdStr) return [];
+    const userId = parseInt(userIdStr, 10);
+
+    const res = await db
+      .select({
+        wishlistId: wishlists.id,
+        product: products,
+      })
+      .from(wishlists)
+      .innerJoin(products, eq(wishlists.productId, products.id))
+      .where(eq(wishlists.userId, userId));
+
+    return res;
+  }),
+
+  // Contact Message endpoint
+  submitContactMessage: publicQuery
+    .input(z.object({
+      name: z.string().min(2),
+      email: z.string().email(),
+      phone: z.string().optional(),
+      message: z.string().min(10),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db.insert(contactMessages).values({
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        message: input.message,
+      });
+      return { success: true };
+    }),
+
+  // My Orders endpoint
+  getMyOrders: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const userIdStr = ctx.user.unionId.split(":")[1];
+    if (!userIdStr) return [];
+    const userId = parseInt(userIdStr, 10);
+
+    const myOrders = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.userId, userId))
+      .orderBy(desc(orders.createdAt));
+
+    return myOrders;
+  }),
+
   // Stats for admin
-  getStats: publicQuery.query(async () => {
+  getStats: adminQuery.query(async () => {
     const db = getDb();
 
     const totalOrders = await db

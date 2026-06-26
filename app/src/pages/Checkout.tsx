@@ -4,8 +4,10 @@ import { useCart } from "@/hooks/useCart";
 import { trpc } from "@/providers/trpc";
 import { Link, useNavigate } from "react-router";
 import { useState } from "react";
-import { ChevronLeft, CreditCard, Banknote, Smartphone, Building, Loader2 } from "lucide-react";
+import { CreditCard, Banknote, Smartphone, Building, Loader2, Tag, Check, X } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+
+type PaymentMethod = "cash_on_delivery" | "vodafone_cash" | "instapay" | "bank_transfer";
 
 export default function Checkout() {
   const { lang, isRTL } = useLanguage();
@@ -15,6 +17,7 @@ export default function Checkout() {
   const { data: paymentMethods } = trpc.store.getPaymentMethods.useQuery();
   const { data: governorates } = trpc.store.getShippingGovernorates.useQuery();
   const createOrder = trpc.store.createOrder.useMutation();
+  const validateCoupon = trpc.store.validateCoupon.useMutation();
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -28,6 +31,8 @@ export default function Checkout() {
     notes: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
 
   const subtotal = getTotalPrice();
 
@@ -35,9 +40,9 @@ export default function Checkout() {
     (g) => g.governorate === formData.governorate
   );
   const shippingFee = selectedGov ? parseFloat(selectedGov.baseFee ?? "0") : 0;
-  const freeShippingThreshold = 500;
-  const effectiveShipping = subtotal >= freeShippingThreshold ? 0 : shippingFee;
-  const total = subtotal + effectiveShipping;
+  const effectiveShipping = shippingFee;
+  const discount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const total = subtotal - discount + effectiveShipping;
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -45,10 +50,42 @@ export default function Checkout() {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    try {
+      const result = await validateCoupon.mutateAsync({
+        code: couponCode.trim(),
+        subtotal: subtotal,
+      });
+      if (result.valid) {
+        setAppliedCoupon({
+          code: couponCode.trim(),
+          discountAmount: result.discountAmount,
+        });
+        toast.success(lang === "ar" ? "تم تطبيق كود الخصم بنجاح" : "Coupon applied successfully");
+      }
+    } catch (err: any) {
+      toast.error(err.message || (lang === "ar" ? "كود الخصم غير صالح" : "Invalid coupon code"));
+      setAppliedCoupon(null);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName || !formData.phone || !formData.address || !formData.governorate) {
       toast.error(lang === "ar" ? "يرجى ملء جميع الحقول المطلوبة" : "Please fill all required fields");
+      return;
+    }
+    
+    // Egyptian phone number validation
+    const phoneRegex = /^01[0125][0-9]{8}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      toast.error(lang === "ar" ? "يرجى إدخال رقم هاتف مصري صحيح (مثال: 01012345678)" : "Please enter a valid Egyptian phone number");
       return;
     }
 
@@ -63,8 +100,9 @@ export default function Checkout() {
         governorate: formData.governorate,
         city: formData.city || undefined,
         postalCode: formData.postalCode || undefined,
-        paymentMethod: formData.paymentMethod as any,
+        paymentMethod: formData.paymentMethod as PaymentMethod,
         notes: formData.notes || undefined,
+        couponCode: appliedCoupon?.code,
         items: items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -72,10 +110,10 @@ export default function Checkout() {
       });
 
       clearCart();
-      navigate("/order-confirmation", {
-        state: { orderNumber: result.orderNumber, total: result.total },
+      navigate(`/order-confirmation?order=${result.orderNumber}`, {
+        state: { total: result.total },
       });
-    } catch (error) {
+    } catch {
       toast.error(lang === "ar" ? "حدث خطأ" : "An error occurred");
     } finally {
       setIsSubmitting(false);
@@ -325,7 +363,7 @@ export default function Checkout() {
                     {item.name} x{item.quantity}
                   </span>
                   <span className="font-medium">
-                    {(parseFloat(item.price) * item.quantity).toFixed(0)}{" "}
+                    {(parseFloat(item.salePrice || item.price) * item.quantity).toFixed(0)}{" "}
                     {t.currency}
                   </span>
                 </div>
@@ -346,7 +384,58 @@ export default function Checkout() {
                   )}
                 </span>
               </div>
+              {appliedCoupon && (
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>{lang === "ar" ? "الخصم" : "Discount"} ({appliedCoupon.code})</span>
+                  <span>-{appliedCoupon.discountAmount.toFixed(0)} {t.currency}</span>
+                </div>
+              )}
             </div>
+
+            {/* Coupon Code Input */}
+            <div className="mt-6 mb-4">
+              <label className="block text-sm font-medium text-[#4B1C71] mb-2">
+                {lang === "ar" ? "كود الخصم" : "Coupon Code"}
+              </label>
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between px-4 py-3 bg-green-50 border border-green-200 rounded-xl">
+                  <div className="flex items-center gap-2 text-green-700 font-medium">
+                    <Tag className="w-4 h-4" />
+                    <span>{appliedCoupon.code}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="p-1 text-green-600 hover:bg-green-100 rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    placeholder={lang === "ar" ? "أدخل كود الخصم" : "Enter coupon code"}
+                    className="flex-1 px-4 py-3 rounded-xl border border-[#E7D8F1] focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30 uppercase font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={validateCoupon.isPending || !couponCode.trim()}
+                    className="px-6 py-3 bg-[#FCF8FF] text-[#4B1C71] border border-[#E7D8F1] font-semibold rounded-xl hover:bg-[#F7ECFF] transition-colors disabled:opacity-50"
+                  >
+                    {validateCoupon.isPending ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      lang === "ar" ? "تطبيق" : "Apply"
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="border-t border-[#E7D8F1] pt-4 mt-4">
               <div className="flex justify-between text-xl font-bold">
                 <span>{t.total}</span>

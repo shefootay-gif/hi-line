@@ -8,12 +8,47 @@ function required(name: string): string {
   return value ?? "";
 }
 
+function optionalNonEmpty(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
+function databaseUrl(): string {
+  const value = required("DATABASE_URL").trim();
+  if (!value || value.startsWith("#") || !value.includes("://")) {
+    throw new Error(
+      "DATABASE_URL must be set to a valid MySQL connection URL, for example mysql://user:password@host:3306/database",
+    );
+  }
+  return value;
+}
+
 export const env = {
-  appId: required("APP_ID"),
-  appSecret: required("APP_SECRET"),
+  // Primary JWT secret (new, preferred)
+  jwtSecret:
+    optionalNonEmpty("JWT_SECRET") ??
+    optionalNonEmpty("APP_SECRET") ??
+    "local-dev-secret-change-in-production",
+
+  // Legacy compat — used in kimi/session.ts via appSecret fallback
+  appId: process.env.APP_ID ?? "",
+  appSecret:
+    optionalNonEmpty("APP_SECRET") ??
+    (process.env.NODE_ENV === "production" ? required("APP_SECRET") : "local-dev-secret"),
+
   isProduction: process.env.NODE_ENV === "production",
-  databaseUrl: required("DATABASE_URL"),
-  kimiAuthUrl: required("KIMI_AUTH_URL"),
-  kimiOpenUrl: required("KIMI_OPEN_URL"),
+  databaseUrl: databaseUrl(),
+
+  // Kimi OAuth (optional — only needed if using OAuth login)
+  kimiAuthUrl: process.env.KIMI_AUTH_URL ?? "",
+  kimiOpenUrl: process.env.KIMI_OPEN_URL ?? "",
   ownerUnionId: process.env.OWNER_UNION_ID ?? "",
+
+  // Local admin credentials
+  localAdminUsername:
+    process.env.LOCAL_ADMIN_USERNAME ??
+    (process.env.NODE_ENV === "production" ? "" : "admin"),
+  localAdminPassword:
+    process.env.LOCAL_ADMIN_PASSWORD ??
+    (process.env.NODE_ENV === "production" ? "" : "123456"),
 };

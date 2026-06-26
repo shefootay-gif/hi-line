@@ -42,8 +42,13 @@ const emptyProduct = {
   seoTitle: "",
   seoDescription: "",
 };
+type ProductForm = typeof emptyProduct;
 
-type AdminProduct = typeof emptyProduct & {
+type AdminProduct = Omit<typeof emptyProduct, "descriptionEn" | "descriptionAr" | "shortDescriptionEn" | "shortDescriptionAr" | "salePrice" | "sku" | "scentColor" | "categoryId" | "images" | "benefits" | "benefitsAr" | "ingredients" | "ingredientsAr" | "usageInstructions" | "usageInstructionsAr" | "seoTitle" | "seoDescription" | "isActive" | "isFeatured" | "isBestSeller"> & {
+  descriptionEn?: string | null;
+  descriptionAr?: string | null;
+  shortDescriptionEn?: string | null;
+  shortDescriptionAr?: string | null;
   salePrice?: string | null;
   sku?: string | null;
   scentColor?: string | null;
@@ -57,6 +62,9 @@ type AdminProduct = typeof emptyProduct & {
   usageInstructionsAr?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  isActive?: boolean | null;
+  isFeatured?: boolean | null;
+  isBestSeller?: boolean | null;
 };
 
 function listValue(value: string[] | string | null | undefined): string[] {
@@ -78,9 +86,11 @@ export default function AdminProducts() {
   const [editing, setEditing] = useState<typeof emptyProduct>(emptyProduct);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  const { data: products, isLoading } = trpc.admin.listProducts.useQuery(
-    search ? { search } : undefined
+  const { data: products, isLoading, isError: productsError } = trpc.admin.listProducts.useQuery(
+    search ? { search } : undefined,
+    { retry: false, throwOnError: false }
   );
+  const { data: categories } = trpc.admin.listCategories.useQuery();
 
   const createProduct = trpc.admin.createProduct.useMutation({
     onSuccess: () => {
@@ -114,9 +124,9 @@ export default function AdminProducts() {
       return;
     }
     if (editing.id) {
-      updateProduct.mutate(editing as any);
+      updateProduct.mutate(editing);
     } else {
-      createProduct.mutate(editing as any);
+      createProduct.mutate(editing);
     }
   };
 
@@ -124,6 +134,10 @@ export default function AdminProducts() {
     setEditing({
       ...emptyProduct,
       ...product,
+      descriptionEn: product.descriptionEn ?? "",
+      descriptionAr: product.descriptionAr ?? "",
+      shortDescriptionEn: product.shortDescriptionEn ?? "",
+      shortDescriptionAr: product.shortDescriptionAr ?? "",
       salePrice: product.salePrice ?? "",
       sku: product.sku ?? "",
       scentColor: product.scentColor ?? "",
@@ -137,6 +151,9 @@ export default function AdminProducts() {
       usageInstructionsAr: product.usageInstructionsAr ?? "",
       seoTitle: product.seoTitle ?? "",
       seoDescription: product.seoDescription ?? "",
+      isActive: product.isActive ?? true,
+      isFeatured: product.isFeatured ?? false,
+      isBestSeller: product.isBestSeller ?? false,
     });
     setShowModal(true);
   };
@@ -179,7 +196,13 @@ export default function AdminProducts() {
           <div className="p-12 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#B57EDC]" />
           </div>
-        ) : products?.length === 0 ? (
+        ) : productsError ? (
+          <div className="p-12 text-center">
+            <Package className="w-12 h-12 text-[#E7D8F1] mx-auto mb-3" />
+            <p className="text-[#6F6178] text-sm mb-1">{lang === "ar" ? "تعذّر الاتصال بقاعدة البيانات" : "Could not connect to database"}</p>
+            <p className="text-[#8D7A97] text-xs">{lang === "ar" ? "تأكد من تشغيل الخادم وإعدادات DB" : "Check your server and DB settings"}</p>
+          </div>
+        ) : !products || products.length === 0 ? (
           <div className="p-12 text-center text-[#6F6178]">{t.noProductsFound}</div>
         ) : (
           <div className="overflow-x-auto">
@@ -368,6 +391,34 @@ export default function AdminProducts() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                    {lang === "ar" ? "القسم" : "Category"}
+                  </label>
+                  <select
+                    value={editing.categoryId ?? ""}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        categoryId: e.target.value
+                          ? Number.parseInt(e.target.value, 10)
+                          : undefined,
+                      })
+                    }
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] text-sm focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30"
+                  >
+                    <option value="">
+                      {lang === "ar" ? "بدون قسم" : "No category"}
+                    </option>
+                    {categories?.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {lang === "ar" ? category.nameAr : category.nameEn}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.scent} Color
                   </label>
                   <input
@@ -453,18 +504,18 @@ export default function AdminProducts() {
               </div>
               {/* Toggles */}
               <div className="flex flex-wrap gap-4">
-                {["isActive", "isFeatured", "isBestSeller"].map((field) => (
+                {(["isActive", "isFeatured", "isBestSeller"] as const).map((field) => (
                   <label key={field} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={(editing as any)[field]}
+                      checked={editing[field]}
                       onChange={(e) =>
                         setEditing({ ...editing, [field]: e.target.checked })
                       }
                       className="w-4 h-4 accent-[#B57EDC]"
                     />
                     <span className="text-sm text-[#4B1C71]">
-                      {(t as any)[field] || field}
+                      {t[field as keyof ProductForm & keyof typeof t] || field}
                     </span>
                   </label>
                 ))}

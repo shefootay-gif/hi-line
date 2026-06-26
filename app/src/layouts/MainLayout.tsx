@@ -2,6 +2,8 @@ import { Outlet, useNavigate, useLocation } from "react-router";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTranslations } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
+import { trpc } from "@/providers/trpc";
+import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import {
@@ -18,6 +20,8 @@ import {
   Minus,
   Plus,
   Trash2,
+  User,
+  LogOut,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
@@ -25,8 +29,10 @@ export default function MainLayout() {
   const { lang, isRTL, toggleLanguage } = useLanguage();
   const t = useTranslations(lang);
   const { items, getTotalItems, getTotalPrice, updateQuantity, removeItem } = useCart();
+  const { user, logout } = useAuth({ redirectOnUnauthenticated: false });
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: settings } = trpc.store.getSettings.useQuery();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [lastScroll, setLastScroll] = useState(0);
@@ -55,26 +61,38 @@ export default function MainLayout() {
     { label: t.about, href: "/about" },
     { label: t.faq, href: "/faq" },
     { label: t.contact, href: "/contact" },
+    { label: lang === "ar" ? "تتبع طلبي" : "Track Order", href: "/track-order" },
   ];
 
   const cartItemCount = getTotalItems();
   const cartTotal = getTotalPrice();
+  const logoUrl = settings?.logo_url || "/brand/logo.jpg";
+  const storeName = (lang === "ar" ? settings?.store_name_ar : settings?.store_name_en) || "Hi Line Pro Care";
+  const defaultAnnouncement =
+    lang === "ar" ? "خصم 50% على مجموعة Hi Line Roll On" : "50% OFF Hi Line Roll On Collection";
+  const savedAnnouncement = lang === "ar" ? settings?.announcement_text_ar : settings?.announcement_text_en;
+  const announcement =
+    savedAnnouncement && !/free shipping|شحن مجاني|500/i.test(savedAnnouncement)
+      ? savedAnnouncement
+      : defaultAnnouncement;
+  const whatsappNumber = (settings?.whatsapp_number || "+201223863092").replace(/[^\d]/g, "");
+  const displayPhone = settings?.phone_number || settings?.whatsapp_number || "+20 122 386 3092";
+  const facebookUrl = settings?.facebook_url || "https://www.facebook.com/profile.php?id=61587944979845";
+  const instagramUrl = settings?.instagram_url || "#";
+  const whatsappText = encodeURIComponent("Hello! I'm interested in ordering Hi Line Pro Care products.");
 
   return (
     <div className={`min-h-screen flex flex-col beauty-shell ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
-      {/* Google Fonts */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet"
-      />
 
-      {/* Announcement Bar */}
-      <div className="bg-[#4B1C71] text-white text-center py-2.5 px-4 text-xs sm:text-sm shimmer-soft">
-        <span className="font-medium">
-          {lang === "ar" ? t.freeShippingAnnouncement : t.freeShippingAnnouncement}
-        </span>
+
+      {/* Promo Bar */}
+      <div className="bg-[#4B1C71] text-white py-2.5 px-4 text-xs sm:text-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 text-center">
+          <span className="font-semibold">{announcement}</span>
+          <Link to="/shop" className="hidden sm:inline-flex rounded-full bg-white/12 px-3 py-1 font-semibold hover:bg-white/20">
+            Roll On
+          </Link>
+        </div>
       </div>
 
       {/* Header */}
@@ -88,8 +106,8 @@ export default function MainLayout() {
             {/* Logo */}
             <Link to="/" className="flex items-center shrink-0" onClick={scrollToTop}>
               <img
-                src="/brand/logo.jpg"
-                alt="Hi Line Pro Care"
+                src={logoUrl}
+                alt={storeName}
                 className="h-12 w-auto object-contain rounded-md"
               />
             </Link>
@@ -190,7 +208,7 @@ export default function MainLayout() {
                                   {item.scent}
                                 </p>
                                 <p className="text-sm font-semibold text-[#4B1C71] mt-1">
-                                  {parseFloat(item.price).toFixed(0)}{" "}
+                                  {parseFloat(item.salePrice || item.price).toFixed(0)}{" "}
                                   {t.currency}
                                 </p>
                                 <div className="flex items-center gap-2 mt-2">
@@ -271,9 +289,54 @@ export default function MainLayout() {
                 </SheetContent>
               </Sheet>
 
+              {/* Mobile Login/User Icon */}
+              {user ? (
+                <Link
+                  to="/my-orders"
+                  className="sm:hidden flex items-center justify-center w-9 h-9 rounded-full hover:bg-[#F7ECFF] transition-colors"
+                  title={lang === "ar" ? "حسابي" : "My Account"}
+                >
+                  <User className="w-5 h-5 text-[#B57EDC]" />
+                </Link>
+              ) : (
+                <Link
+                  to="/login"
+                  className="sm:hidden flex items-center justify-center w-9 h-9 rounded-full hover:bg-[#F7ECFF] transition-colors"
+                  title={lang === "ar" ? "تسجيل الدخول" : "Login"}
+                >
+                  <User className="w-5 h-5 text-[#4B1C71]" />
+                </Link>
+              )}
+
+              {user ? (
+                <div className="hidden sm:flex items-center gap-2">
+                  <Link
+                    to="/my-orders"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full beauty-pill text-sm font-medium hover:bg-[#F1E1FF] transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                    {lang === "ar" ? "حسابي" : "My Account"}
+                  </Link>
+                  <button
+                    onClick={() => logout()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full beauty-pill text-sm font-medium hover:bg-[#F1E1FF] transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {lang === "ar" ? "تسجيل الخروج" : "Logout"}
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/login"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full beauty-pill text-sm font-medium hover:bg-[#F1E1FF] transition-colors"
+                >
+                  {t.login}
+                </Link>
+              )}
+
               {/* WhatsApp Quick Order */}
               <a
-                href={`https://wa.me/201223863092?text=${encodeURIComponent("Hello! I'm interested in ordering Hi Line Pro Care products.")}`}
+                href={`https://wa.me/${whatsappNumber}?text=${whatsappText}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#25D366] text-white text-sm font-medium hover:bg-[#128C7E] transition-colors shadow-[0_10px_24px_rgba(37,211,102,0.2)]"
@@ -316,8 +379,38 @@ export default function MainLayout() {
                   <ChevronRight className="w-4 h-4" />
                 </Link>
               ))}
+              {user ? (
+                <>
+                  <Link
+                    to="/my-orders"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2 text-sm font-medium text-[#4B1C71]"
+                  >
+                    {lang === "ar" ? "حسابي" : "My Account"}
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      logout();
+                    }}
+                    className="flex items-center justify-between py-2 text-sm font-medium text-[#4B1C71]"
+                  >
+                    {lang === "ar" ? "تسجيل الخروج" : "Logout"}
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-between py-2 text-sm font-medium text-[#4B1C71]"
+                >
+                  {t.login}
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              )}
               <a
-                href={`https://wa.me/201223863092?text=${encodeURIComponent("Hello! I'm interested in ordering Hi Line Pro Care products.")}`}
+                href={`https://wa.me/${whatsappNumber}?text=${whatsappText}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 py-3 mt-2 rounded-xl bg-[#25D366] text-white font-medium"
@@ -342,13 +435,13 @@ export default function MainLayout() {
             {/* Brand Column */}
             <div>
               <img
-                src="/brand/logo.jpg"
-                alt="Hi Line Pro Care"
+                src={logoUrl}
+                alt={storeName}
                 className="h-16 w-auto object-contain bg-white rounded-lg p-2 mb-6"
               />
               <div className="flex items-center gap-3">
                 <a
-                  href="https://www.facebook.com/profile.php?id=61587944979845"
+                  href={facebookUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-[#B57EDC] hover:text-white transition-colors"
@@ -356,13 +449,13 @@ export default function MainLayout() {
                   <Facebook className="w-4 h-4" />
                 </a>
                 <a
-                  href="#"
+                  href={instagramUrl}
                   className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-[#B57EDC] hover:text-white transition-colors"
                 >
                   <Instagram className="w-4 h-4" />
                 </a>
                 <a
-                  href="https://wa.me/201223863092"
+                  href={`https://wa.me/${whatsappNumber}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-[#25D366] hover:text-white transition-colors"
@@ -424,11 +517,11 @@ export default function MainLayout() {
               <ul className="space-y-3">
                 <li className="flex items-center gap-2 text-sm text-white/70">
                   <Phone className="w-4 h-4 text-[#C9A2E2]" />
-                  <span>+20 122 386 3092</span>
+                  <span>{displayPhone}</span>
                 </li>
                 <li className="flex items-center gap-2 text-sm text-white/70">
                   <MessageCircle className="w-4 h-4 text-[#25D366]" />
-                  <span>+20 122 386 3092</span>
+                  <span>{displayPhone}</span>
                 </li>
               </ul>
             </div>
@@ -439,7 +532,7 @@ export default function MainLayout() {
         <div className="border-t border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-sm text-white/50">
-              &copy; 2025 Hi Line Pro Care. {t.allRightsReserved}
+              &copy; {new Date().getFullYear()} {storeName}. {t.allRightsReserved}
             </p>
             <p className="flex items-center gap-1 text-sm text-white/50">
               {t.madeWithCare} <Heart className="w-3.5 h-3.5 text-red-400" />
@@ -450,7 +543,7 @@ export default function MainLayout() {
 
       {/* Floating WhatsApp Button */}
       <a
-        href={`https://wa.me/201223863092?text=${encodeURIComponent("Hello! I'm interested in ordering Hi Line Pro Care products.")}`}
+        href={`https://wa.me/${whatsappNumber}?text=${whatsappText}`}
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 z-50 w-14 h-14 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"

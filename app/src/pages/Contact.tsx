@@ -1,15 +1,13 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTranslations } from "@/lib/translations";
-import { Link } from "react-router";
+import { trpc } from "@/providers/trpc";
 import { useState } from "react";
 import {
   MessageCircle,
   Phone,
-  Mail,
   MapPin,
   Facebook,
   Instagram,
-  Send,
   CheckCircle,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
@@ -17,6 +15,7 @@ import toast, { Toaster } from "react-hot-toast";
 export default function Contact() {
   const { lang, isRTL } = useLanguage();
   const t = useTranslations(lang);
+  const { data: settings } = trpc.store.getSettings.useQuery();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -24,6 +23,10 @@ export default function Contact() {
     message: "",
   });
   const [sent, setSent] = useState(false);
+  const whatsappNumber = (settings?.whatsapp_number || "+201223863092").replace(/[^\d]/g, "");
+  const displayPhone = settings?.phone_number || settings?.whatsapp_number || "+20 122 386 3092";
+  const facebookUrl = settings?.facebook_url || "https://www.facebook.com/profile.php?id=61587944979845";
+  const instagramUrl = settings?.instagram_url || "#";
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -31,16 +34,29 @@ export default function Contact() {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const submitMessage = trpc.store.submitContactMessage.useMutation();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.message) {
+    if (!formData.name || !formData.message || !formData.email) {
       toast.error(
-        lang === "ar" ? "يرجى ملء الاسم والرسالة" : "Please fill name and message"
+        lang === "ar" ? "يرجى ملء جميع الحقول المطلوبة" : "Please fill all required fields"
       );
       return;
     }
-    setSent(true);
-    toast.success(t.messageSent);
+    
+    try {
+      await submitMessage.mutateAsync({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        message: formData.message,
+      });
+      setSent(true);
+      toast.success(t.messageSent);
+    } catch (err: any) {
+      toast.error(err.message || (lang === "ar" ? "حدث خطأ أثناء الإرسال" : "Error sending message"));
+    }
   };
 
   return (
@@ -51,7 +67,7 @@ export default function Contact() {
       <div
         className="pt-32 pb-20"
         style={{
-          background: "linear-gradient(135deg, #B57EDC 0%, #B57EDC 100%)",
+          background: "linear-gradient(135deg, #4B1C71 0%, #B57EDC 50%, #dbb6ee 100%)",
         }}
       >
         <div className="max-w-4xl mx-auto px-4 text-center">
@@ -168,7 +184,7 @@ export default function Contact() {
                       {lang === "ar" ? "هاتف" : "Phone"}
                     </p>
                     <p className="text-sm font-medium text-[#4B1C71]">
-                      +20 122 386 3092
+                      {displayPhone}
                     </p>
                   </div>
                 </li>
@@ -179,7 +195,7 @@ export default function Contact() {
                   <div>
                     <p className="text-xs text-[#8D7A97]">WhatsApp</p>
                     <p className="text-sm font-medium text-[#4B1C71]">
-                      +20 122 386 3092
+                      {displayPhone}
                     </p>
                   </div>
                 </li>
@@ -199,7 +215,7 @@ export default function Contact() {
 
             {/* WhatsApp CTA */}
             <a
-              href="https://wa.me/201223863092"
+              href={`https://wa.me/${whatsappNumber}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 py-4 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#128C7E] transition-colors"
@@ -215,7 +231,7 @@ export default function Contact() {
               </h3>
               <div className="flex items-center gap-3">
                 <a
-                  href="https://www.facebook.com/profile.php?id=61587944979845"
+                  href={facebookUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-10 h-10 rounded-xl bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center hover:bg-[#1877F2] hover:text-white transition-colors"
@@ -223,7 +239,7 @@ export default function Contact() {
                   <Facebook className="w-5 h-5" />
                 </a>
                 <a
-                  href="#"
+                  href={instagramUrl}
                   className="w-10 h-10 rounded-xl bg-[#E4405F]/10 text-[#E4405F] flex items-center justify-center hover:bg-[#E4405F] hover:text-white transition-colors"
                 >
                   <Instagram className="w-5 h-5" />

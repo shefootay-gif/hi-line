@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation, useNavigate } from "react-router";
+import { Outlet, Link, Navigate, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useState } from "react";
@@ -6,26 +6,32 @@ import {
   LayoutDashboard,
   ShoppingBag,
   Package,
+  FolderTree,
   Settings,
   Menu,
   X,
-  ChevronLeft,
   LogOut,
   Store,
+  Zap,
+  TrendingUp,
+  Tag,
 } from "lucide-react";
 
 const adminNav = [
-  { label: "Dashboard", labelAr: "لوحة التحكم", href: "/admin", icon: LayoutDashboard },
-  { label: "Products", labelAr: "المنتجات", href: "/admin/products", icon: Package },
-  { label: "Orders", labelAr: "الطلبات", href: "/admin/orders", icon: ShoppingBag },
-  { label: "Settings", labelAr: "الإعدادات", href: "/admin/settings", icon: Settings },
+  { label: "Dashboard",    labelAr: "لوحة التحكم",  href: "/admin",              icon: LayoutDashboard },
+  { label: "Products",     labelAr: "المنتجات",     href: "/admin/products",     icon: Package },
+  { label: "Categories",   labelAr: "الأقسام",      href: "/admin/categories",   icon: FolderTree },
+  { label: "Orders",       labelAr: "الطلبات",      href: "/admin/orders",       icon: ShoppingBag },
+  { label: "Coupons",      labelAr: "الكوبونات",    href: "/admin/coupons",      icon: Tag },
+  { label: "Media Buyer",  labelAr: "ميديا باير",   href: "/admin/media-buyer",  icon: Zap },
+  { label: "Dropshipping", labelAr: "دروب شوبينج",  href: "/admin/dropshipping", icon: TrendingUp },
+  { label: "Settings",     labelAr: "الإعدادات",    href: "/admin/settings",     icon: Settings },
 ];
 
 export default function AdminLayout() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, logout } = useAuth({ redirectPath: "/admin/login" });
   const { lang, isRTL } = useLanguage();
   const location = useLocation();
-  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (isLoading) {
@@ -37,21 +43,7 @@ export default function AdminLayout() {
   }
 
   if (!user || user.role !== "admin") {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-lg text-[#6F6178]">
-          {lang === "ar"
-            ? "غير مصرح بالوصول"
-            : "Access Denied"}
-        </p>
-        <Link
-          to="/"
-          className="px-6 py-2.5 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-lg"
-        >
-          {lang === "ar" ? "الصفحة الرئيسية" : "Go Home"}
-        </Link>
-      </div>
-    );
+    return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />;
   }
 
   return (

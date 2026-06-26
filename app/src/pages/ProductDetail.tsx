@@ -1,5 +1,6 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTranslations } from "@/lib/translations";
+import { findCatalogProductBySlug } from "@/lib/hiLineCatalog";
 import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
 import { useParams, Link } from "react-router";
@@ -13,6 +14,8 @@ import {
   Facebook,
   Copy,
   CheckCheck,
+  Heart,
+  Star,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -44,14 +47,99 @@ export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { lang, isRTL } = useLanguage();
   const t = useTranslations(lang);
-  const { data: product, isLoading } = trpc.store.getProductBySlug.useQuery(
+  const { data: apiProduct, isLoading } = trpc.store.getProductBySlug.useQuery(
     { slug: slug || "" },
     { enabled: !!slug }
   );
+
+  const { data: user } = trpc.auth.me.useQuery();
+  const { data: wishlist, refetch: refetchWishlist } = trpc.store.getWishlist.useQuery(undefined, {
+    enabled: !!user,
+  });
+  const toggleWishlist = trpc.store.toggleWishlist.useMutation();
+  const { data: reviews } = trpc.store.getReviews.useQuery(
+    { productId: apiProduct?.id || 0 },
+    { enabled: !!apiProduct }
+  );
+  const addReview = trpc.store.addReview.useMutation();
+  
+  const catalogProduct = findCatalogProductBySlug(slug);
+  const product = apiProduct
+    ? catalogProduct
+      ? {
+          ...apiProduct,
+          ...catalogProduct,
+          id: apiProduct.id,
+          relatedProductsList: apiProduct.relatedProductsList,
+          benefits: apiProduct.benefits ?? [],
+          benefitsAr: apiProduct.benefitsAr ?? [],
+          ingredients: apiProduct.ingredients,
+          ingredientsAr: apiProduct.ingredientsAr,
+          usageInstructions: apiProduct.usageInstructions,
+          usageInstructionsAr: apiProduct.usageInstructionsAr,
+        }
+      : apiProduct
+    : catalogProduct
+      ? {
+          ...catalogProduct,
+          descriptionAr: catalogProduct.shortDescriptionAr,
+          benefits: [],
+          benefitsAr: [],
+          ingredients: null,
+          ingredientsAr: null,
+          usageInstructions: null,
+          usageInstructionsAr: null,
+          relatedProductsList: [],
+        }
+      : null;
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+
+  const isWishlisted = wishlist?.some(w => w.product.id === product?.id) ?? false;
+
+  const handleToggleWishlist = async () => {
+    if (!user) {
+      toast.error(lang === "ar" ? "يجب تسجيل الدخول أولاً" : "Please login first");
+      return;
+    }
+    if (!product) return;
+    try {
+      const res = await toggleWishlist.mutateAsync({ productId: product.id });
+      refetchWishlist();
+      if (res.added) {
+        toast.success(lang === "ar" ? "تمت الإضافة للمفضلة" : "Added to wishlist");
+      } else {
+        toast.success(lang === "ar" ? "تمت الإزالة من المفضلة" : "Removed from wishlist");
+      }
+    } catch {
+      toast.error(lang === "ar" ? "حدث خطأ" : "An error occurred");
+    }
+  };
+
+  const handleAddReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error(lang === "ar" ? "يجب تسجيل الدخول أولاً" : "Please login first");
+      return;
+    }
+    if (!product) return;
+    try {
+      await addReview.mutateAsync({
+        productId: product.id,
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+      setReviewComment("");
+      setReviewRating(5);
+      toast.success(lang === "ar" ? "تم إرسال تقييمك بنجاح وسوف يظهر بعد المراجعة" : "Review submitted successfully and will appear after approval");
+    } catch {
+      toast.error(lang === "ar" ? "حدث خطأ أثناء إرسال التقييم" : "Error submitting review");
+    }
+  };
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -65,6 +153,7 @@ export default function ProductDetail() {
         price: product.price,
         salePrice: product.salePrice,
         image: listValue<string>(product.images)[0] ?? null,
+        stock: (product as { stock?: number }).stock ?? 1,
       });
     }
     setAdded(true);
@@ -128,6 +217,7 @@ export default function ProductDetail() {
   const images = listValue<string>(product.images);
   const benefits = listValue<string>(product.benefits);
   const benefitsAr = listValue<string>(product.benefitsAr);
+  const productStock = (product as { stock?: number }).stock ?? 1;
 
   return (
     <div className={isRTL ? "font-[Cairo]" : "font-[Inter]"}>
@@ -222,42 +312,64 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Quantity */}
-            <div className="mb-6">
-              <label className="text-sm font-medium text-[#4B1C71] mb-2 block">
-                {t.quantity}
-              </label>
-              <div className="flex items-center gap-3">
+            {/* Quantity and Actions */}
+            <div className="flex flex-col sm:flex-row items-stretch gap-4 mb-8">
+              <div className="flex items-center justify-between border-2 border-[#E7D8F1] rounded-xl px-4 py-3 sm:w-32 bg-white">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg border border-[#E7D8F1] hover:bg-[#F7ECFF]"
+                  className="text-[#B57EDC] hover:text-[#4B1C71] p-1"
                 >
-                  <Minus className="w-4 h-4" />
+                  <Minus className="w-5 h-5" />
                 </button>
-                <span className="text-lg font-semibold w-8 text-center">
+                <span className="font-bold text-[#4B1C71] text-lg">
                   {quantity}
                 </span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg border border-[#E7D8F1] hover:bg-[#F7ECFF]"
+                  className="text-[#B57EDC] hover:text-[#4B1C71] p-1"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex gap-3 flex-1">
+                <button
+                  onClick={handleAddToCart}
+                  disabled={added || productStock === 0}
+                  className={`flex-1 py-4 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-md ${
+                    added
+                      ? "bg-green-500 text-white shadow-green-500/20"
+                      : "bg-[#4B1C71] text-white hover:bg-[#3a1558] shadow-[#4B1C71]/20 hover:shadow-lg hover:-translate-y-0.5"
+                  } ${
+                    productStock === 0 ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {added ? (
+                    <>
+                      <Check className="w-5 h-5 animate-in zoom-in" />
+                      {lang === "ar" ? "تمت الإضافة" : "Added"}
+                    </>
+                  ) : (
+                    lang === "ar" ? "أضف إلى السلة" : "Add to Cart"
+                  )}
+                </button>
+
+                <button
+                  onClick={handleToggleWishlist}
+                  className={`w-14 h-14 rounded-xl flex items-center justify-center border-2 transition-all duration-300 ${
+                    isWishlisted 
+                      ? "border-[#B57EDC] bg-[#F7ECFF] text-[#B57EDC] shadow-sm"
+                      : "border-[#E7D8F1] bg-white text-[#8D7A97] hover:border-[#B57EDC] hover:text-[#B57EDC]"
+                  }`}
+                  title={lang === "ar" ? "المفضلة" : "Wishlist"}
+                >
+                  <Heart className={`w-6 h-6 ${isWishlisted ? "fill-[#B57EDC]" : ""}`} />
                 </button>
               </div>
             </div>
 
             {/* Actions */}
             <div className="space-y-3 mb-8">
-              <button
-                onClick={handleAddToCart}
-                className={`w-full py-4 rounded-xl font-semibold text-base transition-all duration-200 ${
-                  added
-                    ? "bg-green-500 text-white"
-                    : "beauty-button"
-                }`}
-              >
-                {added ? t.added : t.addToCart}
-              </button>
               <button
                 onClick={handleWhatsAppOrder}
                 className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-[#25D366] text-[#25D366] font-semibold hover:bg-[#25D366] hover:text-white transition-all"
@@ -353,6 +465,94 @@ export default function ProductDetail() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Reviews Section */}
+      <div className="bg-[#FCF8FF] py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-bold text-[#4B1C71] mb-8">
+            {lang === "ar" ? "التقييمات والمراجعات" : "Reviews & Ratings"}
+          </h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+            <div className="lg:col-span-2">
+              {reviews && reviews.length > 0 ? (
+                <div className="space-y-6">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="bg-white p-6 rounded-2xl border border-[#E7D8F1]">
+                      <div className="flex items-center gap-2 mb-3">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-4 h-4 ${i < review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-[#6F6178] text-sm leading-relaxed">{review.comment}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white p-8 rounded-2xl border border-[#E7D8F1] text-center">
+                  <Star className="w-12 h-12 text-[#E7D8F1] mx-auto mb-3" />
+                  <p className="text-[#6F6178]">
+                    {lang === "ar" ? "لا توجد تقييمات حتى الآن. كن أول من يقيّم!" : "No reviews yet. Be the first to review!"}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="bg-white p-6 rounded-2xl border border-[#E7D8F1] shadow-sm sticky top-24">
+                <h3 className="font-bold text-[#4B1C71] mb-4">
+                  {lang === "ar" ? "أضف تقييمك" : "Write a Review"}
+                </h3>
+                <form onSubmit={handleAddReview} className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-[#6F6178] mb-2">
+                      {lang === "ar" ? "تقييمك" : "Your Rating"}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setReviewRating(i + 1)}
+                          className="focus:outline-none"
+                        >
+                          <Star
+                            className={`w-6 h-6 transition-colors ${
+                              i < reviewRating ? "text-yellow-400 fill-yellow-400" : "text-gray-300 hover:text-yellow-200"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-[#6F6178] mb-2">
+                      {lang === "ar" ? "مراجعتك (اختياري)" : "Your Review (optional)"}
+                    </label>
+                    <textarea
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      rows={4}
+                      className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30 resize-none text-sm"
+                      placeholder={lang === "ar" ? "شاركنا رأيك بالمنتج..." : "Share your experience..."}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={addReview.isPending}
+                    className="w-full py-3 bg-[#4B1C71] text-white font-semibold rounded-xl hover:bg-[#3a1558] transition-colors disabled:opacity-70"
+                  >
+                    {addReview.isPending ? "..." : (lang === "ar" ? "إرسال التقييم" : "Submit Review")}
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       </div>

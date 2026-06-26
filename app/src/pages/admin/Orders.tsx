@@ -8,8 +8,8 @@ import {
   Trash2,
   X,
   Loader2,
-  Package,
   MessageCircle,
+  ShoppingBag,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -22,27 +22,40 @@ const statusColors: Record<string, string> = {
   refunded: "#8D7A97",
 };
 
-const paymentStatusColors: Record<string, string> = {
-  pending: "#B57EDC",
-  paid: "#22C55E",
-  failed: "#EF4444",
-  refunded: "#8D7A97",
+const statuses = ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"] as const;
+type OrderStatus = (typeof statuses)[number];
+type AdminOrder = {
+  id: number;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  shippingAddress: string;
+  paymentMethod: string | null;
+  orderStatus: string | null;
+  total: string;
+  notes: string | null;
+  createdAt: Date;
 };
+
+function orderStatus(status: string | null): OrderStatus {
+  return statuses.includes(status as OrderStatus) ? (status as OrderStatus) : "pending";
+}
 
 export default function AdminOrders() {
   const { lang, isRTL } = useLanguage();
   const t = useTranslations(lang);
   const utils = trpc.useUtils();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [viewOrder, setViewOrder] = useState<any>(null);
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "">("");
+  const [viewOrder, setViewOrder] = useState<AdminOrder | null>(null);
   const [updateStatusId, setUpdateStatusId] = useState<number | null>(null);
-  const [newStatus, setNewStatus] = useState("");
+  const [newStatus, setNewStatus] = useState<OrderStatus>("pending");
 
-  const { data: orders, isLoading } = trpc.admin.listOrders.useQuery(
+  const { data: orders, isLoading, isError: ordersError } = trpc.admin.listOrders.useQuery(
     search || statusFilter
       ? { search: search || undefined, status: statusFilter || undefined }
-      : undefined
+      : undefined,
+    { retry: false, throwOnError: false }
   );
 
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation({
@@ -60,15 +73,13 @@ export default function AdminOrders() {
     },
   });
 
-  const handleWhatsAppCustomer = (order: any) => {
+  const handleWhatsAppCustomer = (order: AdminOrder) => {
     const message = `Hello! Regarding your order #${order.orderNumber}`;
     window.open(
       `https://wa.me/${order.customerPhone?.replace(/\+/g, "")}?text=${encodeURIComponent(message)}`,
       "_blank"
     );
   };
-
-  const statuses = ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"];
 
   return (
     <div className={`p-6 lg:p-8 ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
@@ -90,13 +101,13 @@ export default function AdminOrders() {
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => setStatusFilter(e.target.value ? orderStatus(e.target.value) : "")}
           className="px-4 py-2.5 bg-white rounded-xl border border-[#E7D8F1] text-sm focus:outline-none"
         >
           <option value="">{lang === "ar" ? "كل الحالات" : "All Statuses"}</option>
           {statuses.map((s) => (
             <option key={s} value={s}>
-              {(t as any)[s] || s}
+              {t[s]}
             </option>
           ))}
         </select>
@@ -108,7 +119,13 @@ export default function AdminOrders() {
           <div className="p-12 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#B57EDC]" />
           </div>
-        ) : orders?.length === 0 ? (
+        ) : ordersError ? (
+          <div className="p-12 text-center">
+            <ShoppingBag className="w-12 h-12 text-[#E7D8F1] mx-auto mb-3" />
+            <p className="text-[#6F6178] text-sm mb-1">{lang === "ar" ? "تعذّر الاتصال بقاعدة البيانات" : "Could not connect to database"}</p>
+            <p className="text-[#8D7A97] text-xs">{lang === "ar" ? "تأكد من تشغيل الخادم وإعدادات DB" : "Check your server and DB settings"}</p>
+          </div>
+        ) : !orders || orders.length === 0 ? (
           <div className="p-12 text-center text-[#6F6178]">{t.noOrdersFound}</div>
         ) : (
           <div className="overflow-x-auto">
@@ -162,17 +179,17 @@ export default function AdminOrders() {
                       <button
                         onClick={() => {
                           setUpdateStatusId(order.id);
-                          setNewStatus(order.orderStatus);
+                          setNewStatus(orderStatus(order.orderStatus));
                         }}
                       >
                         <span
                           className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
                           style={{
-                            backgroundColor: `${statusColors[order.orderStatus]}15`,
-                            color: statusColors[order.orderStatus],
+                            backgroundColor: `${statusColors[orderStatus(order.orderStatus)]}15`,
+                            color: statusColors[orderStatus(order.orderStatus)],
                           }}
                         >
-                          {(t as any)[order.orderStatus] || order.orderStatus}
+                          {t[orderStatus(order.orderStatus)]}
                         </span>
                       </button>
                     </td>
@@ -294,14 +311,14 @@ export default function AdminOrders() {
                     name="status"
                     value={s}
                     checked={newStatus === s}
-                    onChange={(e) => setNewStatus(e.target.value)}
+                    onChange={(e) => setNewStatus(orderStatus(e.target.value))}
                     className="w-4 h-4 accent-[#B57EDC]"
                   />
                   <span
                     className="text-sm font-medium"
                     style={{ color: statusColors[s] }}
                   >
-                    {(t as any)[s] || s}
+                    {t[s]}
                   </span>
                 </label>
               ))}
@@ -317,7 +334,7 @@ export default function AdminOrders() {
                 onClick={() =>
                   updateOrderStatus.mutate({
                     id: updateStatusId,
-                    status: newStatus as any,
+                    status: newStatus,
                   })
                 }
                 disabled={updateOrderStatus.isPending}

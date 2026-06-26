@@ -2,6 +2,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
+import { rollOnProducts, type CatalogProduct } from "@/lib/hiLineCatalog";
 import { Link } from "react-router";
 import { useNavigate } from "react-router";
 import {
@@ -19,49 +20,6 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 gsap.registerPlugin(ScrollTrigger);
-
-const scentVariants = [
-  {
-    id: 1,
-    name: "Tropical Breeze",
-    nameAr: "تروبيكال بريز",
-    color: "#159C73",
-    image: "/products/tropical-breeze.jpg",
-    slug: "hi-line-deodorant-roll-on-tropical-breeze",
-  },
-  {
-    id: 2,
-    name: "Voyage",
-    nameAr: "فوياج",
-    color: "#1E6D9E",
-    image: "/products/voyage.jpg",
-    slug: "hi-line-deodorant-roll-on-voyage",
-  },
-  {
-    id: 3,
-    name: "Candy Pop",
-    nameAr: "كاندي بوب",
-    color: "#C85BAA",
-    image: "/products/candy-pop.jpg",
-    slug: "hi-line-deodorant-roll-on-candy-pop",
-  },
-  {
-    id: 4,
-    name: "Sweet Mango",
-    nameAr: "سويت مانجو",
-    color: "#F28A24",
-    image: "/products/sweet-mango.jpg",
-    slug: "hi-line-deodorant-roll-on-sweet-mango",
-  },
-  {
-    id: 5,
-    name: "Fragrance Free",
-    nameAr: "بدون عطر",
-    color: "#4B1C71",
-    image: "/products/fragrance-free.jpg",
-    slug: "hi-line-deodorant-roll-on-fragrance-free",
-  },
-];
 
 const benefitCards = [
   {
@@ -118,38 +76,21 @@ const howToSteps = [
   },
 ];
 
-type HomeProduct = {
-  id: number;
-  nameEn: string;
-  nameAr: string;
-  scent: string;
-  scentColor: string | null;
-  price: string;
-  salePrice: string | null;
-  images: string[] | string | null;
-};
-
-function listValue(value: string[] | string | null | undefined): string[] {
-  if (Array.isArray(value)) return value;
-  if (!value) return [];
-  try {
-    return JSON.parse(value);
-  } catch {
-    return [];
-  }
-}
+type HomeProduct = CatalogProduct;
 
 export default function Home() {
   const { lang, isRTL } = useLanguage();
   const t = useTranslations(lang);
   const navigate = useNavigate();
   const { addItem } = useCart();
-  const { data: products } = trpc.store.getProducts.useQuery();
   const { data: faqs } = trpc.store.getFaqs.useQuery();
+  const { data: settings } = trpc.store.getSettings.useQuery();
 
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [email, setEmail] = useState("");
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
+  const storeName = (lang === "ar" ? settings?.store_name_ar : settings?.store_name_en) || t.heroSubtitle;
+  const tagline = (lang === "ar" ? settings?.tagline_ar : settings?.tagline_en) || t.heroDescription;
 
   const heroRef = useRef<HTMLDivElement>(null);
   const scentRef = useRef<HTMLDivElement>(null);
@@ -240,7 +181,7 @@ export default function Home() {
       scentColor: product.scentColor,
       price: product.price,
       salePrice: product.salePrice,
-      image: listValue(product.images)[0] ?? null,
+      image: product.images[0] ?? null,
     });
     setAddedIds((prev) => new Set(prev).add(product.id));
     setTimeout(() => {
@@ -252,15 +193,9 @@ export default function Home() {
     }, 1500);
   };
 
-  const getProductForScent = (scentName: string) => {
-    return products?.find(
-      (p) => p.scent.toLowerCase() === scentName.toLowerCase()
-    );
-  };
-
-  const getProductPrice = (product: any) => {
-    if (!product) return "85";
-    return parseFloat(product.price).toFixed(0);
+  const getProductPrice = (product?: HomeProduct) => {
+    if (!product) return "285";
+    return parseFloat(product.salePrice).toFixed(0);
   };
 
   const visibleFaqs = faqs?.slice(0, 4) || [];
@@ -286,14 +221,28 @@ export default function Home() {
               <p className="hero-text text-xs sm:text-sm uppercase beauty-eyebrow font-semibold mb-4">
                 Lebanese Formula
               </p>
-              <h1 className="hero-text text-4xl sm:text-5xl lg:text-6xl font-bold text-[#4B1C71] leading-tight mb-4">
-                {t.heroTitle}
+              <h1 className="hero-text text-5xl sm:text-6xl lg:text-7xl font-black text-[#4B1C71] leading-none mb-3">
+                Hi Line
               </h1>
-              <h2 className="hero-text text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#B57EDC] mb-6">
-                {t.heroSubtitle}
+              <h2 className="hero-text text-2xl sm:text-3xl font-semibold text-[#B57EDC] mb-2">
+                Pro Care
               </h2>
+              <p className="hero-text text-lg sm:text-xl font-semibold text-[#7F4CA5] mb-6">
+                Roll On
+              </p>
+              <h3 className="sr-only">
+                {storeName}
+              </h3>
+              <p className="sr-only">
+                {t.heroTitle}
+              </p>
+              <p className="sr-only">
+                {tagline}
+              </p>
               <p className="hero-text text-base sm:text-lg text-[#6F6178] leading-relaxed mb-8">
-                {t.heroDescription}
+                {lang === "ar"
+                  ? "منتجات Hi Line Roll On بسعر 285 جنيه بدل 570 جنيه."
+                  : "Hi Line Roll On products for LE 285.00 instead of LE 570.00."}
               </p>
               <div
                 className={`hero-text flex flex-col sm:flex-row gap-4 ${
@@ -360,51 +309,67 @@ export default function Home() {
             <p className="text-xs uppercase beauty-eyebrow font-semibold mb-3">
               {lang === "ar" ? "مجموعتنا" : "OUR COLLECTION"}
             </p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-[#4B1C71] mb-4">
-              {t.chooseYourScent}
+            <h2 className="mb-2 text-2xl font-semibold text-[#7F4CA5] sm:text-3xl">
+              Roll On
             </h2>
-            <p className="text-[#6F6178] max-w-md mx-auto">{t.scentSubtitle}</p>
+            <p className="mx-auto max-w-md text-[#6F6178]">
+              {lang === "ar" ? "كل منتجات الرول أون تحت قسم واحد" : "All roll-on products under one section"}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-            {scentVariants.map((variant) => {
-              const product = getProductForScent(variant.name);
+            {rollOnProducts.map((product) => {
+              const variant = {
+                id: product.id,
+                name: product.scent,
+                nameAr: product.scent,
+                color: product.scentColor,
+                image: product.images[0],
+                slug: product.slug,
+              };
               return (
                 <div
                   key={variant.id}
-                  className="scent-card group beauty-card rounded-2xl overflow-hidden"
+                  className="scent-card group overflow-hidden rounded-lg border border-[#E7D8F1]/80 bg-white shadow-[0_10px_30px_rgba(75,28,113,0.07)]"
                 >
                   <Link to={`/shop/${variant.slug}`} className="block">
                     <div
-                      className="aspect-square relative flex items-center justify-center p-6"
+                      className="aspect-square relative flex items-center justify-center bg-white p-5"
                       style={{
                         background: `linear-gradient(145deg, ${variant.color}12, #fcf8ff)`,
                       }}
                     >
+                      <span className="absolute left-3 top-3 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white">
+                        50% OFF
+                      </span>
                       <img
                         src={variant.image}
                         alt={variant.name}
                         loading="lazy"
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                        className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
                       />
                     </div>
                   </Link>
-                  <div className="p-4">
+                  <div className="p-4 text-center">
                     <span
-                      className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider text-white mb-2"
+                      className="hidden"
                       style={{ backgroundColor: variant.color }}
                     >
                       {lang === "ar" ? variant.nameAr : variant.name}
                     </span>
-                    <h3 className="text-sm font-semibold text-[#4B1C71] mb-1">
-                      Hi Line
+                    <h3 className="min-h-[3.4rem] text-sm font-semibold leading-snug text-[#241A2E]">
+                      <span className="block">Hi Line roll on whiting deodorant</span>
+                      <span className="block">{variant.name}</span>
                     </h3>
-                    <p className="text-xs text-[#6F6178] mb-2">
+                    <p className="hidden">
                       {lang === "ar" ? "رول أون مزيل عرق" : "Deodorant Roll On"}
                     </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-base font-bold text-[#4B1C71]">
-                        {getProductPrice(product)} {t.currency}
+                    <div className="mt-3 flex flex-wrap items-baseline justify-center gap-2">
+                      <span className="text-base font-black text-[#D71920]">
+                        LE {getProductPrice(product)}.00
+                      </span>
+                      <span className="text-sm text-[#8D7A97] line-through">
+                        LE 570.00
                       </span>
                     </div>
                   </div>
@@ -526,15 +491,8 @@ export default function Home() {
                 <p className="text-sm text-[#6F6178]">
                   {lang === "ar" ? step.descAr : step.desc}
                 </p>
-                {idx < howToSteps.length - 1 && (
-                  <div
-                    className={`hidden sm:block absolute top-6 ${
-                      isRTL ? "-left-2" : "-right-2"
-                    } w-full border-t-2 border-dashed border-[#E7D8F1]`}
-                  />
-                )}
-              </div>
-            ))}
+                </div>
+              ))}
           </div>
         </div>
       </section>

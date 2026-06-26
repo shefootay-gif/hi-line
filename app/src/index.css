@@ -77,10 +77,11 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     color: var(--beauty-ink);
     background:
       radial-gradient(circle at top left, rgba(181, 126, 220, 0.12), transparent 32rem),

@@ -4,37 +4,43 @@ import type { SessionPayload } from "./types";
 
 const JWT_ALG = "HS256";
 
+function getSecret() {
+  // Use jwtSecret (JWT_SECRET env) as primary, fallback to appSecret
+  return new TextEncoder().encode(env.jwtSecret);
+}
+
 export async function signSessionToken(
   payload: SessionPayload,
 ): Promise<string> {
-  const secret = new TextEncoder().encode(env.appSecret);
-  return new jose.SignJWT(payload)
+  return new jose.SignJWT(payload as unknown as jose.JWTPayload)
     .setProtectedHeader({ alg: JWT_ALG })
     .setIssuedAt()
-    .setExpirationTime("1 year")
-    .sign(secret);
+    .setExpirationTime("30d")
+    .sign(getSecret());
 }
 
 export async function verifySessionToken(
   token: string,
 ): Promise<SessionPayload | null> {
-  if (!token) {
-    console.warn("[session] No token provided for verification.");
-    return null;
-  }
+  if (!token) return null;
   try {
-    const secret = new TextEncoder().encode(env.appSecret);
-    const { payload } = await jose.jwtVerify(token, secret, {
+    const { payload } = await jose.jwtVerify(token, getSecret(), {
       algorithms: [JWT_ALG],
     });
-    const { unionId, clientId } = payload;
-    if (!unionId || !clientId) {
-      console.warn("[session] JWT payload missing required fields.");
+    const { unionId, clientId } = payload as {
+      unionId?: string;
+      clientId?: string;
+    };
+    if (!unionId) {
+      console.warn("[session] JWT payload missing unionId field.");
       return null;
     }
-    return { unionId, clientId } as SessionPayload;
+    return { unionId, clientId: clientId ?? "local" } as SessionPayload;
   } catch (error) {
-    console.warn("[session] JWT verification failed:", error);
+    console.warn(
+      "[session] JWT verification failed:",
+      error instanceof Error ? error.message : "Verification failed",
+    );
     return null;
   }
 }

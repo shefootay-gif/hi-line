@@ -11,6 +11,7 @@ export interface CartItem {
   salePrice: string | null;
   image: string | null;
   quantity: number;
+  stock?: number;
 }
 
 interface CartState {
@@ -23,58 +24,130 @@ interface CartState {
   getTotalPrice: () => number;
 }
 
+type NormalizedCartItem = Omit<CartItem, "stock"> & { stock: number };
+
+const parsePositiveInt = (value: unknown, fallback = 1) => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.floor(parsed));
+};
+
+const parseMoney = (value: unknown) => {
+  const parsed = typeof value === "number" ? value : parseFloat(String(value ?? ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const normalizeText = (value: unknown) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizePriceString = (value: unknown) => {
+  const parsed = parseMoney(value);
+  return parsed.toFixed(2);
+};
+
+const normalizeCartItem = (item: Partial<CartItem> & Pick<CartItem, "productId">): NormalizedCartItem => {
+  const stock = parsePositiveInt(item.stock, 1);
+  const quantity = Math.max(1, Math.min(parsePositiveInt(item.quantity, 1), stock || 1));
+
+  return {
+    productId: item.productId,
+    name: typeof item.name === "string" && item.name.trim() ? item.name : "",
+    nameAr: normalizeText(item.nameAr),
+    scent: typeof item.scent === "string" && item.scent.trim() ? item.scent : "",
+    scentColor: normalizeText(item.scentColor),
+    price: normalizePriceString(item.price),
+    salePrice: normalizeText(item.salePrice),
+    image: normalizeText(item.image),
+    quantity,
+    stock,
+  };
+};
+
+const normalizeCartItems = (items: Array<Partial<CartItem> & Pick<CartItem, "productId">>) =>
+  items
+    .map((item) => normalizeCartItem(item))
+    .filter((item) => item.quantity > 0 && item.stock > 0);
+
 export const useCart = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
       addItem: (item) =>
         set((state) => {
-          const existing = state.items.find(
+          const normalizedItem = normalizeCartItem(item);
+          if (normalizedItem.stock <= 0) {
+            return { items: normalizeCartItems(state.items) };
+          }
+          const items = normalizeCartItems(state.items);
+          const existing = items.find(
             (i) => i.productId === item.productId
           );
           if (existing) {
+            const existingItem = normalizeCartItem(existing);
+            const newQuantity = Math.min(
+              existingItem.quantity + 1,
+              existingItem.stock || normalizedItem.stock
+            );
             return {
-              items: state.items.map((i) =>
-                i.productId === item.productId
-                  ? { ...i, quantity: i.quantity + 1 }
-                  : i
+              items: items.map((i) =>
+                i.productId === item.productId ? { ...i, quantity: newQuantity } : i
               ),
             };
           }
-          return { items: [...state.items, { ...item, quantity: 1 }] };
+          return { items: [...items, normalizedItem] };
         }),
       removeItem: (productId) =>
         set((state) => ({
-          items: state.items.filter((i) => i.productId !== productId),
+          items: normalizeCartItems(state.items).filter((i) => i.productId !== productId),
         })),
       updateQuantity: (productId, quantity) =>
         set((state) => {
+          const items = normalizeCartItems(state.items);
           if (quantity <= 0) {
             return {
-              items: state.items.filter((i) => i.productId !== productId),
+              items: items.filter((i) => i.productId !== productId),
             };
           }
           return {
-            items: state.items.map((i) =>
-              i.productId === productId ? { ...i, quantity } : i
-            ),
+            items: items.map((i) => {
+              if (i.productId === productId) {
+                // Enforce stock limit
+                return { ...i, quantity: Math.min(quantity, i.stock ?? quantity) };
+              }
+              return i;
+            }),
           };
         }),
       clearCart: () => set({ items: [] }),
       getTotalItems: () => {
-        return get().items.reduce((sum, item) => sum + item.quantity, 0);
+        return normalizeCartItems(get().items).reduce(
+          (sum, item) => sum + item.quantity,
+          0
+        );
       },
       getTotalPrice: () => {
-        return get().items.reduce((sum, item) => {
-          const price = item.salePrice
-            ? parseFloat(item.salePrice)
-            : parseFloat(item.price);
+        return normalizeCartItems(get().items).reduce((sum, item) => {
+          const price = item.salePrice ? parseMoney(item.salePrice) : parseMoney(item.price);
           return sum + price * item.quantity;
         }, 0);
       },
     }),
     {
       name: "hiline-cart",
+      version: 2,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<CartState> | undefined;
+        return {
+          items: normalizeCartItems(state?.items ?? []),
+        };
+      },
     }
   )
 );
+
+useCart.setState((state) => ({
+  items: normalizeCartItems(state.items),
+}));

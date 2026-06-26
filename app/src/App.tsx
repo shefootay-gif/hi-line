@@ -13,11 +13,19 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import FAQ from "./pages/FAQ";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import MyOrders from "./pages/MyOrders";
+import Wishlist from "./pages/Wishlist";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
+import AdminCategories from "./pages/admin/Categories";
 import AdminOrders from "./pages/admin/Orders";
 import AdminSettings from "./pages/admin/Settings";
+import AdminCoupons from "./pages/admin/Coupons";
+import MediaBuyer from "./pages/admin/MediaBuyer";
+import Dropshipping from "./pages/admin/Dropshipping";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -29,6 +37,7 @@ export default function App() {
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/shop" element={<Shop />} />
+            <Route path="/shop/category/:category" element={<Shop />} />
             <Route path="/shop/:slug" element={<ProductDetail />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
@@ -37,17 +46,26 @@ export default function App() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/my-orders" element={<MyOrders />} />
+            <Route path="/wishlist" element={<Wishlist />} />
           </Route>
 
           {/* Auth */}
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/admin/login" element={<Login mode="admin" />} />
 
           {/* Admin Routes */}
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/products" element={<AdminProducts />} />
+            <Route path="/admin/categories" element={<AdminCategories />} />
             <Route path="/admin/orders" element={<AdminOrders />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin/coupons" element={<AdminCoupons />} />
+            <Route path="/admin/media-buyer" element={<MediaBuyer />} />
+            <Route path="/admin/dropshipping" element={<Dropshipping />} />
           </Route>
 
           {/* 404 */}

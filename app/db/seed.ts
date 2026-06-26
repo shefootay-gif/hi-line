@@ -14,7 +14,7 @@ async function seed() {
   console.log("Seeding database...");
 
   // Seed categories
-  const cats = await db
+  await db
     .insert(categories)
     .values([
       {
@@ -73,7 +73,7 @@ async function seed() {
   console.log("Categories seeded");
 
   // Seed products
-  const prods = await db
+  await db
     .insert(products)
     .values([
       {
@@ -413,16 +413,18 @@ async function seed() {
       { key: "whatsapp_number", value: "+201223863092" },
       { key: "phone_number", value: "+201223863092" },
       { key: "facebook_url", value: "https://www.facebook.com/profile.php?id=61587944979845" },
+      { key: "instagram_url", value: "" },
+      { key: "logo_url", value: "/brand/logo.jpg" },
       { key: "currency", value: "EGP" },
       { key: "default_language", value: "en" },
       { key: "meta_title_en", value: "Hi Line Pro Care - Deodorant Roll On | Freshness That Fits Every Mood" },
       { key: "meta_description_en", value: "Discover Hi Line Deodorant Roll On. 48h protection, 0% Aluminum, Lebanese Formula. 5 amazing scents. Shop now and experience the freshness!" },
       { key: "meta_title_ar", value: "ظ‡ط§ظٹ ظ„ط§ظٹظ† ط¨ط±ظˆ ظƒظٹط± - ط±ظˆظ„ ط£ظˆظ† ظ…ط²ظٹظ„ ط¹ط±ظ‚ | ط§ظ†طھط¹ط§ط´ ظٹظ†ط§ط³ط¨ ظƒظ„ ظ…ط²ط§ط¬" },
       { key: "meta_description_ar", value: "ط§ظƒطھط´ظپ ظ‡ط§ظٹ ظ„ط§ظٹظ† ط±ظˆظ„ ط£ظˆظ† ظ…ط²ظٹظ„ ط§ظ„ط¹ط±ظ‚. ط­ظ…ط§ظٹط© 48 ط³ط§ط¹ط©طŒ 0% ط£ظ„ظ…ظ†ظٹظˆظ…طŒ طھط±ظƒظٹط¨ط© ظ„ط¨ظ†ط§ظ†ظٹط©. 5 ط±ظˆط§ط¦ط­ ط±ط§ط¦ط¹ط©. طھط³ظˆظ‚ ط§ظ„ط¢ظ† ظˆط§ط®طھط¨ط± ط§ظ„ط§ظ†طھط¹ط§ط´!" },
-      { key: "free_shipping_threshold", value: "500" },
-      { key: "announcement_text_en", value: "Free shipping on orders over EGP 500!" },
-      { key: "announcement_text_ar", value: "ط´ط­ظ† ظ…ط¬ط§ظ†ظٹ ظ„ظ„ط·ظ„ط¨ط§طھ ط§ظ„طھظٹ طھط²ظٹط¯ ط¹ظ† 500 ط¬ظ†ظٹظ‡!" },
-      { key: "primary_color", value: "#F5B235" },
+      { key: "free_shipping_threshold", value: "" },
+      { key: "announcement_text_en", value: "50% OFF Hi Line Roll On Collection" },
+      { key: "announcement_text_ar", value: "خصم 50% على مجموعة Hi Line Roll On" },
+      { key: "primary_color", value: "#4B1C71" },
       { key: "secondary_color", value: "#B57EDC" },
     ])
     .onDuplicateKeyUpdate({

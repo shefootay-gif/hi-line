@@ -11,8 +11,55 @@ import {
   orders,
   orderItems,
   customers,
+  coupons,
 } from "@db/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
+
+const editableSettingKeys = new Set([
+  // Store identity
+  "store_name_en",
+  "store_name_ar",
+  "tagline_en",
+  "tagline_ar",
+  "logo_url",
+  "favicon_url",
+  "hero_bg_url",
+  // Contact
+  "whatsapp_number",
+  "phone_number",
+  "email_address",
+  "address_en",
+  "address_ar",
+  // Social Media
+  "facebook_url",
+  "instagram_url",
+  "tiktok_url",
+  "youtube_url",
+  "twitter_url",
+  "snapchat_url",
+  "telegram_url",
+  "linkedin_url",
+  "pinterest_url",
+  // Appearance
+  "primary_color",
+  "secondary_color",
+  "accent_color",
+  "background_color",
+  // Announcements
+  "announcement_text_en",
+  "announcement_text_ar",
+  // Shipping
+  "free_shipping_threshold",
+  "default_shipping_fee",
+  // SEO
+  "meta_title_en",
+  "meta_description_en",
+  "meta_title_ar",
+  "meta_description_ar",
+  // Store config
+  "currency",
+  "default_language",
+]);
 
 export const adminRouter = createRouter({
   // Products management
@@ -147,7 +194,7 @@ export const adminRouter = createRouter({
   listOrders: adminQuery
     .input(
       z.object({
-        status: z.string().optional(),
+        status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]).optional(),
         search: z.string().optional(),
       }).optional()
     )
@@ -156,7 +203,7 @@ export const adminRouter = createRouter({
       const conditions = [];
 
       if (input?.status) {
-        conditions.push(eq(orders.orderStatus, input.status as any));
+        conditions.push(eq(orders.orderStatus, input.status));
       }
       if (input?.search) {
         conditions.push(like(orders.orderNumber, `%${input.search}%`));
@@ -281,7 +328,12 @@ export const adminRouter = createRouter({
 
   // Settings management
   updateSetting: adminQuery
-    .input(z.object({ key: z.string(), value: z.string() }))
+    .input(
+      z.object({
+        key: z.string().refine((key) => editableSettingKeys.has(key), "Invalid setting key"),
+        value: z.string().max(3_000_000),
+      })
+    )
     .mutation(async ({ input }) => {
       const db = getDb();
       await db
@@ -290,6 +342,83 @@ export const adminRouter = createRouter({
         .onDuplicateKeyUpdate({
           set: { value: input.value, updatedAt: new Date() },
         });
+      return { success: true };
+    }),
+
+  // Coupons management
+  listCoupons: adminQuery
+    .query(async () => {
+      const db = getDb();
+      return db.select().from(coupons).orderBy(desc(coupons.createdAt));
+    }),
+
+  createCoupon: adminQuery
+    .input(
+      z.object({
+        code: z.string().min(1),
+        discountType: z.enum(["percentage", "fixed"]),
+        discountValue: z.string().min(1),
+        minOrderValue: z.string().optional(),
+        maxUsage: z.number().optional(),
+        isActive: z.boolean().default(true),
+        expiresAt: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const existing = await db
+        .select()
+        .from(coupons)
+        .where(eq(coupons.code, input.code))
+        .limit(1);
+      if (existing.length > 0) {
+        throw new Error("Coupon code already exists");
+      }
+      const result = await db.insert(coupons).values({
+        code: input.code,
+        discountType: input.discountType,
+        discountValue: input.discountValue,
+        minOrderValue: input.minOrderValue || "0",
+        maxUsage: input.maxUsage ?? null,
+        isActive: input.isActive,
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+      });
+      return { id: Number(result[0].insertId) };
+    }),
+
+  updateCoupon: adminQuery
+    .input(
+      z.object({
+        id: z.number(),
+        code: z.string().min(1),
+        discountType: z.enum(["percentage", "fixed"]),
+        discountValue: z.string().min(1),
+        minOrderValue: z.string().optional(),
+        maxUsage: z.number().optional(),
+        isActive: z.boolean().default(true),
+        expiresAt: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const { id, ...data } = input;
+      await db
+        .update(coupons)
+        .set({
+          ...data,
+          minOrderValue: data.minOrderValue || "0",
+          maxUsage: data.maxUsage ?? null,
+          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+        })
+        .where(eq(coupons.id, id));
+      return { success: true };
+    }),
+
+  deleteCoupon: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db.delete(coupons).where(eq(coupons.id, input.id));
       return { success: true };
     }),
 
@@ -331,6 +460,14 @@ export const adminRouter = createRouter({
     }),
 
   // Category management
+  listCategories: adminQuery.query(async () => {
+    const db = getDb();
+    return await db
+      .select()
+      .from(categories)
+      .orderBy(categories.sortOrder);
+  }),
+
   createCategory: adminQuery
     .input(
       z.object({

@@ -8,7 +8,7 @@ import { Session } from "@contracts/constants";
 import { Errors } from "@contracts/errors";
 import { signSessionToken, verifySessionToken } from "./session";
 import { users as kimiUsers } from "./platform";
-import { findUserByUnionId, upsertUser } from "../queries/users";
+import { findUserById, findUserByUnionId, upsertUser } from "../queries/users";
 import type { TokenResponse } from "./types";
 
 async function exchangeAuthCode(
@@ -65,13 +65,42 @@ export async function authenticateRequest(headers: Headers) {
   const cookies = cookie.parse(headers.get("cookie") || "");
   const token = cookies[Session.cookieName];
   if (!token) {
-    console.warn("[auth] No session cookie found in request.");
     throw Errors.forbidden("Invalid authentication token.");
   }
   const claim = await verifySessionToken(token);
   if (!claim) {
     throw Errors.forbidden("Invalid authentication token.");
   }
+  if (claim.unionId === `local-admin:${env.localAdminUsername}`) {
+    const now = new Date();
+    return {
+      id: 0,
+      unionId: claim.unionId,
+      name: "Hi Line Admin",
+      email: "admin@hiline.local",
+      avatar: null,
+      role: "admin",
+      passwordHash: null,
+      createdAt: now,
+      updatedAt: now,
+      lastSignInAt: now,
+    } as const;
+  }
+  // Handle local email/password login — unionId is "local:<nanoid>"
+  if (claim.unionId.startsWith("local:")) {
+    let user = await findUserByUnionId(claim.unionId);
+    if (!user) {
+      const legacyId = Number(claim.unionId.slice("local:".length));
+      if (Number.isFinite(legacyId)) {
+        user = await findUserById(legacyId);
+      }
+    }
+    if (!user) {
+      throw Errors.forbidden("User not found. Please re-login.");
+    }
+    return user;
+  }
+  // Fallback: Kimi OAuth user
   const user = await findUserByUnionId(claim.unionId);
   if (!user) {
     throw Errors.forbidden("User not found. Please re-login.");
@@ -101,7 +130,19 @@ export function createOAuthCallbackHandler() {
     }
 
     try {
-      const redirectUri = atob(state);
+      const decodedState = atob(state);
+      let redirectUri = decodedState;
+      let postLoginPath = "/";
+      try {
+        const parsed = JSON.parse(decodedState) as {
+          redirectUri?: string;
+          mode?: string;
+        };
+        redirectUri = parsed.redirectUri || redirectUri;
+        postLoginPath = parsed.mode === "admin" ? "/admin" : "/";
+      } catch {
+        redirectUri = decodedState;
+      }
       const tokenResp = await exchangeAuthCode(code, redirectUri);
       const { userId } = await verifyAccessToken(tokenResp.access_token);
       const userProfile = await kimiUsers.getProfile(tokenResp.access_token);
@@ -127,9 +168,9 @@ export function createOAuthCallbackHandler() {
         maxAge: Session.maxAgeMs / 1000,
       });
 
-      return c.redirect("/", 302);
+      return c.redirect(postLoginPath, 302);
     } catch (error) {
-      console.error("[OAuth] Callback failed", error);
+      console.error("[OAuth] Callback failed", error instanceof Error ? error.message : "Unknown error");
       return c.json({ error: "OAuth callback failed" }, 500);
     }
   };

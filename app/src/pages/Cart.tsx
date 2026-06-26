@@ -2,7 +2,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useTranslations } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
 import { Link, useNavigate } from "react-router";
-import { ShoppingBag, Minus, Plus, Trash2, ArrowRight, ArrowLeft, MessageCircle } from "lucide-react";
+import { ShoppingBag, Minus, Plus, Trash2, MessageCircle } from "lucide-react";
 
 export default function Cart() {
   const { lang, isRTL } = useLanguage();
@@ -16,7 +16,7 @@ export default function Cart() {
       .map(
         (item) =>
           `- ${item.name} (${item.scent}) x${item.quantity} = ${(
-            parseFloat(item.price) * item.quantity
+            parseFloat(item.salePrice || item.price) * item.quantity
           ).toFixed(0)} EGP`
       )
       .join("\n");
@@ -108,14 +108,16 @@ export default function Cart() {
                           onClick={() =>
                             updateQuantity(item.productId, item.quantity + 1)
                           }
-                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E7D8F1] hover:bg-[#F7ECFF]"
+                          disabled={item.quantity >= (item.stock ?? 1)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E7D8F1] hover:bg-[#F7ECFF] disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={item.quantity >= (item.stock ?? 1) ? (lang === "ar" ? "أقصى كمية متاحة" : "Max stock reached") : undefined}
                         >
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
                       <span className="text-lg font-bold text-[#4B1C71]">
                         {(
-                          parseFloat(item.price) * item.quantity
+                          parseFloat(item.salePrice || item.price) * item.quantity
                         ).toFixed(0)}{" "}
                         {t.currency}
                       </span>

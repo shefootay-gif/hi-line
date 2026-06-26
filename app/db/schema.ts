@@ -20,6 +20,7 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -119,6 +120,7 @@ export type Customer = typeof customers.$inferSelect;
 export const orders = mysqlTable("orders", {
   id: serial("id").primaryKey(),
   orderNumber: varchar("order_number", { length: 50 }).notNull().unique(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }),
   customerId: bigint("customer_id", { mode: "number", unsigned: true }),
   customerName: varchar("customer_name", { length: 255 }).notNull(),
   customerPhone: varchar("customer_phone", { length: 50 }).notNull(),
@@ -130,6 +132,8 @@ export const orders = mysqlTable("orders", {
   postalCode: varchar("postal_code", { length: 20 }),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
   shippingFee: decimal("shipping_fee", { precision: 10, scale: 2 }).default("0"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  couponCode: varchar("coupon_code", { length: 50 }),
   total: decimal("total", { precision: 12, scale: 2 }).notNull(),
   paymentMethod: mysqlEnum("payment_method", [
     "cash_on_delivery",
@@ -262,3 +266,75 @@ export const faqs = mysqlTable("faqs", {
 });
 
 export type Faq = typeof faqs.$inferSelect;
+
+// Coupons table
+export const coupons = mysqlTable("coupons", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  discountType: mysqlEnum("discount_type", ["percentage", "fixed"]).notNull(),
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minOrderValue: decimal("min_order_value", { precision: 10, scale: 2 }).default("0"),
+  maxUsage: int("max_usage"),
+  currentUsage: int("current_usage").default(0),
+  isActive: boolean("is_active").default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type Coupon = typeof coupons.$inferSelect;
+
+// Reviews table
+export const reviews = mysqlTable("reviews", {
+  id: serial("id").primaryKey(),
+  productId: bigint("product_id", { mode: "number", unsigned: true }).notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  rating: int("rating").notNull(),
+  comment: text("comment"),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type Review = typeof reviews.$inferSelect;
+
+// Wishlists table
+export const wishlists = mysqlTable("wishlists", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  productId: bigint("product_id", { mode: "number", unsigned: true }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Wishlist = typeof wishlists.$inferSelect;
+
+// Contact Messages table
+export const contactMessages = mysqlTable("contact_messages", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ContactMessage = typeof contactMessages.$inferSelect;
+
+// Password Reset Tokens table
+export const passwordResetTokens = mysqlTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;

@@ -151,6 +151,7 @@ export const translations = {
     filter: "Filter",
     active: "Active",
     inactive: "Inactive",
+    status: "Status",
     featured: "Featured",
     bestSeller: "Best Seller",
     stock: "Stock",
@@ -159,6 +160,7 @@ export const translations = {
     sku: "SKU",
     scent: "Scent",
     name: "Name",
+    nameEn: "Name (English)",
     nameAr: "Name (Arabic)",
     descriptionAr: "Description (Arabic)",
     shortDescription: "Short Description",
@@ -305,7 +307,7 @@ export const translations = {
       "The page you are looking for does not exist or has been moved.",
 
     // Announcement
-    freeShippingAnnouncement: "Free shipping on orders over EGP 500!",
+    freeShippingAnnouncement: "50% OFF Hi Line Roll On Collection",
   },
   ar: {
     // Navigation
@@ -460,6 +462,7 @@ export const translations = {
     filter: "تصفية",
     active: "نشط",
     inactive: "غير نشط",
+    status: "الحالة",
     featured: "مميز",
     bestSeller: "الأكثر مبيعاً",
     stock: "المخزون",
@@ -468,6 +471,7 @@ export const translations = {
     sku: "رمز المنتج",
     scent: "الرائحة",
     name: "الاسم",
+    nameEn: "الاسم (بالإنجليزية)",
     nameAr: "الاسم (بالعربية)",
     descriptionAr: "الوصف (بالعربية)",
     shortDescription: "وصف مختصر",
@@ -613,7 +617,7 @@ export const translations = {
     pageNotFoundText: "الصفحة التي تبحث عنها غير موجودة أو تم نقلها.",
 
     // Announcement
-    freeShippingAnnouncement: "شحن مجاني للطلبات التي تزيد عن 500 جنيه!",
+    freeShippingAnnouncement: "خصم 50% على مجموعة Hi Line Roll On",
   },
 };
 
@@ -622,4 +626,3 @@ export type Translations = typeof translations.en;
 export function useTranslations(lang: "en" | "ar") {
   return translations[lang];
 }
-

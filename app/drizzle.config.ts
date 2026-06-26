@@ -1,9 +1,9 @@
 import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required to run drizzle commands");
+const connectionString = process.env.DATABASE_URL?.trim();
+if (!connectionString || connectionString.startsWith("#") || !connectionString.includes("://")) {
+  throw new Error("DATABASE_URL must be a valid MySQL connection URL");
 }
 
 export default defineConfig({
