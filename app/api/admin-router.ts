@@ -18,6 +18,17 @@ import {
   mediaBuyerCampaigns,
   inventoryMovements,
   adminActivityLogs,
+  paymentTransactions,
+  shippingProviders,
+  shipments,
+  invoices,
+  adminNotifications,
+  returnRequests,
+  uploadAssets,
+  seoPages,
+  adminStaffUsers,
+  exportJobs,
+  backupJobs,
 } from "@db/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
 
@@ -151,6 +162,23 @@ const editableSettingKeys = new Set([
   "currency",
   "default_language",
 ]);
+
+
+function csvEscape(value: unknown) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function toCsv(rows: Record<string, unknown>[]) {
+  if (rows.length === 0) return "";
+  const headers = Object.keys(rows[0]);
+  return [headers.join(","), ...rows.map((row) => headers.map((h) => csvEscape(row[h])).join(","))].join("\n");
+}
+
+function safeNumber(value: string | number | null | undefined) {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
 
 export const adminRouter = createRouter({
   // Products management
@@ -1293,6 +1321,242 @@ export const adminRouter = createRouter({
       storeOrders: toNumber(realOrders?.orders),
     };
   }),
+
+
+  // Payments / transactions
+  listPaymentTransactions: adminQuery
+    .input(z.object({ limit: z.number().default(100) }).optional())
+    .query(async ({ input }) => {
+      const db = getDb();
+      return db.select().from(paymentTransactions).orderBy(desc(paymentTransactions.createdAt)).limit(input?.limit ?? 100);
+    }),
+
+  createManualPaymentTransaction: adminQuery
+    .input(z.object({ orderId: z.number().optional(), orderNumber: z.string().optional(), provider: z.enum(["manual", "tap", "hyperpay", "paytabs", "stripe", "moyasar", "myfatoorah"]).default("manual"), method: z.string().optional(), amount: z.string().default("0"), currency: z.string().default("EGP"), status: z.enum(["pending", "paid", "failed", "refunded", "cancelled"]).default("pending"), providerReference: z.string().optional(), checkoutUrl: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const result = await db.insert(paymentTransactions).values({ ...input, orderId: input.orderId ?? null, paidAt: input.status === "paid" ? new Date() : null });
+      if (input.orderId && input.status === "paid") await db.update(orders).set({ paymentStatus: "paid" }).where(eq(orders.id, input.orderId));
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_payment", entityType: "payment_transaction", entityId: Number(result[0].insertId), details: input });
+      return { id: Number(result[0].insertId) };
+    }),
+
+  updatePaymentTransactionStatus: adminQuery
+    .input(z.object({ id: z.number(), status: z.enum(["pending", "paid", "failed", "refunded", "cancelled"]) }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const found = await db.select().from(paymentTransactions).where(eq(paymentTransactions.id, input.id)).limit(1);
+      await db.update(paymentTransactions).set({ status: input.status, paidAt: input.status === "paid" ? new Date() : null }).where(eq(paymentTransactions.id, input.id));
+      if (found[0]?.orderId && input.status === "paid") await db.update(orders).set({ paymentStatus: "paid" }).where(eq(orders.id, found[0].orderId));
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "update_payment_status", entityType: "payment_transaction", entityId: input.id, details: input });
+      return { success: true };
+    }),
+
+  // Shipping providers and shipments
+  listShippingProviders: adminQuery.query(async () => {
+    const db = getDb();
+    return db.select().from(shippingProviders).orderBy(desc(shippingProviders.createdAt));
+  }),
+
+  createShippingProvider: adminQuery
+    .input(z.object({ name: z.string().min(1), phone: z.string().optional(), website: z.string().optional(), trackingUrlTemplate: z.string().optional(), baseFee: z.string().default("0"), isActive: z.boolean().default(true), notes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const result = await db.insert(shippingProviders).values(input);
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_shipping_provider", entityType: "shipping_provider", entityId: Number(result[0].insertId), details: input });
+      return { id: Number(result[0].insertId) };
+    }),
+
+  updateShippingProvider: adminQuery
+    .input(z.object({ id: z.number(), name: z.string().min(1), phone: z.string().optional(), website: z.string().optional(), trackingUrlTemplate: z.string().optional(), baseFee: z.string().default("0"), isActive: z.boolean().default(true), notes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb(); const { id, ...data } = input;
+      await db.update(shippingProviders).set(data).where(eq(shippingProviders.id, id));
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "update_shipping_provider", entityType: "shipping_provider", entityId: id, details: data });
+      return { success: true };
+    }),
+
+  listShipments: adminQuery
+    .input(z.object({ limit: z.number().default(100) }).optional())
+    .query(async ({ input }) => {
+      const db = getDb();
+      return db.select().from(shipments).orderBy(desc(shipments.createdAt)).limit(input?.limit ?? 100);
+    }),
+
+  createShipment: adminQuery
+    .input(z.object({ orderId: z.number(), providerId: z.number().optional(), trackingNumber: z.string().optional(), status: z.enum(["pending", "ready", "shipped", "out_for_delivery", "delivered", "failed", "returned"]).default("pending"), shippingCost: z.string().default("0"), notes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const result = await db.insert(shipments).values({ ...input, providerId: input.providerId ?? null, shippedAt: ["shipped", "out_for_delivery", "delivered"].includes(input.status) ? new Date() : null, deliveredAt: input.status === "delivered" ? new Date() : null });
+      if (["shipped", "out_for_delivery", "delivered"].includes(input.status)) await db.update(orders).set({ orderStatus: input.status === "delivered" ? "delivered" : "shipped" }).where(eq(orders.id, input.orderId));
+      await db.insert(adminNotifications).values({ title: "Shipment updated", message: `Shipment created for order #${input.orderId}`, type: "shipping", entityType: "shipment", entityId: Number(result[0].insertId) });
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_shipment", entityType: "shipment", entityId: Number(result[0].insertId), details: input });
+      return { id: Number(result[0].insertId) };
+    }),
+
+  updateShipmentStatus: adminQuery
+    .input(z.object({ id: z.number(), status: z.enum(["pending", "ready", "shipped", "out_for_delivery", "delivered", "failed", "returned"]) }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const found = await db.select().from(shipments).where(eq(shipments.id, input.id)).limit(1);
+      await db.update(shipments).set({ status: input.status, shippedAt: ["shipped", "out_for_delivery", "delivered"].includes(input.status) ? new Date() : null, deliveredAt: input.status === "delivered" ? new Date() : null }).where(eq(shipments.id, input.id));
+      if (found[0]?.orderId && ["shipped", "delivered"].includes(input.status)) await db.update(orders).set({ orderStatus: input.status === "delivered" ? "delivered" : "shipped" }).where(eq(orders.id, found[0].orderId));
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "update_shipment_status", entityType: "shipment", entityId: input.id, details: input });
+      return { success: true };
+    }),
+
+  // Invoices
+  listInvoices: adminQuery.query(async () => {
+    const db = getDb(); return db.select().from(invoices).orderBy(desc(invoices.createdAt));
+  }),
+
+  createInvoiceForOrder: adminQuery
+    .input(z.object({ orderId: z.number(), taxAmount: z.string().default("0") }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const order = await db.select().from(orders).where(eq(orders.id, input.orderId)).limit(1);
+      if (!order[0]) throw new Error("Order not found");
+      const existing = await db.select().from(invoices).where(eq(invoices.orderId, input.orderId)).limit(1);
+      if (existing[0]) return { id: existing[0].id, invoiceNumber: existing[0].invoiceNumber };
+      const invoiceNumber = `INV-${order[0].orderNumber}-${Date.now().toString().slice(-5)}`;
+      const result = await db.insert(invoices).values({ orderId: input.orderId, invoiceNumber, subtotal: order[0].subtotal, shippingFee: order[0].shippingFee ?? "0", discountAmount: order[0].discountAmount ?? "0", taxAmount: input.taxAmount, total: String(safeNumber(order[0].total) + safeNumber(input.taxAmount)), status: order[0].paymentStatus === "paid" ? "paid" : "issued" });
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_invoice", entityType: "invoice", entityId: Number(result[0].insertId), details: { orderId: input.orderId, invoiceNumber } });
+      return { id: Number(result[0].insertId), invoiceNumber };
+    }),
+
+  updateInvoiceStatus: adminQuery
+    .input(z.object({ id: z.number(), status: z.enum(["draft", "issued", "paid", "cancelled"]) }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb(); await db.update(invoices).set({ status: input.status }).where(eq(invoices.id, input.id));
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "update_invoice_status", entityType: "invoice", entityId: input.id, details: input });
+      return { success: true };
+    }),
+
+  // Notifications
+  listAdminNotifications: adminQuery
+    .input(z.object({ limit: z.number().default(100) }).optional())
+    .query(async ({ input }) => {
+      const db = getDb(); return db.select().from(adminNotifications).orderBy(desc(adminNotifications.createdAt)).limit(input?.limit ?? 100);
+    }),
+
+  createAdminNotification: adminQuery
+    .input(z.object({ title: z.string().min(1), message: z.string().min(1), type: z.enum(["order", "payment", "shipping", "inventory", "system", "return"]).default("system") }))
+    .mutation(async ({ input }) => { const db = getDb(); const result = await db.insert(adminNotifications).values(input); return { id: Number(result[0].insertId) }; }),
+
+  markAdminNotificationRead: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => { const db = getDb(); await db.update(adminNotifications).set({ isRead: true }).where(eq(adminNotifications.id, input.id)); return { success: true }; }),
+
+  // Return requests
+  listReturnRequests: adminQuery.query(async () => { const db = getDb(); return db.select().from(returnRequests).orderBy(desc(returnRequests.createdAt)); }),
+
+  createReturnRequestAdmin: adminQuery
+    .input(z.object({ orderNumber: z.string().min(1), customerPhone: z.string().min(1), customerName: z.string().optional(), reason: z.string().min(1), refundAmount: z.string().default("0"), status: z.enum(["pending", "approved", "rejected", "received", "refunded", "closed"]).default("pending"), adminNotes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const order = await db.select().from(orders).where(and(eq(orders.orderNumber, input.orderNumber), eq(orders.customerPhone, input.customerPhone))).limit(1);
+      const result = await db.insert(returnRequests).values({ ...input, orderId: order[0]?.id ?? null });
+      await db.insert(adminNotifications).values({ title: "Return request", message: `Return request for ${input.orderNumber}`, type: "return", entityType: "return_request", entityId: Number(result[0].insertId) });
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_return_request", entityType: "return_request", entityId: Number(result[0].insertId), details: input });
+      return { id: Number(result[0].insertId) };
+    }),
+
+  updateReturnRequestStatus: adminQuery
+    .input(z.object({ id: z.number(), status: z.enum(["pending", "approved", "rejected", "received", "refunded", "closed"]), refundAmount: z.string().optional(), restockItems: z.boolean().default(false), adminNotes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb(); const { id, ...data } = input;
+      await db.update(returnRequests).set(data).where(eq(returnRequests.id, id));
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "update_return_status", entityType: "return_request", entityId: id, details: data });
+      return { success: true };
+    }),
+
+  // Media library / uploads registry
+  listUploadAssets: adminQuery.query(async () => { const db = getDb(); return db.select().from(uploadAssets).orderBy(desc(uploadAssets.createdAt)); }),
+
+  createUploadAsset: adminQuery
+    .input(z.object({ title: z.string().optional(), url: z.string().min(1), altText: z.string().optional(), mimeType: z.string().optional(), sizeBytes: z.number().optional(), width: z.number().optional(), height: z.number().optional(), folder: z.string().default("general") }))
+    .mutation(async ({ input, ctx }) => { const db = getDb(); const result = await db.insert(uploadAssets).values(input); await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_media_asset", entityType: "upload_asset", entityId: Number(result[0].insertId), details: { title: input.title, url: input.url } }); return { id: Number(result[0].insertId) }; }),
+
+  deleteUploadAsset: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => { const db = getDb(); await db.delete(uploadAssets).where(eq(uploadAssets.id, input.id)); await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "delete_media_asset", entityType: "upload_asset", entityId: input.id }); return { success: true }; }),
+
+  // SEO tools
+  listSeoPages: adminQuery.query(async () => { const db = getDb(); return db.select().from(seoPages).orderBy(desc(seoPages.createdAt)); }),
+
+  upsertSeoPage: adminQuery
+    .input(z.object({ path: z.string().min(1), titleEn: z.string().optional(), titleAr: z.string().optional(), descriptionEn: z.string().optional(), descriptionAr: z.string().optional(), keywords: z.string().optional(), ogImage: z.string().optional(), canonicalUrl: z.string().optional(), isIndexed: z.boolean().default(true) }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      await db.insert(seoPages).values(input).onDuplicateKeyUpdate({ set: { ...input, updatedAt: new Date() } });
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "upsert_seo_page", entityType: "seo_page", details: { path: input.path } });
+      return { success: true };
+    }),
+
+  generateSeoFiles: adminQuery.query(async () => {
+    const db = getDb();
+    const pages = await db.select().from(seoPages);
+    const productRows = await db.select({ slug: products.slug, updatedAt: products.updatedAt }).from(products).where(eq(products.isActive, true));
+    const staticPaths = ["/", "/shop", "/about", "/contact", "/faq", "/track-order"];
+    const urls = [...staticPaths, ...productRows.map((p) => `/shop/${p.slug}`), ...pages.map((p) => p.path)];
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${Array.from(new Set(urls)).map((u) => `  <url><loc>${u}</loc></url>`).join("\n")}\n</urlset>`;
+    const robots = "User-agent: *\nAllow: /\nSitemap: /sitemap.xml\n";
+    return { sitemap, robots, urlsCount: urls.length };
+  }),
+
+  // Admin staff permissions registry
+  listAdminStaffUsers: adminQuery.query(async () => { const db = getDb(); return db.select().from(adminStaffUsers).orderBy(desc(adminStaffUsers.createdAt)); }),
+
+  createAdminStaffUser: adminQuery
+    .input(z.object({ name: z.string().min(1), email: z.string().optional(), role: z.enum(["owner", "admin", "orders", "inventory", "marketing", "support", "viewer"]).default("viewer"), permissions: z.array(z.string()).default([]), isActive: z.boolean().default(true), notes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => { const db = getDb(); const result = await db.insert(adminStaffUsers).values(input); await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_admin_staff", entityType: "admin_staff", entityId: Number(result[0].insertId), details: input }); return { id: Number(result[0].insertId) }; }),
+
+  updateAdminStaffUser: adminQuery
+    .input(z.object({ id: z.number(), name: z.string().min(1), email: z.string().optional(), role: z.enum(["owner", "admin", "orders", "inventory", "marketing", "support", "viewer"]).default("viewer"), permissions: z.array(z.string()).default([]), isActive: z.boolean().default(true), notes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => { const db = getDb(); const { id, ...data } = input; await db.update(adminStaffUsers).set(data).where(eq(adminStaffUsers.id, id)); await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "update_admin_staff", entityType: "admin_staff", entityId: id, details: data }); return { success: true }; }),
+
+  // Export center
+  createExportJob: adminQuery
+    .input(z.object({ type: z.enum(["orders", "customers", "products", "inventory", "campaigns", "activity", "returns"]) }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const tableRows: Record<string, unknown>[] = input.type === "orders" ? await db.select().from(orders) as Record<string, unknown>[]
+        : input.type === "customers" ? await db.select().from(customers) as Record<string, unknown>[]
+        : input.type === "products" ? await db.select().from(products) as Record<string, unknown>[]
+        : input.type === "inventory" ? await db.select().from(inventoryMovements) as Record<string, unknown>[]
+        : input.type === "campaigns" ? await db.select().from(mediaBuyerCampaigns) as Record<string, unknown>[]
+        : input.type === "activity" ? await db.select().from(adminActivityLogs) as Record<string, unknown>[]
+        : await db.select().from(returnRequests) as Record<string, unknown>[];
+      const content = toCsv(tableRows);
+      const fileName = `${input.type}-${new Date().toISOString().slice(0, 10)}.csv`;
+      const result = await db.insert(exportJobs).values({ type: input.type, fileName, rowCount: tableRows.length, content, status: "ready" });
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_export", entityType: "export_job", entityId: Number(result[0].insertId), details: { type: input.type, rowCount: tableRows.length } });
+      return { id: Number(result[0].insertId), fileName, rowCount: tableRows.length, content };
+    }),
+
+  listExportJobs: adminQuery.query(async () => { const db = getDb(); return db.select().from(exportJobs).orderBy(desc(exportJobs.createdAt)); }),
+
+  // Backup center
+  createBackupJob: adminQuery
+    .input(z.object({ label: z.string().min(1), notes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const content = {
+        createdAt: new Date().toISOString(),
+        products: await db.select().from(products),
+        categories: await db.select().from(categories),
+        orders: await db.select().from(orders),
+        customers: await db.select().from(customers),
+        storeSettings: await db.select().from(storeSettings),
+        shippingSettings: await db.select().from(shippingSettings),
+        paymentSettings: await db.select().from(paymentSettings),
+      };
+      const result = await db.insert(backupJobs).values({ label: input.label, notes: input.notes, content, status: "ready" });
+      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_backup", entityType: "backup_job", entityId: Number(result[0].insertId), details: { label: input.label } });
+      return { id: Number(result[0].insertId), content };
+    }),
+
+  listBackupJobs: adminQuery.query(async () => { const db = getDb(); return db.select().from(backupJobs).orderBy(desc(backupJobs.createdAt)); }),
 
   // Sales analytics
   getSalesByDate: adminQuery

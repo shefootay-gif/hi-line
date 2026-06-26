@@ -17,6 +17,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import MyOrders from "./pages/MyOrders";
 import Wishlist from "./pages/Wishlist";
+import ReturnRequest from "./pages/ReturnRequest";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
@@ -29,6 +30,12 @@ import Dropshipping from "./pages/admin/Dropshipping";
 import ActivityLogs from "./pages/admin/ActivityLogs";
 import InventoryMovements from "./pages/admin/InventoryMovements";
 import DataAnalytics from "./pages/admin/DataAnalytics";
+import FulfillmentCenter from "./pages/admin/FulfillmentCenter";
+import Notifications from "./pages/admin/Notifications";
+import MediaLibrary from "./pages/admin/MediaLibrary";
+import SeoTools from "./pages/admin/SeoTools";
+import AdminUsers from "./pages/admin/AdminUsers";
+import ExportBackup from "./pages/admin/ExportBackup";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -51,6 +58,7 @@ export default function App() {
             <Route path="/faq" element={<FAQ />} />
             <Route path="/my-orders" element={<MyOrders />} />
             <Route path="/wishlist" element={<Wishlist />} />
+            <Route path="/returns" element={<ReturnRequest />} />
           </Route>
 
           {/* Auth */}
@@ -72,6 +80,12 @@ export default function App() {
             <Route path="/admin/inventory-movements" element={<InventoryMovements />} />
             <Route path="/admin/analytics" element={<DataAnalytics />} />
             <Route path="/admin/activity-logs" element={<ActivityLogs />} />
+            <Route path="/admin/fulfillment" element={<FulfillmentCenter />} />
+            <Route path="/admin/notifications" element={<Notifications />} />
+            <Route path="/admin/media-library" element={<MediaLibrary />} />
+            <Route path="/admin/seo" element={<SeoTools />} />
+            <Route path="/admin/admin-users" element={<AdminUsers />} />
+            <Route path="/admin/export-backup" element={<ExportBackup />} />
           </Route>
 
           {/* 404 */}

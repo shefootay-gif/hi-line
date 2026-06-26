@@ -15,6 +15,8 @@ import {
   wishlists,
   contactMessages,
   inventoryMovements,
+  returnRequests,
+  adminNotifications,
 } from "@db/schema";
 import { eq, desc, and, or, like, sql, inArray } from "drizzle-orm";
 
@@ -633,6 +635,75 @@ export const storeRouter = createRouter({
 
     return res;
   }),
+
+
+  // Return / exchange request endpoint
+  createReturnRequest: publicQuery
+    .input(
+      z.object({
+        orderNumber: z.string().trim().min(1).max(50),
+        customerPhone: z.string().trim().min(1).max(50),
+        reason: z.string().trim().min(5).max(2000),
+        images: z.array(z.string()).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+
+      const orderResult = await db
+        .select()
+        .from(orders)
+        .where(
+          and(
+            eq(orders.orderNumber, input.orderNumber),
+            eq(orders.customerPhone, input.customerPhone)
+          )
+        )
+        .limit(1);
+
+      if (orderResult.length === 0) {
+        throw new Error("Order not found. Please check the order number and phone.");
+      }
+
+      const order = orderResult[0];
+
+      const existingOpenRequest = await db
+        .select({ id: returnRequests.id })
+        .from(returnRequests)
+        .where(
+          and(
+            eq(returnRequests.orderId, order.id),
+            sql`${returnRequests.status} IN ('pending', 'approved', 'received')`
+          )
+        )
+        .limit(1);
+
+      if (existingOpenRequest.length > 0) {
+        throw new Error("A return request already exists for this order.");
+      }
+
+      const result = await db.insert(returnRequests).values({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        reason: input.reason,
+        images: input.images ?? null,
+        status: "pending",
+      });
+
+      const requestId = Number(result[0].insertId);
+
+      await db.insert(adminNotifications).values({
+        title: "New return request",
+        message: `Return request for order ${order.orderNumber} from ${order.customerName}`,
+        type: "return",
+        entityType: "return_request",
+        entityId: requestId,
+      });
+
+      return { success: true, id: requestId };
+    }),
 
   // Contact Message endpoint
   submitContactMessage: publicQuery

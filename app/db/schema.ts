@@ -460,3 +460,172 @@ export const adminActivityLogs = mysqlTable("admin_activity_logs", {
 
 export type AdminActivityLog = typeof adminActivityLogs.$inferSelect;
 
+
+
+// Payment transactions table
+export const paymentTransactions = mysqlTable("payment_transactions", {
+  id: serial("id").primaryKey(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }),
+  orderNumber: varchar("order_number", { length: 50 }),
+  provider: mysqlEnum("provider", ["manual", "tap", "hyperpay", "paytabs", "stripe", "moyasar", "myfatoorah"]).default("manual"),
+  method: varchar("method", { length: 100 }),
+  amount: decimal("amount", { precision: 12, scale: 2 }).default("0"),
+  currency: varchar("currency", { length: 10 }).default("EGP"),
+  status: mysqlEnum("status", ["pending", "paid", "failed", "refunded", "cancelled"]).default("pending"),
+  providerReference: varchar("provider_reference", { length: 255 }),
+  checkoutUrl: text("checkout_url"),
+  rawPayload: json("raw_payload").$type<Record<string, unknown>>(),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
+
+// Shipping providers table
+export const shippingProviders = mysqlTable("shipping_providers", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  website: text("website"),
+  trackingUrlTemplate: text("tracking_url_template"),
+  baseFee: decimal("base_fee", { precision: 10, scale: 2 }).default("0"),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+export type ShippingProvider = typeof shippingProviders.$inferSelect;
+
+// Shipments table
+export const shipments = mysqlTable("shipments", {
+  id: serial("id").primaryKey(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull(),
+  providerId: bigint("provider_id", { mode: "number", unsigned: true }),
+  trackingNumber: varchar("tracking_number", { length: 150 }),
+  status: mysqlEnum("status", ["pending", "ready", "shipped", "out_for_delivery", "delivered", "failed", "returned"]).default("pending"),
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("0"),
+  estimatedDelivery: timestamp("estimated_delivery"),
+  shippedAt: timestamp("shipped_at"),
+  deliveredAt: timestamp("delivered_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+export type Shipment = typeof shipments.$inferSelect;
+
+// Invoices table
+export const invoices = mysqlTable("invoices", {
+  id: serial("id").primaryKey(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull(),
+  invoiceNumber: varchar("invoice_number", { length: 80 }).notNull().unique(),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).default("0"),
+  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).default("0"),
+  shippingFee: decimal("shipping_fee", { precision: 10, scale: 2 }).default("0"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 12, scale: 2 }).default("0"),
+  status: mysqlEnum("status", ["draft", "issued", "paid", "cancelled"]).default("issued"),
+  issuedAt: timestamp("issued_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+export type Invoice = typeof invoices.$inferSelect;
+
+// Notifications table
+export const adminNotifications = mysqlTable("admin_notifications", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  type: mysqlEnum("type", ["order", "payment", "shipping", "inventory", "system", "return"]).default("system"),
+  isRead: boolean("is_read").default(false),
+  entityType: varchar("entity_type", { length: 100 }),
+  entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type AdminNotification = typeof adminNotifications.$inferSelect;
+
+// Return / refund requests table
+export const returnRequests = mysqlTable("return_requests", {
+  id: serial("id").primaryKey(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }),
+  orderNumber: varchar("order_number", { length: 50 }).notNull(),
+  customerName: varchar("customer_name", { length: 255 }),
+  customerPhone: varchar("customer_phone", { length: 50 }).notNull(),
+  reason: text("reason").notNull(),
+  images: json("images").$type<string[]>(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected", "received", "refunded", "closed"]).default("pending"),
+  refundAmount: decimal("refund_amount", { precision: 12, scale: 2 }).default("0"),
+  restockItems: boolean("restock_items").default(false),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+export type ReturnRequest = typeof returnRequests.$inferSelect;
+
+// Upload / media assets table
+export const uploadAssets = mysqlTable("upload_assets", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }),
+  url: text("url").notNull(),
+  altText: varchar("alt_text", { length: 255 }),
+  mimeType: varchar("mime_type", { length: 100 }),
+  sizeBytes: int("size_bytes"),
+  width: int("width"),
+  height: int("height"),
+  folder: varchar("folder", { length: 120 }).default("general"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UploadAsset = typeof uploadAssets.$inferSelect;
+
+// SEO pages / metadata table
+export const seoPages = mysqlTable("seo_pages", {
+  id: serial("id").primaryKey(),
+  path: varchar("path", { length: 255 }).notNull().unique(),
+  titleEn: varchar("title_en", { length: 255 }),
+  titleAr: varchar("title_ar", { length: 255 }),
+  descriptionEn: text("description_en"),
+  descriptionAr: text("description_ar"),
+  keywords: text("keywords"),
+  ogImage: text("og_image"),
+  canonicalUrl: text("canonical_url"),
+  isIndexed: boolean("is_indexed").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+export type SeoPage = typeof seoPages.$inferSelect;
+
+// Admin staff / permissions registry table
+export const adminStaffUsers = mysqlTable("admin_staff_users", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  role: mysqlEnum("role", ["owner", "admin", "orders", "inventory", "marketing", "support", "viewer"]).default("viewer"),
+  permissions: json("permissions").$type<string[]>(),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+export type AdminStaffUser = typeof adminStaffUsers.$inferSelect;
+
+// Export jobs table
+export const exportJobs = mysqlTable("export_jobs", {
+  id: serial("id").primaryKey(),
+  type: mysqlEnum("type", ["orders", "customers", "products", "inventory", "campaigns", "activity", "returns"]).notNull(),
+  status: mysqlEnum("status", ["ready", "failed"]).default("ready"),
+  fileName: varchar("file_name", { length: 255 }),
+  rowCount: int("row_count").default(0),
+  content: text("content"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type ExportJob = typeof exportJobs.$inferSelect;
+
+// Backup jobs table
+export const backupJobs = mysqlTable("backup_jobs", {
+  id: serial("id").primaryKey(),
+  label: varchar("label", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["ready", "failed"]).default("ready"),
+  content: json("content").$type<Record<string, unknown>>(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type BackupJob = typeof backupJobs.$inferSelect;
