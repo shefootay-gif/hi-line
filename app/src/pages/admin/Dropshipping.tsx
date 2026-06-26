@@ -1,211 +1,304 @@
 import { useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { trpc } from "@/providers/trpc";
+import toast, { Toaster } from "react-hot-toast";
 import {
-  TrendingUp,
-  Plus,
-  Package,
-  Truck,
-  Globe,
-  Search,
-  ExternalLink,
   CheckCircle,
-  Clock,
-  XCircle,
-  Star,
-  ShoppingCart,
+  ExternalLink,
+  Loader2,
+  Package,
+  Pencil,
+  Plus,
   RefreshCcw,
-  ArrowRight,
+  Search,
+  Trash2,
+  Truck,
+  X,
 } from "lucide-react";
 
-type Supplier = {
+type SupplierStatus = "active" | "pending" | "inactive";
+type CatalogStatus = "available" | "out_of_stock" | "draft";
+
+type SupplierRow = {
   id: number;
   name: string;
   country: string;
-  flag: string;
-  products: number;
-  rating: number;
-  shippingDays: string;
-  status: "active" | "pending" | "inactive";
-  category: string;
+  category?: string | null;
+  contactName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  catalogUrl?: string | null;
+  rating?: string | null;
+  shippingDays?: string | null;
+  status?: SupplierStatus | null;
+  notes?: string | null;
+  productsCount?: number | string | null;
 };
 
-type DropOrder = {
+type CatalogProduct = {
   id: number;
-  orderRef: string;
-  supplier: string;
-  product: string;
-  qty: number;
-  cost: number;
-  status: "processing" | "shipped" | "delivered" | "failed";
-  date: string;
+  supplierId: number;
+  name: string;
+  sku?: string | null;
+  category?: string | null;
+  costPrice: string;
+  suggestedPrice?: string | null;
+  stock?: number | null;
+  status?: CatalogStatus | null;
 };
 
-const mockSuppliers: Supplier[] = [
-  { id: 1, name: "Cairo Beauty Wholesale", country: "Egypt", flag: "🇪🇬", products: 124, rating: 4.8, shippingDays: "2-3", status: "active", category: "Beauty & Personal Care" },
-  { id: 2, name: "Gulf Cosmetics Hub", country: "UAE", flag: "🇦🇪", products: 89, rating: 4.6, shippingDays: "4-6", status: "active", category: "Cosmetics" },
-  { id: 3, name: "Lebanese Fragrance Co.", country: "Lebanon", flag: "🇱🇧", products: 45, rating: 4.9, shippingDays: "5-7", status: "pending", category: "Fragrances" },
-  { id: 4, name: "KSA Retail Partners", country: "Saudi Arabia", flag: "🇸🇦", products: 210, rating: 4.5, shippingDays: "3-5", status: "inactive", category: "Personal Care" },
-];
+const emptySupplier = {
+  id: 0,
+  name: "",
+  country: "",
+  category: "Beauty & Personal Care",
+  contactName: "",
+  phone: "",
+  email: "",
+  website: "",
+  catalogUrl: "",
+  rating: "0",
+  shippingDays: "3-5",
+  status: "active" as SupplierStatus,
+  notes: "",
+};
 
-const mockOrders: DropOrder[] = [
-  { id: 1, orderRef: "DS-001", supplier: "Cairo Beauty Wholesale", product: "Hi Line Tropical Breeze", qty: 20, cost: 1200, status: "shipped", date: "2025-06-20" },
-  { id: 2, orderRef: "DS-002", supplier: "Gulf Cosmetics Hub", product: "Hi Line Voyage", qty: 15, cost: 950, status: "delivered", date: "2025-06-18" },
-  { id: 3, orderRef: "DS-003", supplier: "Cairo Beauty Wholesale", product: "Hi Line Candy Pop", qty: 30, cost: 1800, status: "processing", date: "2025-06-22" },
-];
+type SupplierForm = typeof emptySupplier;
 
-const statusConfig: Record<string, { bg: string; text: string; icon: React.ElementType; label_ar: string; label_en: string }> = {
-  active:     { bg: "#DCFCE7", text: "#15803D", icon: CheckCircle, label_ar: "نشط",       label_en: "Active" },
-  pending:    { bg: "#FEF3C7", text: "#92400E", icon: Clock,        label_ar: "معلق",      label_en: "Pending" },
-  inactive:   { bg: "#F1F5F9", text: "#475569", icon: XCircle,      label_ar: "غير نشط",  label_en: "Inactive" },
-  processing: { bg: "#DBEAFE", text: "#1D4ED8", icon: RefreshCcw,   label_ar: "جاري",     label_en: "Processing" },
-  shipped:    { bg: "#E0F2FE", text: "#0369A1", icon: Truck,         label_ar: "مشحون",    label_en: "Shipped" },
-  delivered:  { bg: "#DCFCE7", text: "#15803D", icon: CheckCircle,  label_ar: "مُسلَّم",   label_en: "Delivered" },
-  failed:     { bg: "#FEE2E2", text: "#B91C1C", icon: XCircle,      label_ar: "فشل",      label_en: "Failed" },
+const statusStyle: Record<SupplierStatus, { bg: string; text: string; ar: string; en: string }> = {
+  active: { bg: "#DCFCE7", text: "#15803D", ar: "نشط", en: "Active" },
+  pending: { bg: "#FEF3C7", text: "#92400E", ar: "معلق", en: "Pending" },
+  inactive: { bg: "#F1F5F9", text: "#475569", ar: "غير نشط", en: "Inactive" },
 };
 
 export default function Dropshipping() {
   const { lang, isRTL } = useLanguage();
   const ar = lang === "ar";
-  const [activeTab, setActiveTab] = useState<"suppliers" | "orders" | "catalog">("suppliers");
+  const utils = trpc.useUtils();
+  const [activeTab, setActiveTab] = useState<"suppliers" | "catalog">("suppliers");
   const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<SupplierForm>(emptySupplier);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | undefined>(undefined);
 
-  const filteredSuppliers = mockSuppliers.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.country.toLowerCase().includes(search.toLowerCase())
+  const { data: suppliers = [], isLoading } = trpc.admin.listDropshippingSuppliers.useQuery(undefined, {
+    retry: false,
+    throwOnError: false,
+  });
+  const { data: catalog = [], isLoading: catalogLoading } = trpc.admin.listSupplierCatalog.useQuery(
+    { supplierId: selectedSupplierId },
+    { retry: false, throwOnError: false }
   );
 
-  const totalProducts = mockSuppliers.filter(s => s.status === "active").reduce((sum, s) => sum + s.products, 0);
-  const activeSuppliers = mockSuppliers.filter(s => s.status === "active").length;
-  const pendingOrders = mockOrders.filter(o => o.status === "processing").length;
-  const totalCost = mockOrders.reduce((s, o) => s + o.cost, 0);
+  const createSupplier = trpc.admin.createDropshippingSupplier.useMutation({
+    onSuccess: () => {
+      utils.admin.listDropshippingSuppliers.invalidate();
+      setShowModal(false);
+      setEditing(emptySupplier);
+      toast.success(ar ? "تمت إضافة المورد" : "Supplier created");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateSupplier = trpc.admin.updateDropshippingSupplier.useMutation({
+    onSuccess: () => {
+      utils.admin.listDropshippingSuppliers.invalidate();
+      setShowModal(false);
+      setEditing(emptySupplier);
+      toast.success(ar ? "تم تعديل المورد" : "Supplier updated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteSupplier = trpc.admin.deleteDropshippingSupplier.useMutation({
+    onSuccess: () => {
+      utils.admin.listDropshippingSuppliers.invalidate();
+      utils.admin.listSupplierCatalog.invalidate();
+      toast.success(ar ? "تم حذف المورد" : "Supplier deleted");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const importCatalog = trpc.admin.importSupplierCatalog.useMutation({
+    onSuccess: (data) => {
+      utils.admin.listSupplierCatalog.invalidate();
+      utils.admin.listDropshippingSuppliers.invalidate();
+      toast.success(ar ? `تم استيراد ${data.importedCount} منتجات` : `${data.importedCount} products imported`);
+      setActiveTab("catalog");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const filteredSuppliers = (suppliers as SupplierRow[]).filter((supplier) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [supplier.name, supplier.country, supplier.category ?? ""]
+      .join(" ")
+      .toLowerCase()
+      .includes(q);
+  });
+
+  const activeSuppliers = (suppliers as SupplierRow[]).filter((s) => s.status === "active").length;
+  const totalCatalog = (catalog as CatalogProduct[]).length;
+
+  const openCreate = () => {
+    setEditing(emptySupplier);
+    setShowModal(true);
+  };
+
+  const openEdit = (supplier: SupplierRow) => {
+    setEditing({
+      ...emptySupplier,
+      id: supplier.id,
+      name: supplier.name,
+      country: supplier.country,
+      category: supplier.category ?? "Beauty & Personal Care",
+      contactName: supplier.contactName ?? "",
+      phone: supplier.phone ?? "",
+      email: supplier.email ?? "",
+      website: supplier.website ?? "",
+      catalogUrl: supplier.catalogUrl ?? "",
+      rating: supplier.rating ?? "0",
+      shippingDays: supplier.shippingDays ?? "3-5",
+      status: supplier.status ?? "active",
+      notes: supplier.notes ?? "",
+    });
+    setShowModal(true);
+  };
+
+  const saveSupplier = () => {
+    if (!editing.name.trim() || !editing.country.trim()) {
+      toast.error(ar ? "اكتب اسم المورد والدولة" : "Supplier name and country are required");
+      return;
+    }
+
+    const payload = {
+      name: editing.name.trim(),
+      country: editing.country.trim(),
+      category: editing.category.trim(),
+      contactName: editing.contactName.trim(),
+      phone: editing.phone.trim(),
+      email: editing.email.trim(),
+      website: editing.website.trim(),
+      catalogUrl: editing.catalogUrl.trim(),
+      rating: editing.rating.trim() || "0",
+      shippingDays: editing.shippingDays.trim() || "3-5",
+      status: editing.status,
+      notes: editing.notes.trim(),
+    };
+
+    if (editing.id) updateSupplier.mutate({ id: editing.id, ...payload });
+    else createSupplier.mutate(payload);
+  };
 
   return (
     <div className={`min-h-screen bg-[#F8F4FC] p-6 lg:p-8 ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+      <Toaster position="top-center" />
+
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-xl bg-[#E0F2FE] flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-[#0EA5E9]" />
+          <div className="mb-1 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#E0F2FE]">
+              <Truck className="h-4 w-4 text-[#0EA5E9]" />
             </div>
-            <h1 className="text-2xl font-bold text-[#1A0533]">
-              {ar ? "دروب شوبينج" : "Dropshipping"}
-            </h1>
+            <h1 className="text-2xl font-bold text-[#1A0533]">{ar ? "دروب شوبينج" : "Dropshipping"}</h1>
           </div>
           <p className="text-sm text-[#6F6178] ms-10">
-            {ar ? "إدارة الموردين والطلبات والكتالوج" : "Manage suppliers, orders, and product catalog"}
+            {ar ? "إدارة الموردين واستيراد كتالوج المنتجات" : "Manage suppliers and import product catalogs"}
           </p>
         </div>
-        <button className="flex items-center gap-2 bg-[#0EA5E9] text-white text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-[#0284C7] transition-colors shadow-sm">
-          <Plus className="w-4 h-4" />
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 rounded-xl bg-[#0EA5E9] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0284C7]"
+        >
+          <Plus className="h-4 w-4" />
           {ar ? "إضافة مورد" : "Add Supplier"}
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { icon: Globe, label: ar ? "موردون نشطون" : "Active Suppliers", value: activeSuppliers.toString(), color: "#0EA5E9" },
-          { icon: Package, label: ar ? "منتجات متاحة" : "Available Products", value: totalProducts.toLocaleString(), color: "#7C3AED" },
-          { icon: ShoppingCart, label: ar ? "طلبات معلقة" : "Pending Orders", value: pendingOrders.toString(), color: "#D97706" },
-          { icon: TrendingUp, label: ar ? "إجمالي التكلفة" : "Total Cost", value: `${totalCost.toLocaleString()} ${ar ? "ج" : "EGP"}`, color: "#059669" },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-2xl border border-[#EDE5F7] p-5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: `${stat.color}18` }}>
-              <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
-            </div>
-            <p className="text-2xl font-bold text-[#1A0533]">{stat.value}</p>
-            <p className="text-xs text-[#6F6178] mt-1">{stat.label}</p>
-          </div>
-        ))}
+      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-[#EDE5F7] bg-white p-5">
+          <CheckCircle className="mb-3 h-5 w-5 text-green-600" />
+          <p className="text-2xl font-bold text-[#1A0533]">{activeSuppliers}</p>
+          <p className="text-xs text-[#6F6178]">{ar ? "موردون نشطون" : "Active Suppliers"}</p>
+        </div>
+        <div className="rounded-2xl border border-[#EDE5F7] bg-white p-5">
+          <Package className="mb-3 h-5 w-5 text-[#7C3AED]" />
+          <p className="text-2xl font-bold text-[#1A0533]">{totalCatalog}</p>
+          <p className="text-xs text-[#6F6178]">{ar ? "منتجات في الكتالوج" : "Catalog Products"}</p>
+        </div>
+        <div className="rounded-2xl border border-[#EDE5F7] bg-white p-5">
+          <RefreshCcw className="mb-3 h-5 w-5 text-[#0EA5E9]" />
+          <p className="text-2xl font-bold text-[#1A0533]">{(suppliers as SupplierRow[]).length}</p>
+          <p className="text-xs text-[#6F6178]">{ar ? "إجمالي الموردين" : "Total Suppliers"}</p>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white rounded-2xl border border-[#EDE5F7] overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b border-[#EDE5F7] flex-wrap gap-4">
-          <div className="flex gap-1 bg-[#F8F4FC] rounded-xl p-1">
-            {(["suppliers", "orders", "catalog"] as const).map((tab) => (
+      <div className="overflow-hidden rounded-2xl border border-[#EDE5F7] bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#EDE5F7] p-6">
+          <div className="flex gap-1 rounded-xl bg-[#F8F4FC] p-1">
+            {(["suppliers", "catalog"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`text-xs font-medium px-4 py-1.5 rounded-lg transition-all ${
-                  activeTab === tab
-                    ? "bg-white text-[#0EA5E9] shadow-sm"
-                    : "text-[#6F6178] hover:text-[#1A0533]"
+                className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-all ${
+                  activeTab === tab ? "bg-white text-[#0EA5E9] shadow-sm" : "text-[#6F6178] hover:text-[#1A0533]"
                 }`}
               >
-                {tab === "suppliers" ? (ar ? "الموردون" : "Suppliers")
-                  : tab === "orders" ? (ar ? "الطلبات" : "Orders")
-                  : (ar ? "الكتالوج" : "Catalog")}
+                {tab === "suppliers" ? (ar ? "الموردون" : "Suppliers") : ar ? "الكتالوج" : "Catalog"}
               </button>
             ))}
           </div>
           <div className="relative">
-            <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF] ${isRTL ? "right-3" : "left-3"}`} />
+            <Search className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF] ${isRTL ? "right-3" : "left-3"}`} />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder={ar ? "بحث..." : "Search..."}
-              className={`text-sm border border-[#EDE5F7] rounded-xl py-2 bg-[#FAFAFA] focus:outline-none focus:border-[#0EA5E9] transition-colors ${
+              className={`rounded-xl border border-[#EDE5F7] bg-[#FAFAFA] py-2 text-sm focus:border-[#0EA5E9] focus:outline-none ${
                 isRTL ? "pr-9 pl-4" : "pl-9 pr-4"
               }`}
             />
           </div>
         </div>
 
-        {/* Suppliers Tab */}
         {activeTab === "suppliers" && (
           <div className="divide-y divide-[#F0EAF8]">
+            {isLoading && <div className="p-8 text-center text-sm text-[#6F6178]">{ar ? "جاري التحميل..." : "Loading..."}</div>}
             {filteredSuppliers.map((supplier) => {
-              const s = statusConfig[supplier.status];
-              const StatusIcon = s.icon;
+              const status = statusStyle[supplier.status ?? "active"];
               return (
-                <div key={supplier.id} className="flex items-center justify-between p-5 hover:bg-[#FAFAFA] transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-[#F3E8FF] flex items-center justify-center text-2xl">
-                      {supplier.flag}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-[#1A0533]">{supplier.name}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-[#9CA3AF]">{supplier.country}</span>
-                        <span className="text-xs text-[#9CA3AF]">•</span>
-                        <span className="text-xs text-[#9CA3AF]">{supplier.category}</span>
-                      </div>
-                    </div>
+                <div key={supplier.id} className="flex flex-wrap items-center justify-between gap-4 p-5 transition-colors hover:bg-[#FAFAFA]">
+                  <div>
+                    <p className="font-semibold text-[#1A0533]">{supplier.name}</p>
+                    <p className="mt-1 text-xs text-[#9CA3AF]">
+                      {supplier.country} • {supplier.category ?? "Beauty & Personal Care"} • {Number(supplier.productsCount ?? 0)} {ar ? "منتج" : "products"}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-6 flex-wrap">
-                    <div className="text-center hidden sm:block">
-                      <p className="text-sm font-bold text-[#1A0533]">{supplier.products}</p>
-                      <p className="text-[10px] text-[#9CA3AF]">{ar ? "منتج" : "products"}</p>
-                    </div>
-                    <div className="text-center hidden sm:block">
-                      <div className="flex items-center gap-1">
-                        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                        <p className="text-sm font-bold text-[#1A0533]">{supplier.rating}</p>
-                      </div>
-                      <p className="text-[10px] text-[#9CA3AF]">{ar ? "التقييم" : "rating"}</p>
-                    </div>
-                    <div className="text-center hidden md:block">
-                      <div className="flex items-center gap-1">
-                        <Truck className="w-3.5 h-3.5 text-[#6F6178]" />
-                        <p className="text-sm font-bold text-[#1A0533]">{supplier.shippingDays}d</p>
-                      </div>
-                      <p className="text-[10px] text-[#9CA3AF]">{ar ? "شحن" : "delivery"}</p>
-                    </div>
-                    <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: s.bg, color: s.text }}>
-                      <StatusIcon className="w-3 h-3" />
-                      {ar ? s.label_ar : s.label_en}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: status.bg, color: status.text }}>
+                      {ar ? status.ar : status.en}
                     </span>
-                    <div className="flex items-center gap-2">
-                      <button className="p-1.5 rounded-lg hover:bg-[#F3E8FF] text-[#6F6178] hover:text-[#7C3AED] transition-colors">
-                        <ExternalLink className="w-4 h-4" />
+                    {supplier.website && (
+                      <button onClick={() => window.open(supplier.website ?? "", "_blank")} className="rounded-lg p-2 text-[#6F6178] hover:bg-[#F3E8FF]">
+                        <ExternalLink className="h-4 w-4" />
                       </button>
-                      <button className="flex items-center gap-1 text-xs font-medium text-white bg-[#0EA5E9] hover:bg-[#0284C7] px-3 py-1.5 rounded-lg transition-colors">
-                        {ar ? "استيراد" : "Import"}
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
+                    )}
+                    <button onClick={() => openEdit(supplier)} className="rounded-lg p-2 text-[#6F6178] hover:bg-[#F3E8FF]">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => importCatalog.mutate({ supplierId: supplier.id })}
+                      disabled={importCatalog.isPending}
+                      className="flex items-center gap-1 rounded-lg bg-[#0EA5E9] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#0284C7] disabled:opacity-60"
+                    >
+                      {importCatalog.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+                      {ar ? "استيراد الكتالوج" : "Import Catalog"}
+                    </button>
+                    <button onClick={() => deleteSupplier.mutate({ id: supplier.id })} className="rounded-lg p-2 text-red-500 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               );
@@ -213,73 +306,108 @@ export default function Dropshipping() {
           </div>
         )}
 
-        {/* Orders Tab */}
-        {activeTab === "orders" && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-xs text-[#9CA3AF] border-b border-[#EDE5F7] bg-[#FAFAFA]">
-                  <th className="px-6 py-3 font-medium">{ar ? "رقم الطلب" : "Order Ref"}</th>
-                  <th className="px-4 py-3 font-medium">{ar ? "المورد" : "Supplier"}</th>
-                  <th className="px-4 py-3 font-medium">{ar ? "المنتج" : "Product"}</th>
-                  <th className="px-4 py-3 font-medium">{ar ? "الكمية" : "Qty"}</th>
-                  <th className="px-4 py-3 font-medium">{ar ? "التكلفة" : "Cost"}</th>
-                  <th className="px-4 py-3 font-medium">{ar ? "الحالة" : "Status"}</th>
-                  <th className="px-4 py-3 font-medium">{ar ? "التاريخ" : "Date"}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#F0EAF8]">
-                {mockOrders.map((order) => {
-                  const s = statusConfig[order.status];
-                  const StatusIcon = s.icon;
-                  return (
-                    <tr key={order.id} className="hover:bg-[#FAFAFA] transition-colors">
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-semibold text-[#7C3AED]">{order.orderRef}</span>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-[#1A0533]">{order.supplier}</td>
-                      <td className="px-4 py-4 text-sm text-[#1A0533]">{order.product}</td>
-                      <td className="px-4 py-4 text-sm font-medium text-[#1A0533]">{order.qty}</td>
-                      <td className="px-4 py-4 text-sm font-bold text-[#1A0533]">{order.cost.toLocaleString()} {ar ? "ج" : "EGP"}</td>
-                      <td className="px-4 py-4">
-                        <span className="flex items-center gap-1.5 w-fit text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: s.bg, color: s.text }}>
-                          <StatusIcon className="w-3 h-3" />
-                          {ar ? s.label_ar : s.label_en}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-xs text-[#9CA3AF]">{order.date}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Catalog Tab */}
         {activeTab === "catalog" && (
-          <div className="p-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[#E0F2FE] flex items-center justify-center mx-auto mb-4">
-              <Package className="w-8 h-8 text-[#0EA5E9]" />
-            </div>
-            <h3 className="text-lg font-semibold text-[#1A0533] mb-2">
-              {ar ? "استورد كتالوج المورد" : "Import Supplier Catalog"}
-            </h3>
-            <p className="text-sm text-[#6F6178] mb-6 max-w-sm mx-auto">
-              {ar
-                ? "اختر مورداً من القائمة واضغط استيراد لإضافة منتجاته إلى متجرك"
-                : "Select a supplier and click Import to add their products to your store"}
-            </p>
-            <button
-              onClick={() => setActiveTab("suppliers")}
-              className="flex items-center gap-2 mx-auto bg-[#0EA5E9] text-white text-sm font-medium px-6 py-2.5 rounded-xl hover:bg-[#0284C7] transition-colors"
+          <div className="p-6">
+            <select
+              value={selectedSupplierId ?? ""}
+              onChange={(event) => setSelectedSupplierId(event.target.value ? Number(event.target.value) : undefined)}
+              className="mb-4 rounded-xl border border-[#EDE5F7] bg-white px-3 py-2 text-sm"
             >
-              {ar ? "اختر مورداً" : "Choose Supplier"}
-              <ArrowRight className="w-4 h-4" />
-            </button>
+              <option value="">{ar ? "كل الموردين" : "All suppliers"}</option>
+              {(suppliers as SupplierRow[]).map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+              ))}
+            </select>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="border-b bg-[#FAFAFA] text-xs text-[#9CA3AF]">
+                    <th className="px-4 py-3 text-start">{ar ? "المنتج" : "Product"}</th>
+                    <th className="px-4 py-3 text-start">SKU</th>
+                    <th className="px-4 py-3 text-start">{ar ? "التكلفة" : "Cost"}</th>
+                    <th className="px-4 py-3 text-start">{ar ? "السعر المقترح" : "Suggested"}</th>
+                    <th className="px-4 py-3 text-start">{ar ? "المخزون" : "Stock"}</th>
+                    <th className="px-4 py-3 text-start">{ar ? "الحالة" : "Status"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {catalogLoading && <tr><td colSpan={6} className="p-6 text-center text-[#6F6178]">{ar ? "جاري التحميل..." : "Loading..."}</td></tr>}
+                  {(catalog as CatalogProduct[]).map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-3 font-medium text-[#1A0533]">{item.name}</td>
+                      <td className="px-4 py-3 text-[#6F6178]">{item.sku ?? "-"}</td>
+                      <td className="px-4 py-3">{item.costPrice}</td>
+                      <td className="px-4 py-3">{item.suggestedPrice ?? "-"}</td>
+                      <td className="px-4 py-3">{item.stock ?? 0}</td>
+                      <td className="px-4 py-3">{item.status ?? "available"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#1A0533]">{editing.id ? (ar ? "تعديل مورد" : "Edit Supplier") : ar ? "إضافة مورد" : "Add Supplier"}</h2>
+              <button onClick={() => setShowModal(false)} className="rounded-lg p-2 hover:bg-gray-100"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {[
+                ["name", ar ? "اسم المورد" : "Supplier name"],
+                ["country", ar ? "الدولة" : "Country"],
+                ["category", ar ? "التصنيف" : "Category"],
+                ["contactName", ar ? "اسم المسؤول" : "Contact name"],
+                ["phone", ar ? "الهاتف" : "Phone"],
+                ["email", ar ? "الإيميل" : "Email"],
+                ["website", ar ? "الموقع" : "Website"],
+                ["catalogUrl", ar ? "رابط الكتالوج" : "Catalog URL"],
+                ["rating", ar ? "التقييم" : "Rating"],
+                ["shippingDays", ar ? "مدة الشحن" : "Shipping days"],
+              ].map(([key, label]) => (
+                <label key={key} className="text-sm font-medium text-[#1A0533]">
+                  {label}
+                  <input
+                    value={String(editing[key as keyof SupplierForm])}
+                    onChange={(event) => setEditing({ ...editing, [key]: event.target.value })}
+                    className="mt-1 w-full rounded-xl border border-[#EDE5F7] px-3 py-2 text-sm outline-none focus:border-[#0EA5E9]"
+                  />
+                </label>
+              ))}
+              <label className="text-sm font-medium text-[#1A0533]">
+                {ar ? "الحالة" : "Status"}
+                <select
+                  value={editing.status}
+                  onChange={(event) => setEditing({ ...editing, status: event.target.value as SupplierStatus })}
+                  className="mt-1 w-full rounded-xl border border-[#EDE5F7] px-3 py-2 text-sm outline-none focus:border-[#0EA5E9]"
+                >
+                  <option value="active">{ar ? "نشط" : "Active"}</option>
+                  <option value="pending">{ar ? "معلق" : "Pending"}</option>
+                  <option value="inactive">{ar ? "غير نشط" : "Inactive"}</option>
+                </select>
+              </label>
+              <label className="md:col-span-2 text-sm font-medium text-[#1A0533]">
+                {ar ? "ملاحظات" : "Notes"}
+                <textarea
+                  value={editing.notes}
+                  onChange={(event) => setEditing({ ...editing, notes: event.target.value })}
+                  className="mt-1 min-h-24 w-full rounded-xl border border-[#EDE5F7] px-3 py-2 text-sm outline-none focus:border-[#0EA5E9]"
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setShowModal(false)} className="rounded-xl border px-4 py-2 text-sm">{ar ? "إلغاء" : "Cancel"}</button>
+              <button onClick={saveSupplier} disabled={createSupplier.isPending || updateSupplier.isPending} className="rounded-xl bg-[#0EA5E9] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                {ar ? "حفظ" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

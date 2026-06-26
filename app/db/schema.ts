@@ -338,3 +338,87 @@ export const passwordResetTokens = mysqlTable("password_reset_tokens", {
 });
 
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+
+// Dropshipping Suppliers table
+export const dropshippingSuppliers = mysqlTable("dropshipping_suppliers", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  country: varchar("country", { length: 100 }).notNull(),
+  category: varchar("category", { length: 150 }).default("Beauty & Personal Care"),
+  contactName: varchar("contact_name", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 320 }),
+  website: text("website"),
+  catalogUrl: text("catalog_url"),
+  rating: decimal("rating", { precision: 3, scale: 1 }).default("0"),
+  shippingDays: varchar("shipping_days", { length: 50 }).default("3-5"),
+  status: mysqlEnum("status", ["active", "pending", "inactive"]).default("active"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type DropshippingSupplier = typeof dropshippingSuppliers.$inferSelect;
+
+// Dropshipping Supplier Products / Catalog table
+export const dropshippingSupplierProducts = mysqlTable("dropshipping_supplier_products", {
+  id: serial("id").primaryKey(),
+  supplierId: bigint("supplier_id", { mode: "number", unsigned: true }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  sku: varchar("sku", { length: 100 }),
+  category: varchar("category", { length: 150 }),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }).notNull(),
+  suggestedPrice: decimal("suggested_price", { precision: 10, scale: 2 }),
+  stock: int("stock").default(0),
+  imageUrl: text("image_url"),
+  sourceUrl: text("source_url"),
+  status: mysqlEnum("status", ["available", "out_of_stock", "draft"]).default("available"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type DropshippingSupplierProduct = typeof dropshippingSupplierProducts.$inferSelect;
+
+// Dropshipping Import Logs table
+export const dropshippingImportLogs = mysqlTable("dropshipping_import_logs", {
+  id: serial("id").primaryKey(),
+  supplierId: bigint("supplier_id", { mode: "number", unsigned: true }).notNull(),
+  importedCount: int("imported_count").default(0),
+  source: varchar("source", { length: 100 }).default("manual"),
+  status: mysqlEnum("status", ["success", "failed"]).default("success"),
+  message: text("message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type DropshippingImportLog = typeof dropshippingImportLogs.$inferSelect;
+
+// Media Buyer Campaigns table
+export const mediaBuyerCampaigns = mysqlTable("media_buyer_campaigns", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  platform: mysqlEnum("platform", ["facebook", "instagram", "tiktok", "google"]).default("facebook"),
+  status: mysqlEnum("status", ["active", "paused", "draft"]).default("draft"),
+  budget: decimal("budget", { precision: 12, scale: 2 }).default("0"),
+  spend: decimal("spend", { precision: 12, scale: 2 }).default("0"),
+  impressions: int("impressions").default(0),
+  clicks: int("clicks").default(0),
+  conversions: int("conversions").default(0),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  linkUrl: text("link_url"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type MediaBuyerCampaign = typeof mediaBuyerCampaigns.$inferSelect;

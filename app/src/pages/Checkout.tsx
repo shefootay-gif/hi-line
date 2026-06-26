@@ -4,7 +4,7 @@ import { useCart } from "@/hooks/useCart";
 import { trpc } from "@/providers/trpc";
 import { Link, useNavigate } from "react-router";
 import { useState } from "react";
-import { CreditCard, Banknote, Smartphone, Building, Loader2, Tag, Check, X } from "lucide-react";
+import { CreditCard, Banknote, Smartphone, Building, Loader2, Tag,  X } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 type PaymentMethod = "cash_on_delivery" | "vodafone_cash" | "instapay" | "bank_transfer";

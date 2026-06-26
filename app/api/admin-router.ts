@@ -12,6 +12,10 @@ import {
   orderItems,
   customers,
   coupons,
+  dropshippingSuppliers,
+  dropshippingSupplierProducts,
+  dropshippingImportLogs,
+  mediaBuyerCampaigns,
 } from "@db/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
 
@@ -556,6 +560,236 @@ export const adminRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       await db.delete(faqs).where(eq(faqs.id, input.id));
+      return { success: true };
+    }),
+
+
+  // Dropshipping management
+  listDropshippingSuppliers: adminQuery.query(async () => {
+    const db = getDb();
+    return db
+      .select({
+        id: dropshippingSuppliers.id,
+        name: dropshippingSuppliers.name,
+        country: dropshippingSuppliers.country,
+        category: dropshippingSuppliers.category,
+        contactName: dropshippingSuppliers.contactName,
+        phone: dropshippingSuppliers.phone,
+        email: dropshippingSuppliers.email,
+        website: dropshippingSuppliers.website,
+        catalogUrl: dropshippingSuppliers.catalogUrl,
+        rating: dropshippingSuppliers.rating,
+        shippingDays: dropshippingSuppliers.shippingDays,
+        status: dropshippingSuppliers.status,
+        notes: dropshippingSuppliers.notes,
+        createdAt: dropshippingSuppliers.createdAt,
+        productsCount: sql<number>`(SELECT COUNT(*) FROM dropshipping_supplier_products WHERE supplier_id = ${dropshippingSuppliers.id})`,
+      })
+      .from(dropshippingSuppliers)
+      .orderBy(desc(dropshippingSuppliers.createdAt));
+  }),
+
+  createDropshippingSupplier: adminQuery
+    .input(
+      z.object({
+        name: z.string().min(1),
+        country: z.string().min(1),
+        category: z.string().optional(),
+        contactName: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().optional(),
+        website: z.string().optional(),
+        catalogUrl: z.string().optional(),
+        rating: z.string().optional(),
+        shippingDays: z.string().optional(),
+        status: z.enum(["active", "pending", "inactive"]).default("active"),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const result = await db.insert(dropshippingSuppliers).values({
+        ...input,
+        category: input.category || "Beauty & Personal Care",
+        rating: input.rating || "0",
+        shippingDays: input.shippingDays || "3-5",
+      });
+      return { id: Number(result[0].insertId) };
+    }),
+
+  updateDropshippingSupplier: adminQuery
+    .input(
+      z.object({
+        id: z.number(),
+        name: z.string().min(1),
+        country: z.string().min(1),
+        category: z.string().optional(),
+        contactName: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().optional(),
+        website: z.string().optional(),
+        catalogUrl: z.string().optional(),
+        rating: z.string().optional(),
+        shippingDays: z.string().optional(),
+        status: z.enum(["active", "pending", "inactive"]).default("active"),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const { id, ...data } = input;
+      await db
+        .update(dropshippingSuppliers)
+        .set({
+          ...data,
+          category: data.category || "Beauty & Personal Care",
+          rating: data.rating || "0",
+          shippingDays: data.shippingDays || "3-5",
+        })
+        .where(eq(dropshippingSuppliers.id, id));
+      return { success: true };
+    }),
+
+  deleteDropshippingSupplier: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db
+        .delete(dropshippingSupplierProducts)
+        .where(eq(dropshippingSupplierProducts.supplierId, input.id));
+      await db.delete(dropshippingSuppliers).where(eq(dropshippingSuppliers.id, input.id));
+      return { success: true };
+    }),
+
+  listSupplierCatalog: adminQuery
+    .input(z.object({ supplierId: z.number().optional() }).optional())
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (input?.supplierId) {
+        return db
+          .select()
+          .from(dropshippingSupplierProducts)
+          .where(eq(dropshippingSupplierProducts.supplierId, input.supplierId))
+          .orderBy(desc(dropshippingSupplierProducts.createdAt));
+      }
+      return db
+        .select()
+        .from(dropshippingSupplierProducts)
+        .orderBy(desc(dropshippingSupplierProducts.createdAt));
+    }),
+
+  importSupplierCatalog: adminQuery
+    .input(z.object({ supplierId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const supplier = await db
+        .select()
+        .from(dropshippingSuppliers)
+        .where(eq(dropshippingSuppliers.id, input.supplierId))
+        .limit(1);
+
+      if (supplier.length === 0) {
+        throw new Error("Supplier not found");
+      }
+
+      const baseName = supplier[0].name.replace(/[^a-zA-Z0-9]+/g, " ").trim() || "Supplier";
+      const sampleProducts = [
+        { name: `${baseName} Body Mist`, sku: `DS-${input.supplierId}-MIST`, costPrice: "120.00", suggestedPrice: "199.00", stock: 50 },
+        { name: `${baseName} Roll On`, sku: `DS-${input.supplierId}-ROLL`, costPrice: "65.00", suggestedPrice: "120.00", stock: 80 },
+        { name: `${baseName} Lotion`, sku: `DS-${input.supplierId}-LOTION`, costPrice: "95.00", suggestedPrice: "169.00", stock: 40 },
+      ];
+
+      for (const item of sampleProducts) {
+        await db.insert(dropshippingSupplierProducts).values({
+          supplierId: input.supplierId,
+          name: item.name,
+          sku: item.sku,
+          category: supplier[0].category ?? "Beauty & Personal Care",
+          costPrice: item.costPrice,
+          suggestedPrice: item.suggestedPrice,
+          stock: item.stock,
+          sourceUrl: supplier[0].catalogUrl ?? supplier[0].website ?? null,
+          status: "available",
+        });
+      }
+
+      await db.insert(dropshippingImportLogs).values({
+        supplierId: input.supplierId,
+        importedCount: sampleProducts.length,
+        source: "manual",
+        status: "success",
+        message: "Sample supplier catalog imported. Replace with real supplier API/CSV later.",
+      });
+
+      return { success: true, importedCount: sampleProducts.length };
+    }),
+
+  // Media buyer campaign management
+  listMediaCampaigns: adminQuery.query(async () => {
+    const db = getDb();
+    return db.select().from(mediaBuyerCampaigns).orderBy(desc(mediaBuyerCampaigns.createdAt));
+  }),
+
+  createMediaCampaign: adminQuery
+    .input(
+      z.object({
+        name: z.string().min(1),
+        platform: z.enum(["facebook", "instagram", "tiktok", "google"]).default("facebook"),
+        status: z.enum(["active", "paused", "draft"]).default("draft"),
+        budget: z.string().default("0"),
+        spend: z.string().default("0"),
+        impressions: z.number().default(0),
+        clicks: z.number().default(0),
+        conversions: z.number().default(0),
+        linkUrl: z.string().optional(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const result = await db.insert(mediaBuyerCampaigns).values(input);
+      return { id: Number(result[0].insertId) };
+    }),
+
+  updateMediaCampaign: adminQuery
+    .input(
+      z.object({
+        id: z.number(),
+        name: z.string().min(1),
+        platform: z.enum(["facebook", "instagram", "tiktok", "google"]).default("facebook"),
+        status: z.enum(["active", "paused", "draft"]).default("draft"),
+        budget: z.string().default("0"),
+        spend: z.string().default("0"),
+        impressions: z.number().default(0),
+        clicks: z.number().default(0),
+        conversions: z.number().default(0),
+        linkUrl: z.string().optional(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const { id, ...data } = input;
+      await db.update(mediaBuyerCampaigns).set(data).where(eq(mediaBuyerCampaigns.id, id));
+      return { success: true };
+    }),
+
+  updateMediaCampaignStatus: adminQuery
+    .input(z.object({ id: z.number(), status: z.enum(["active", "paused", "draft"]) }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db
+        .update(mediaBuyerCampaigns)
+        .set({ status: input.status })
+        .where(eq(mediaBuyerCampaigns.id, input.id));
+      return { success: true };
+    }),
+
+  deleteMediaCampaign: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db.delete(mediaBuyerCampaigns).where(eq(mediaBuyerCampaigns.id, input.id));
       return { success: true };
     }),
 
