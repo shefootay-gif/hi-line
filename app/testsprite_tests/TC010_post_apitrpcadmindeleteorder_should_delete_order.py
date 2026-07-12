@@ -2,103 +2,98 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 BASE_URL = "http://localhost:3000"
-AUTH = HTTPBasicAuth("admin", "password123")
 TIMEOUT = 30
-HEADERS = {'Content-Type': 'application/json'}
+AUTH = HTTPBasicAuth("admin", "password123")
 
 def test_post_apitrpcadmindeleteorder_should_delete_order():
-    # Step 1: Place a new order to get a valid existing order identifier
-    place_order_url = f"{BASE_URL}/api/trpc/store.placeOrder"
-    place_order_payload = {
-        "customer": {
-            "name": "Test User",
-            "email": "testuser@example.com",
-            "phone": "1234567890",
-            "address": "123 Test St"
-        },
-        "cart": []
+    headers = {
+        "Content-Type": "application/json"
     }
 
-    # We need some products to place an order, so fetch products first
-    products = []
-    try:
-        products_resp = requests.post(f"{BASE_URL}/api/trpc/store.getProducts", headers=HEADERS, timeout=TIMEOUT)
-        products_resp.raise_for_status()
-        products_data = products_resp.json()
-        # Attempt to get 1 product with quantity 1 if available
-        if isinstance(products_data, dict) and "result" in products_data:
-            result_data = products_data.get("result")
-            if isinstance(result_data, dict) and "data" in result_data and isinstance(result_data["data"], list):
-                products = result_data["data"]
-            elif isinstance(products_data.get("result"), list):
-                products = products_data["result"]
-        if not products:
-            raise Exception("No products found for placing order")
-    except Exception as e:
-        raise Exception(f"Failed to fetch products: {e}")
-
-    # Use first product with quantity 1 for placing the order
-    first_product = products[0]
-    product_id = first_product.get("id") or first_product.get("productId")
-    if not product_id:
-        raise Exception("Product ID not found in product data")
-
-    place_order_payload["cart"] = [{"productId": product_id, "quantity": 1}]
-
+    # Step 1: Create a new order to ensure an existing order to delete
+    order_payload = {
+        "method": "store.placeOrder",
+        "params": {
+            "customer": {
+                "name": "Test User",
+                "email": "testuser@example.com",
+                "phone": "1234567890",
+                "address": "123 Test St, Test City"
+            },
+            "cart": [
+                # The product ID and quantity must reflect actual product data.
+                # Since we do not have product info here, attempt to get from products API
+            ]
+        }
+    }
     order_id = None
     try:
-        resp_place_order = requests.post(
-            place_order_url,
-            json=place_order_payload,
-            headers=HEADERS,
-            timeout=TIMEOUT,
-        )
-        resp_place_order.raise_for_status()
-        place_order_resp_json = resp_place_order.json()
-        # Extract order ID or number from response
-        order_id = None
-        if "result" in place_order_resp_json:
-            res = place_order_resp_json["result"]
-            if isinstance(res, dict):
-                order_id = res.get("orderId") or res.get("id") or res.get("orderNumber")
-            elif isinstance(res, str):
-                order_id = res
-        if not order_id:
-            order_id = place_order_resp_json.get("orderId") or place_order_resp_json.get("id") or place_order_resp_json.get("orderNumber")
+        # Fetch products to get a valid productId for placing order
+        get_products_payload = {"method": "store.getProducts", "params": {}}
+        resp = requests.post(f"{BASE_URL}/api/trpc/store.getProducts", json=get_products_payload, timeout=TIMEOUT)
+        assert resp.status_code == 200, f"Failed to fetch products: {resp.text}"
+        products_data = resp.json()
+        # product list may be in result field depending on API, try to extract
+        products = products_data.get("result", {}).get("data", [])
+        assert isinstance(products, list) and len(products) > 0, "No products available to create order."
+        product_id = products[0].get("id")
+        assert product_id is not None, "Product ID not found in product data."
 
-        if not order_id:
-            raise Exception("Order ID not found in placeOrder response")
+        # Prepare order payload with valid product info
+        order_payload["params"]["cart"] = [{"productId": product_id, "quantity": 1}]
 
-        # Step 2: Delete the order via admin.deleteOrder endpoint
-        delete_order_url = f"{BASE_URL}/api/trpc/admin.deleteOrder"
-        delete_payload = {"orderId": order_id}
+        # Place order
+        order_resp = requests.post(f"{BASE_URL}/api/trpc/store.placeOrder", json=order_payload, timeout=TIMEOUT)
+        assert order_resp.status_code == 200, f"Failed to place order: {order_resp.text}"
+        order_resp_json = order_resp.json()
+        # Extract order ID from response data
+        order_id = order_resp_json.get("result", {}).get("data", {}).get("orderId")
+        if order_id is None:
+            # If orderId is not present, try 'id' as fallback
+            order_id = order_resp_json.get("result", {}).get("data", {}).get("id")
+        assert order_id is not None, "Order ID not found in placeOrder response."
 
-        response_delete = requests.post(
-            delete_order_url,
-            json=delete_payload,
-            auth=AUTH,
-            headers=HEADERS,
-            timeout=TIMEOUT,
-        )
+        # Step 2: Authenticate admin (though basic auth is used, login endpoint exists, but instructions say basic token)
+        # So here we assume AUTH is sufficient without JWT token
+        # Step 3: Delete created order
+        delete_payload = {
+            "method": "admin.deleteOrder",
+            "params": {
+                "orderId": order_id
+            }
+        }
+        delete_resp = requests.post(f"{BASE_URL}/api/trpc/admin.deleteOrder", json=delete_payload, auth=AUTH, headers=headers, timeout=TIMEOUT)
+        assert delete_resp.status_code == 200, f"Delete order failed: {delete_resp.text}"
 
-        assert response_delete.status_code == 200, f"Expected 200 status, got {response_delete.status_code}"
-
-        delete_resp_json = response_delete.json()
-        assert (
-            "result" in delete_resp_json or "message" in delete_resp_json or "deleted" in delete_resp_json
-        ), "Deletion confirmation not found in response"
+        delete_resp_json = delete_resp.json()
+        # Check deletion confirmation - look for success indication in response
+        deletion_confirmed = False
+        # Common pattern: check result field or success flag or message in response body
+        if "result" in delete_resp_json and "data" in delete_resp_json["result"]:
+            data = delete_resp_json["result"]["data"]
+            if isinstance(data, dict) and ("deleted" in data or "success" in data):
+                # Detect any affirmative field
+                if data.get("deleted") is True or data.get("success") is True:
+                    deletion_confirmed = True
+            elif isinstance(data, str):
+                # If string message contains 'deleted'
+                if "deleted" in data.lower():
+                    deletion_confirmed = True
+        if not deletion_confirmed:
+            # As fallback, consider HTTP 200 as success, assert presence of any success message
+            assert "delete" in delete_resp.text.lower() or "success" in delete_resp.text.lower(), "Deletion confirmation not found in response."
 
     finally:
-        # Cleanup: Attempt to delete the order if it still exists (ignore errors)
-        if order_id:
+        # Cleanup: Try to delete order if it still exists (for safety in case delete above failed)
+        if order_id is not None:
             try:
-                requests.post(
-                    f"{BASE_URL}/api/trpc/admin.deleteOrder",
-                    json={"orderId": order_id},
-                    auth=AUTH,
-                    headers=HEADERS,
-                    timeout=TIMEOUT,
-                )
+                cleanup_payload = {
+                    "method": "admin.deleteOrder",
+                    "params": {
+                        "orderId": order_id
+                    }
+                }
+                requests.post(f"{BASE_URL}/api/trpc/admin.deleteOrder", json=cleanup_payload, auth=AUTH, headers=headers, timeout=TIMEOUT)
             except Exception:
                 pass
 

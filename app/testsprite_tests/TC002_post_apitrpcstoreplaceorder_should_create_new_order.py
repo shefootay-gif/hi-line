@@ -3,67 +3,69 @@ import requests
 BASE_URL = "http://localhost:3000"
 TIMEOUT = 30
 
+AUTH = requests.auth.HTTPBasicAuth("admin", "password123")
 
 def test_post_apitrpcstoreplaceorder_should_create_new_order():
-    url = f"{BASE_URL}/api/trpc/store.placeOrder"
     headers = {
         "Content-Type": "application/json"
     }
-    # Sample valid customer and cart details based on typical order structure
     payload = {
-        "input": {
+        "method": "store.placeOrder",
+        "params": {
             "customer": {
                 "name": "John Doe",
-                "email": "johndoe@example.com",
+                "email": "john.doe@example.com",
                 "phone": "1234567890",
-                "address": "123 Main St, Anytown, USA"
+                "address": "123 Test St, Test City, TX 78901"
             },
             "cart": [
                 {
-                    "productId": 1,
+                    "id": 1,
                     "quantity": 2
                 },
                 {
-                    "productId": 2,
+                    "id": 2,
                     "quantity": 1
                 }
-            ],
-            "paymentMethod": "credit_card"
+            ]
         }
     }
-
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=TIMEOUT)
-    except requests.RequestException as e:
-        assert False, f"Request failed: {e}"
-
-    assert response.status_code == 200, f"Expected status code 200 but got {response.status_code}"
-
-    try:
-        data = response.json()
-    except ValueError:
-        assert False, "Response is not valid JSON"
-
-    # The typical tRPC response wraps data inside 'result' > 'data'
-    result_data = data.get('result', {}).get('data', {})
-
-    # Check that keys corresponding to order confirmation and order number exist
-    assert isinstance(result_data, dict), "Response 'result.data' is not a dictionary"
-
-    # Try common keys for order confirmation
-    confirmation_keys = ['orderConfirmation', 'confirmation', 'message']
-    confirmation_present = any(key in result_data for key in confirmation_keys)
-    assert confirmation_present, "Order confirmation missing in response"
-
-    # Try common keys for order number
-    order_number_keys = ['orderNumber', 'order_number', 'orderNo', 'order_id']
     order_number = None
-    for key in order_number_keys:
-        if key in result_data:
-            order_number = result_data[key]
-            break
-    assert order_number is not None, "Order number missing in response"
-    assert isinstance(order_number, (str, int)) and str(order_number).strip() != "", "Invalid order number"
+    try:
+        response = requests.post(
+            f"{BASE_URL}/api/trpc/store.placeOrder",
+            json=payload,
+            headers=headers,
+            timeout=TIMEOUT
+        )
+        assert response.status_code == 200, f"Expected status 200, got {response.status_code}"
+        resp_json = response.json()
+        # Check that response has order number
+        assert "result" in resp_json, "Response missing 'result'"
+        result = resp_json["result"]
 
+        assert "orderNumber" in result, "Missing 'orderNumber' in response result"
+        order_number = result["orderNumber"]
+        assert isinstance(order_number, (str, int)) and order_number, "'orderNumber' is empty or invalid"
+
+    finally:
+        # Clean up: delete the created order if order_number is obtained
+        if order_number:
+            delete_payload = {
+                "method": "admin.deleteOrder",
+                "params": {
+                    "orderId": order_number
+                }
+            }
+            try:
+                delete_response = requests.post(
+                    f"{BASE_URL}/api/trpc/admin.deleteOrder",
+                    json=delete_payload,
+                    headers=headers,
+                    auth=AUTH,
+                    timeout=TIMEOUT
+                )
+            except Exception:
+                pass
 
 test_post_apitrpcstoreplaceorder_should_create_new_order()

@@ -4,175 +4,155 @@
 ---
 
 ## 1️⃣ Document Metadata
-- **Project Name:** Hi Line Pro Care
-- **Date:** 2026-06-27
+- **Project Name:** app
+- **Date:** 2026-07-12
 - **Prepared by:** TestSprite AI Team
 
 ---
 
 ## 2️⃣ Requirement Validation Summary
 
-#### Test TC001 post-apitrpcstoregetproducts-should-return-active-products
-- **Test Code:** [TC001_post_apitrpcstoregetproducts_should_return_active_products.py](./TC001_post_apitrpcstoregetproducts_should_return_active_products.py)
+#### Test TC001 getproducts_should_return_active_products_with_optional_filters
+- **Test Code:** [TC001_getproducts_should_return_active_products_with_optional_filters.py](./TC001_getproducts_should_return_active_products_with_optional_filters.py)
 - **Test Error:** Traceback (most recent call last):
-  File "<string>", line 17, in test_post_apitrpcstoregetproducts_should_return_active_products
-  File "/var/lang/lib/python3.12/site-packages/requests/models.py", line 1024, in raise_for_status
-    raise HTTPError(http_error_msg, response=self)
-requests.exceptions.HTTPError: 405 Client Error: Method Not Allowed for url: http://localhost:3000/api/trpc/store.getProducts
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 43, in <module>
-  File "<string>", line 19, in test_post_apitrpcstoregetproducts_should_return_active_products
-AssertionError: Request to http://localhost:3000/api/trpc/store.getProducts failed: 405 Client Error: Method Not Allowed for url: http://localhost:3000/api/trpc/store.getProducts
+  File "<string>", line 55, in <module>
+  File "<string>", line 35, in test_getproducts_should_return_active_products_with_optional_filters
+AssertionError: Cannot find products list in response
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/87fef206-71d9-454d-8a12-1067305a5fa8
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/f0914c2c-3a37-4ee8-b61b-f02e77780aa2
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
-#### Test TC002 post-apitrpcstoreplaceorder-should-create-new-order
-- **Test Code:** [TC002_post_apitrpcstoreplaceorder_should_create_new_order.py](./TC002_post_apitrpcstoreplaceorder_should_create_new_order.py)
+#### Test TC002 getproductbyslug_should_return_product_details_for_valid_slug
+- **Test Code:** [TC002_getproductbyslug_should_return_product_details_for_valid_slug.py](./TC002_getproductbyslug_should_return_product_details_for_valid_slug.py)
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
   File "<string>", line 69, in <module>
-  File "<string>", line 40, in test_post_apitrpcstoreplaceorder_should_create_new_order
-AssertionError: Expected status code 200 but got 404
+  File "<string>", line 47, in test_getproductbyslug_should_return_product_details_for_valid_slug
+AssertionError: Expected status code 200, got 400
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/e0f13d60-2faf-41b6-8b72-0baa4c0db221
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/1a15c632-86f6-4fd1-9673-1118fe6154dd
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
-#### Test TC003 post-apitrpcstorecancelorder-should-cancel-order
-- **Test Code:** [TC003_post_apitrpcstorecancelorder_should_cancel_order.py](./TC003_post_apitrpcstorecancelorder_should_cancel_order.py)
+#### Test TC003 createorder_should_place_order_with_valid_customer_and_shipping_info
+- **Test Code:** [TC003_createorder_should_place_order_with_valid_customer_and_shipping_info.py](./TC003_createorder_should_place_order_with_valid_customer_and_shipping_info.py)
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 134, in <module>
-  File "<string>", line 43, in test_post_apitrpcstorecancelorder_should_cancel_order
-AssertionError
+  File "<string>", line 53, in <module>
+  File "<string>", line 35, in test_createorder_should_place_order_with_valid_customer_and_shipping_info
+AssertionError: Expected status code 200, got 400
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/b8565356-57c8-466b-95ad-9fde0dffc118
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/593a12af-760d-42be-9d41-e8174679adfe
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
-#### Test TC004 post-apitrpcstoregetorderbynumber-should-return-order-status
-- **Test Code:** [TC004_post_apitrpcstoregetorderbynumber_should_return_order_status.py](./TC004_post_apitrpcstoregetorderbynumber_should_return_order_status.py)
+#### Test TC004 validatecoupon_should_return_coupon_validation_result_for_valid_code
+- **Test Code:** [TC004_validatecoupon_should_return_coupon_validation_result_for_valid_code.py](./TC004_validatecoupon_should_return_coupon_validation_result_for_valid_code.py)
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 70, in <module>
-  File "<string>", line 33, in test_post_apitrpcstoregetorderbynumber_should_return_order_status
-AssertionError: Place order failed: {"error":{"json":{"message":"No procedure found on path \"store.placeOrder\"","code":-32004,"data":{"code":"NOT_FOUND","httpStatus":404,"path":"store.placeOrder"}}}}
+  File "<string>", line 33, in <module>
+  File "<string>", line 20, in test_validatecoupon_should_return_coupon_validation_result_for_valid_code
+AssertionError: Expected status code 200 but got 400
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/3d49a02b-adf6-4c3a-99fb-725c70a274f6
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/13d0acf3-2aa7-402a-8c1d-a5f67393bdf8
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
-#### Test TC005 post-apitrpcauthlogin-should-authenticate-admin
-- **Test Code:** [TC005_post_apitrpcauthlogin_should_authenticate_admin.py](./TC005_post_apitrpcauthlogin_should_authenticate_admin.py)
+#### Test TC005 listaddresses_should_require_authentication_and_return_saved_addresses
+- **Test Code:** [TC005_listaddresses_should_require_authentication_and_return_saved_addresses.py](./TC005_listaddresses_should_require_authentication_and_return_saved_addresses.py)
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 23, in <module>
-  File "<string>", line 14, in test_post_apitrpcauthlogin_should_authenticate_admin
-AssertionError: Expected 200 OK but got 404
+  File "<string>", line 35, in <module>
+  File "<string>", line 27, in test_listaddresses_should_require_authentication_and_return_saved_addresses
+AssertionError: Expected 200 OK with auth but got 401
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/a4ab9889-d3f6-4a89-af9b-a608e58f309e
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/49e5954a-bab6-4441-809b-15a211ccf582
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
-#### Test TC006 post-apitrpcadminlistorders-should-return-orders-with-auth
-- **Test Code:** [TC006_post_apitrpcadminlistorders_should_return_orders_with_auth.py](./TC006_post_apitrpcadminlistorders_should_return_orders_with_auth.py)
+#### Test TC006 localadminlogin_should_authenticate_admin_with_valid_credentials
+- **Test Code:** [TC006_localadminlogin_should_authenticate_admin_with_valid_credentials.py](./TC006_localadminlogin_should_authenticate_admin_with_valid_credentials.py)
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 75, in <module>
-  File "<string>", line 40, in test_post_apitrpcadminlistorders_should_return_orders_with_auth
-  File "<string>", line 25, in test_post_apitrpcadminlistorders_should_return_orders_with_auth
-AssertionError: Admin login failed with status code 404
+  File "<string>", line 30, in <module>
+  File "<string>", line 21, in test_localadminlogin_should_authenticate_admin_with_valid_credentials
+AssertionError: Expected status code 200 but got 400
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/61a8ac08-f692-4b27-92aa-90d6ebe6e4f4
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/924e30c4-4402-4483-8232-98172dabf8cd
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
-#### Test TC007 post-apitrpcadminupdateorderstatus-should-update-status
-- **Test Code:** [TC007_post_apitrpcadminupdateorderstatus_should_update_status.py](./TC007_post_apitrpcadminupdateorderstatus_should_update_status.py)
+#### Test TC007 listorders_should_return_orders_for_authenticated_admin
+- **Test Code:** [TC007_listorders_should_return_orders_for_authenticated_admin.py](./TC007_listorders_should_return_orders_for_authenticated_admin.py)
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 89, in <module>
-  File "<string>", line 17, in test_post_apitrpcadminupdateorderstatus_should_update_status
-AssertionError: Admin login failed with status 404
+  File "<string>", line 49, in <module>
+  File "<string>", line 14, in test_listorders_should_return_orders_for_authenticated_admin
+AssertionError: Expected 200 OK when logging in, got 400
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/58e7ea05-ac62-4a3a-9609-8f44b065470b
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/150b0a2d-1cae-4584-9bf2-247460a7166d
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
-#### Test TC008 post-apitrpcadmincreateproduct-should-create-product
-- **Test Code:** [TC008_post_apitrpcadmincreateproduct_should_create_product.py](./TC008_post_apitrpcadmincreateproduct_should_create_product.py)
+#### Test TC008 updateorderstatus_should_update_order_status_with_valid_data
+- **Test Code:** [TC008_updateorderstatus_should_update_order_status_with_valid_data.py](./TC008_updateorderstatus_should_update_order_status_with_valid_data.py)
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 54, in <module>
-  File "<string>", line 13, in test_post_apitrpcadmincreateproduct_should_create_product
-AssertionError: Login failed with status 404
-
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/94ecbc57-c238-4928-947b-844ddce04fe6
-- **Status:** ❌ Failed
-- **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
----
-
-#### Test TC009 post-apitrpcadminupdateproduct-should-update-product
-- **Test Code:** [TC009_post_apitrpcadminupdateproduct_should_update_product.py](./TC009_post_apitrpcadminupdateproduct_should_update_product.py)
-- **Test Error:** Traceback (most recent call last):
-  File "/var/task/handler.py", line 258, in run_with_retry
-    exec(code, exec_env)
-  File "<string>", line 102, in <module>
-  File "<string>", line 35, in test_post_apitrpcadminupdateproduct_should_update_product
-AssertionError: Create product failed: {"error":{"json":{"message":"Authentication required","code":-32001,"data":{"code":"UNAUTHORIZED","httpStatus":401,"path":"admin.createProduct"}}}}
-
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/bef3b60d-d2e6-4aea-a116-2818f8c02c8c
-- **Status:** ❌ Failed
-- **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
----
-
-#### Test TC010 post-apitrpcadmindeleteorder-should-delete-order
-- **Test Code:** [TC010_post_apitrpcadmindeleteorder_should_delete_order.py](./TC010_post_apitrpcadmindeleteorder_should_delete_order.py)
-- **Test Error:** Traceback (most recent call last):
-  File "<string>", line 26, in test_post_apitrpcadmindeleteorder_should_delete_order
+  File "<string>", line 80, in <module>
+  File "<string>", line 56, in update_order_status_test
+  File "<string>", line 32, in create_order
   File "/var/lang/lib/python3.12/site-packages/requests/models.py", line 1024, in raise_for_status
     raise HTTPError(http_error_msg, response=self)
-requests.exceptions.HTTPError: 405 Client Error: Method Not Allowed for url: http://localhost:3000/api/trpc/store.getProducts
+requests.exceptions.HTTPError: 429 Client Error: Too Many Requests for url: http://localhost:3000/api/trpc/store.createOrder
 
-During handling of the above exception, another exception occurred:
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/17ce30b2-8839-418f-8a25-95ce860588b2
+- **Status:** ❌ Failed
+- **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
+---
 
-Traceback (most recent call last):
+#### Test TC009 createproduct_should_create_new_product_with_valid_data
+- **Test Code:** [TC009_createproduct_should_create_new_product_with_valid_data.py](./TC009_createproduct_should_create_new_product_with_valid_data.py)
+- **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 105, in <module>
-  File "<string>", line 38, in test_post_apitrpcadmindeleteorder_should_delete_order
-Exception: Failed to fetch products: 405 Client Error: Method Not Allowed for url: http://localhost:3000/api/trpc/store.getProducts
+  File "<string>", line 56, in <module>
+  File "<string>", line 20, in test_createproduct_should_create_new_product_with_valid_data
+  File "<string>", line 12, in login_admin_get_token
+AssertionError: Admin login failed with status 429
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/bac25a7e-ec5d-498d-9e74-779ee3c56ad4/1c186a16-c648-42f8-8254-14e8b278b7a1
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/49974226-4532-4bf4-a0a7-9a65f4548d45
 - **Status:** ❌ Failed
+- **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
+---
+
+#### Test TC010 deleteorder_should_return_error_for_nonexistent_order_id
+- **Test Code:** [TC010_deleteorder_should_return_error_for_nonexistent_order_id.py](./TC010_deleteorder_should_return_error_for_nonexistent_order_id.py)
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/151cda9c-8a91-4f71-9b2e-200ed05a1969/d6cd0472-25bb-402b-b72d-a73f341ce113
+- **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 
 ## 3️⃣ Coverage & Matching Metrics
 
-- **0.00** of tests passed
+- **10.00** of tests passed
 
 | Requirement        | Total Tests | ✅ Passed | ❌ Failed  |
 |--------------------|-------------|-----------|------------|

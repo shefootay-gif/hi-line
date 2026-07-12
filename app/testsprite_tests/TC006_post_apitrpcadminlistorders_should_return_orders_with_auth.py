@@ -10,66 +10,56 @@ def test_post_apitrpcadminlistorders_should_return_orders_with_auth():
     username = "admin"
     password = "password123"
 
-    # Correct tRPC login payload using method name and params
-    login_payload = {
-        "method": "auth.login",
-        "params": [{"username": username, "password": password}]
-    }
-
     try:
-        login_response = requests.post(
-            login_url,
-            json=login_payload,
-            timeout=timeout
-        )
-        assert login_response.status_code == 200, f"Admin login failed with status code {login_response.status_code}"
-        json_login_resp = login_response.json()
-        assert isinstance(json_login_resp, dict)
+        # Step 1: Authenticate admin to get auth token/session context
+        login_body = {
+            "method": "auth.login",
+            "params": {
+                "username": username,
+                "password": password
+            }
+        }
 
-        # Extract token from tRPC result structure, typically:
-        # { "result": { "data": { "token": "..." } } }
-        token = None
-        if 'result' in json_login_resp:
-            token = json_login_resp['result'].get('data', {}).get('token')
-        if not token:
-            token = json_login_resp.get('token')
-        assert token is not None, "Login response does not contain auth token"
-    except requests.RequestException as e:
-        assert False, f"Request exception during admin login: {e}"
-    except AssertionError as e:
-        raise e
+        response = requests.post(login_url, json=login_body, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
 
-    list_orders_payload = {
-        "method": "admin.listOrders",
-        "params": [{}]
-    }
+        # Validate login success and get token or session context
+        assert response.status_code == 200, f"Expected 200 status for login, got {response.status_code}"
+        assert "result" in data, "Login response missing 'result' key"
 
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
+        result = data["result"]
+        # Token or session key could vary, check for 'token' or 'session'
+        token = result.get("token") or result.get("session")
+        assert token, "Authentication token/session missing in login response"
 
-    try:
-        response = requests.post(
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Step 2: Call the protected admin.listOrders endpoint with Bearer token
+        list_orders_body = {
+            "method": "admin.listOrders",
+            "params": {}
+        }
+
+        list_orders_response = requests.post(
             list_orders_url,
-            json=list_orders_payload,
-            headers=headers,
-            timeout=timeout
+            json=list_orders_body,
+            timeout=timeout,
+            headers=headers
         )
-        assert response.status_code == 200, f"Expected 200 status code, got {response.status_code}"
+        list_orders_response.raise_for_status()
+        list_orders_data = list_orders_response.json()
 
-        resp_json = response.json()
-        assert isinstance(resp_json, dict), "Response is not a JSON object"
-        orders_found = False
-        for v in resp_json.values():
-            if isinstance(v, list):
-                orders_found = True
-                break
-        assert orders_found, "Response JSON does not contain a list of orders"
+        # Assertions
+        assert list_orders_response.status_code == 200, f"Expected 200 status, got {list_orders_response.status_code}"
+        assert "result" in list_orders_data, "Response JSON missing 'result' key"
 
-    except requests.RequestException as e:
-        assert False, f"Request exception during admin.listOrders: {e}"
-    except AssertionError as e:
-        raise e
+        orders = list_orders_data["result"]
+        assert isinstance(orders, list), f"Expected 'result' to be a list, got {type(orders)}"
 
+    except requests.exceptions.RequestException as e:
+        assert False, f"HTTP request failed: {e}"
 
 test_post_apitrpcadminlistorders_should_return_orders_with_auth()

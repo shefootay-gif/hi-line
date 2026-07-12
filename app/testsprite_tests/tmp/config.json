@@ -7,14 +7,14 @@
   "backendUsername": "admin",
   "backendPassword": "password123",
   "executionArgs": {
-    "projectName": "Hi Line Pro Care",
+    "projectName": "app",
     "projectPath": "e:\\Kimi_Agent_Hi Line Pro Care E-commerce\\app",
     "testIds": [],
     "additionalInstruction": "",
-    "serverMode": "development",
+    "serverMode": "production",
     "envs": {
       "API_KEY": "sk-user-89aHXIkow9wL9fVNjQh2gSA2YjtKy1FO-EpNX_Neeqxd31k6jmK1WRPVQLxV1ieLoZefVH7fBYUiy3m3rZM7G6TQSkbGUqVJL8lmOcI2vjr7AwQwLHcdao7irZ2yeGJnqQI"
     }
   },
-  "serverPort": 59808
+  "serverPort": 59312
 }

@@ -1,122 +1,95 @@
 import requests
-from requests.auth import HTTPBasicAuth
 
 BASE_URL = "http://localhost:3000"
 TIMEOUT = 30
-AUTH = HTTPBasicAuth("admin", "password123")
+
 
 def test_post_apitrpcstorecancelorder_should_cancel_order():
     headers = {"Content-Type": "application/json"}
 
-    order_number = None
-
-    # Step 1: Place a new order to get a valid order number
-    place_order_payload = {
-        "method": "store.placeOrder",
-        "params": [
-            {
-                "customer": {
-                    "name": "Test User",
-                    "email": "testuser@example.com",
-                    "phone": "1234567890",
-                    "address": "123 Test St"
-                },
-                "cart": [
-                    # We will first get products to get valid productId and quantity
-                ]
-            }
-        ]
-    }
-
+    # Step 1: Get active products
     try:
-        # Get products to select a product for order
-        get_products_payload = {
-            "method": "store.getProducts",
-            "params": [{}]
-        }
-        resp_products = requests.post(
+        prod_resp = requests.post(
             f"{BASE_URL}/api/trpc/store.getProducts",
-            json=get_products_payload,
             headers=headers,
-            timeout=TIMEOUT
+            json={},  # empty payload
+            timeout=TIMEOUT,
         )
-        assert resp_products.status_code == 200
-        data_products = resp_products.json()
-        products = data_products.get("result", {}).get("data", [])
-        assert isinstance(products, list) and len(products) > 0
-        # Pick first available product with stock > 0
-        selected_product = None
-        for p in products:
-            if p.get("stock", 0) > 0 and "id" in p:
-                selected_product = p
-                break
-        assert selected_product is not None, "No product with stock available to place order"
+        prod_resp.raise_for_status()
+        products_data = prod_resp.json()
+        products = products_data.get("result", {}).get("data", [])
+        assert isinstance(products, list) and len(products) > 0, "No products available to order"
 
-        place_order_payload["params"][0]["cart"] = [
-            {"productId": selected_product["id"], "quantity": 1}
-        ]
+        first_product = products[0]
+        product_id = first_product.get("id")
+        assert product_id is not None, "Product ID missing"
 
-        resp_place_order = requests.post(
-            f"{BASE_URL}/api/trpc/store.placeOrder",
-            json=place_order_payload,
-            headers=headers,
-            timeout=TIMEOUT
-        )
-        assert resp_place_order.status_code == 200
-        data_place_order = resp_place_order.json()
-        order_number = data_place_order.get("result", {}).get("data", {}).get("orderNumber")
-        assert order_number, "Order number not found in placeOrder response"
-
-        # Step 2: Cancel the order using the order number
-        cancel_order_payload = {
-            "method": "store.cancelOrder",
-            "params": [
-                {
-                    "orderNumber": order_number
-                }
+        # Step 2: Place Order
+        place_order_payload = {
+            "customer": {
+                "name": "Test User",
+                "email": "testuser@example.com",
+                "phone": "1234567890",
+                "address": "123 Test St, Test City"
+            },
+            "cart": [
+                {"productId": product_id, "quantity": 1}
             ]
         }
-        resp_cancel_order = requests.post(
-            f"{BASE_URL}/api/trpc/store.cancelOrder",
-            json=cancel_order_payload,
+
+        place_resp = requests.post(
+            f"{BASE_URL}/api/trpc/store.placeOrder",
             headers=headers,
-            timeout=TIMEOUT
+            json=place_order_payload,
+            timeout=TIMEOUT,
         )
-        assert resp_cancel_order.status_code == 200
-        data_cancel_order = resp_cancel_order.json()
-        # Assert presence of result.data to confirm cancellation
-        assert "result" in data_cancel_order and "data" in data_cancel_order["result"] and data_cancel_order["result"]["data"], \
-            f"Cancellation confirmation not found in response: {data_cancel_order}"
+        place_resp.raise_for_status()
+        place_resp_json = place_resp.json()
+        order_number = (
+            place_resp_json.get("result", {})
+            .get("data", {})
+            .get("orderNumber")
+        )
+        assert order_number is not None, "Order number missing from placeOrder response"
+
+        # Step 3: Cancel the order
+        cancel_payload = {
+            "orderNumber": order_number
+        }
+
+        cancel_resp = requests.post(
+            f"{BASE_URL}/api/trpc/store.cancelOrder",
+            headers=headers,
+            json=cancel_payload,
+            timeout=TIMEOUT,
+        )
+        cancel_resp.raise_for_status()
+        cancel_resp_json = cancel_resp.json()
+        cancel_data = cancel_resp_json.get("result", {}).get("data", {})
+
+        assert cancel_data.get("orderNumber") == order_number, "Cancelled orderNumber mismatch"
+        assert cancel_data.get("status") in ["cancelled", "canceled"], "Order status is not cancelled"
+        assert cancel_resp.status_code == 200
 
     finally:
-        # Clean up: Try to delete the test order via admin API if possible
-        # Authenticate as admin
-        auth_payload = {
-            "method": "auth.login",
-            "params": [
-                {
-                    "username": "admin",
-                    "password": "password123"
-                }
-            ]
+        # Cleanup: login admin and delete the order
+        login_payload = {
+            "username": "admin",
+            "password": "password123"
         }
         try:
-            resp_auth = requests.post(
+            login_resp = requests.post(
                 f"{BASE_URL}/api/trpc/auth.login",
-                json=auth_payload,
-                headers=headers,
-                timeout=TIMEOUT
+                headers={"Content-Type": "application/json"},
+                json=login_payload,
+                timeout=TIMEOUT,
             )
-            if resp_auth.status_code == 200:
-                token = resp_auth.json().get("result", {}).get("data", {}).get("token")
-                if token and order_number:
+            if login_resp.status_code == 200:
+                login_data = login_resp.json()
+                token = login_data.get("result", {}).get("data", {}).get("token")
+                if token and 'order_number' in locals():
                     delete_order_payload = {
-                        "method": "admin.deleteOrder",
-                        "params": [
-                            {
-                                "orderNumber": order_number
-                            }
-                        ]
+                        "orderId": order_number
                     }
                     delete_headers = {
                         "Content-Type": "application/json",
@@ -124,11 +97,12 @@ def test_post_apitrpcstorecancelorder_should_cancel_order():
                     }
                     requests.post(
                         f"{BASE_URL}/api/trpc/admin.deleteOrder",
-                        json=delete_order_payload,
                         headers=delete_headers,
-                        timeout=TIMEOUT
+                        json=delete_order_payload,
+                        timeout=TIMEOUT,
                     )
         except Exception:
             pass
+
 
 test_post_apitrpcstorecancelorder_should_cancel_order()

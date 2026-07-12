@@ -1,52 +1,52 @@
 [
   {
     "id": "TC001",
-    "title": "post-apitrpcstoregetproducts-should-return-active-products",
-    "description": "Verify that POST /api/trpc/store.getProducts returns a 200 status with a list of active products when called with a valid request payload."
+    "title": "getproducts_should_return_active_products_with_optional_filters",
+    "description": "Test GET /api/trpc/store.getProducts endpoint to verify it returns a 200 response with a list of active products when called with valid optional filters."
   },
   {
     "id": "TC002",
-    "title": "post-apitrpcstoreplaceorder-should-create-new-order",
-    "description": "Verify that POST /api/trpc/store.placeOrder creates a new order and returns a 200 status with order confirmation and order number when called with valid customer and cart details."
+    "title": "getproductbyslug_should_return_product_details_for_valid_slug",
+    "description": "Test GET /api/trpc/store.getProductBySlug endpoint to verify it returns a 200 response with product details when called with a valid product slug."
   },
   {
     "id": "TC003",
-    "title": "post-apitrpcstorecancelorder-should-cancel-order",
-    "description": "Verify that POST /api/trpc/store.cancelOrder cancels an order and returns a 200 status with cancellation confirmation when called with a valid order number and the order is in a cancelable state."
+    "title": "createorder_should_place_order_with_valid_customer_and_shipping_info",
+    "description": "Test POST /api/trpc/store.createOrder endpoint to verify it successfully places an order and returns a 200 response with order confirmation when provided valid customer information, shipping address, and items."
   },
   {
     "id": "TC004",
-    "title": "post-apitrpcstoregetorderbynumber-should-return-order-status",
-    "description": "Verify that POST /api/trpc/store.getOrderByNumber returns a 200 status with order status details when called with a valid order number."
+    "title": "validatecoupon_should_return_coupon_validation_result_for_valid_code",
+    "description": "Test POST /api/trpc/store.validateCoupon endpoint to verify it returns a 200 response with coupon validation result when provided a valid coupon code."
   },
   {
     "id": "TC005",
-    "title": "post-apitrpcauthlogin-should-authenticate-admin",
-    "description": "Verify that POST /api/trpc/auth.login authenticates an admin and returns a 200 status with an authentication token or session context when called with valid admin credentials."
+    "title": "listaddresses_should_require_authentication_and_return_saved_addresses",
+    "description": "Test GET /api/trpc/store.listAddresses endpoint to verify it returns 401 unauthorized when called without authentication and returns 200 with saved addresses when called with valid authentication token."
   },
   {
     "id": "TC006",
-    "title": "post-apitrpcadminlistorders-should-return-orders-with-auth",
-    "description": "Verify that POST /api/trpc/admin.listOrders returns a 200 status with a list of orders when called with valid authentication."
+    "title": "localadminlogin_should_authenticate_admin_with_valid_credentials",
+    "description": "Test POST /api/trpc/auth.localAdminLogin endpoint to verify it returns a 200 response with authentication token or session data when provided valid admin credentials."
   },
   {
     "id": "TC007",
-    "title": "post-apitrpcadminupdateorderstatus-should-update-status",
-    "description": "Verify that POST /api/trpc/admin.updateOrderStatus updates the order status and returns a 200 status with updated order details when called with valid authentication and valid order data."
+    "title": "listorders_should_return_orders_for_authenticated_admin",
+    "description": "Test GET /api/trpc/admin.listOrders endpoint to verify it returns a 200 response with an array of orders when called with valid admin authentication and returns 401 unauthorized without authentication."
   },
   {
     "id": "TC008",
-    "title": "post-apitrpcadmincreateproduct-should-create-product",
-    "description": "Verify that POST /api/trpc/admin.createProduct creates a new product and returns a 200 status with created product details when called with valid authentication and complete product data."
+    "title": "updateorderstatus_should_update_order_status_with_valid_data",
+    "description": "Test POST /api/trpc/admin.updateOrderStatus endpoint to verify it updates the status of a specific order and returns a 200 response with updated order details when provided valid order identifier and status."
   },
   {
     "id": "TC009",
-    "title": "post-apitrpcadminupdateproduct-should-update-product",
-    "description": "Verify that POST /api/trpc/admin.updateProduct updates an existing product and returns a 200 status with updated product details when called with valid authentication and existing product data."
+    "title": "createproduct_should_create_new_product_with_valid_data",
+    "description": "Test POST /api/trpc/admin.createProduct endpoint to verify it creates a new product listing and returns a 200 response with created product details when provided valid product data."
   },
   {
     "id": "TC010",
-    "title": "post-apitrpcadmindeleteorder-should-delete-order",
-    "description": "Verify that POST /api/trpc/admin.deleteOrder deletes an existing order and returns a 200 status with deletion confirmation when called with valid authentication and existing order identifier."
+    "title": "deleteorder_should_return_error_for_nonexistent_order_id",
+    "description": "Test POST /api/trpc/admin.deleteOrder endpoint to verify it returns a 4xx not-found or error response when attempting to delete an order with a non-existent order id."
   }
 ]

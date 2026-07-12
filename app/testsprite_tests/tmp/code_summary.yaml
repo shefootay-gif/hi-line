@@ -1,70 +1,100 @@
 version: "2"
 type: backend
 tech_stack:
-  - Node.js
   - TypeScript
+  - Node.js
   - Hono
-  - tRPC
-  - Prisma
-  - SQLite
+  - tRPC v10
+  - Drizzle ORM
+  - MySQL
 features:
-  - name: Store API (Public)
-    description: Public endpoints for browsing products and placing orders
+  - name: Store API
+    description: Public facing e-commerce store operations
     files:
-      - src/api/trpc-router.ts
-      - src/db/schema.prisma
+      - api/store-router.ts
     endpoints:
-      - method: POST
+      - method: GET
         path: /api/trpc/store.getProducts
-        description: List all active products
+        description: List active products with optional filters
         auth_required: false
-      - method: POST
-        path: /api/trpc/store.getOrderByNumber
-        description: Get order status by number
+        response_schema:
+          "200": object
+      - method: GET
+        path: /api/trpc/store.getProductBySlug
+        description: Get product details by slug
         auth_required: false
+        response_schema:
+          "200": object
       - method: POST
-        path: /api/trpc/store.placeOrder
+        path: /api/trpc/store.createOrder
         description: Place a new order
         auth_required: false
+        request_schema:
+          body:
+            customerName: string
+            customerPhone: string
+            customerEmail: string
+            shippingAddress: string
+            governorate: string
+            items: array
+        response_schema:
+          "200": object
       - method: POST
-        path: /api/trpc/store.cancelOrder
-        description: Cancel an order
+        path: /api/trpc/store.validateCoupon
+        description: Validate discount coupon
         auth_required: false
-  - name: Admin API (Protected)
-    description: Protected endpoints for managing store
+        response_schema:
+          "200": object
+      - method: GET
+        path: /api/trpc/store.listAddresses
+        description: List authenticated user saved addresses
+        auth_required: true
+        response_schema:
+          "200": array
+  - name: Authentication API
+    description: Auth services for admins and users
     files:
-      - src/api/admin-router.ts
+      - api/auth-router.ts
     endpoints:
       - method: POST
-        path: /api/trpc/auth.login
-        description: Admin login
+        path: /api/trpc/auth.localAdminLogin
+        description: Authenticate local admin credentials
         auth_required: false
-      - method: POST
+        response_schema:
+          "200": object
+  - name: Admin API
+    description: Operations for managing orders, products, and categories
+    files:
+      - api/admin-router.ts
+    endpoints:
+      - method: GET
         path: /api/trpc/admin.listOrders
-        description: List all orders
+        description: List all customer orders
         auth_required: true
+        response_schema:
+          "200": array
       - method: POST
         path: /api/trpc/admin.updateOrderStatus
-        description: Update order status
+        description: Update status of a specific order
         auth_required: true
-      - method: POST
-        path: /api/trpc/admin.listProducts
-        description: List all products
-        auth_required: true
+        response_schema:
+          "200": object
       - method: POST
         path: /api/trpc/admin.createProduct
-        description: Create new product
+        description: Create a new product listing
         auth_required: true
+        response_schema:
+          "200": object
       - method: POST
         path: /api/trpc/admin.updateProduct
-        description: Update product
+        description: Update existing product details
         auth_required: true
-      - method: POST
-        path: /api/trpc/admin.deleteProduct
-        description: Delete product
-        auth_required: true
+        response_schema:
+          "200": object
       - method: POST
         path: /api/trpc/admin.deleteOrder
-        description: Delete order
+        description: Delete a specific order
         auth_required: true
+        response_schema:
+          "200": object
 known_limitations: []
