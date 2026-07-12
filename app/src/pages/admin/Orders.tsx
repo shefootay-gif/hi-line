@@ -10,6 +10,8 @@ import {
   Loader2,
   MessageCircle,
   ShoppingBag,
+  Printer,
+  FileText
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -58,12 +60,152 @@ export default function AdminOrders() {
     { retry: false, throwOnError: false }
   );
 
+  const { data: orderDetails } = trpc.admin.getOrderDetails.useQuery(
+    { id: viewOrder?.id || 0 },
+    { enabled: !!viewOrder }
+  );
+
+  const handlePrintInvoice = () => {
+    if (!orderDetails) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    
+    printWindow.document.write(`
+      <html dir="${isRTL ? "rtl" : "ltr"}">
+        <head>
+          <title>Invoice #${orderDetails.orderNumber}</title>
+          <style>
+            body { font-family: 'Inter', 'Cairo', sans-serif; padding: 40px; color: #333; }
+            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
+            .logo { font-size: 24px; font-weight: bold; color: #4B1C71; }
+            .invoice-title { font-size: 20px; color: #666; }
+            .info-section { display: flex; justify-content: space-between; margin-bottom: 30px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: ${isRTL ? "right" : "left"}; }
+            th { background-color: #f9f9f9; }
+            .total-section { text-align: ${isRTL ? "left" : "right"}; font-size: 18px; font-weight: bold; }
+            @media print { @page { size: A4; margin: 0; } body { padding: 2cm; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">Hi Line Pro Care</div>
+            <div class="invoice-title">INVOICE</div>
+          </div>
+          <div class="info-section">
+            <div>
+              <strong>Bill To:</strong><br/>
+              ${orderDetails.customerName}<br/>
+              ${orderDetails.customerPhone}<br/>
+              ${orderDetails.shippingAddress}
+            </div>
+            <div>
+              <strong>Order #:</strong> ${orderDetails.orderNumber}<br/>
+              <strong>Date:</strong> ${new Date(orderDetails.createdAt).toLocaleDateString()}<br/>
+              <strong>Payment:</strong> ${orderDetails.paymentMethod?.replace(/_/g, " ")}
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${orderDetails.items.map((item: any) => `
+                <tr>
+                  <td>${item.productName} ${item.scent ? `(${item.scent})` : ''}</td>
+                  <td>${item.quantity}</td>
+                  <td>${item.unitPrice} EGP</td>
+                  <td>${item.totalPrice} EGP</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="total-section">
+            Grand Total: ${orderDetails.total} EGP
+          </div>
+          <script>
+            setTimeout(() => window.print(), 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+  };
+
+  const handlePrintLabel = () => {
+    if (!orderDetails) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    
+    printWindow.document.write(`
+      <html dir="${isRTL ? "rtl" : "ltr"}">
+        <head>
+          <title>Shipping Label #${orderDetails.orderNumber}</title>
+          <style>
+            body { font-family: 'Inter', 'Cairo', sans-serif; padding: 20px; display: flex; justify-content: center; background: #eee; }
+            .label { width: 10cm; height: 15cm; background: #fff; padding: 20px; border: 1px solid #000; box-sizing: border-box; }
+            .header { border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 15px; text-align: center; font-weight: bold; font-size: 24px; }
+            .barcode { text-align: center; margin: 20px 0; font-family: 'Libre Barcode 39', monospace; font-size: 48px; }
+            .section { border: 1px solid #000; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+            .title { font-size: 12px; color: #666; margin-bottom: 5px; text-transform: uppercase; }
+            .content { font-size: 18px; font-weight: bold; }
+            .cod { font-size: 24px; font-weight: bold; text-align: center; border: 2px dashed #000; padding: 10px; margin-top: 20px; }
+            @media print { @page { size: 10cm 15cm; margin: 0; } body { padding: 0; background: #fff; } .label { border: none; } }
+          </style>
+          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
+        </head>
+        <body>
+          <div class="label">
+            <div class="header">HI LINE - SHIPPING</div>
+            
+            <div class="section">
+              <div class="title">Deliver To</div>
+              <div class="content">
+                ${orderDetails.customerName}<br/>
+                ${orderDetails.customerPhone}<br/>
+                ${orderDetails.shippingAddress}
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="title">Order Details</div>
+              <div class="content" style="font-size: 14px;">
+                Order #: ${orderDetails.orderNumber}<br/>
+                Items: ${orderDetails.items.reduce((acc: number, item: any) => acc + item.quantity, 0)}
+              </div>
+            </div>
+
+            <div class="barcode">*${orderDetails.orderNumber}*</div>
+            <div style="text-align:center; font-family:monospace;">${orderDetails.orderNumber}</div>
+
+            ${orderDetails.paymentMethod === 'cash_on_delivery' 
+              ? `<div class="cod">COD: ${orderDetails.total} EGP</div>`
+              : `<div class="cod" style="color: green; border-color: green;">PAID (${orderDetails.paymentMethod})</div>`
+            }
+          </div>
+          <script>
+            setTimeout(() => window.print(), 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+  };
+
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation({
     onSuccess: () => {
       utils.admin.listOrders.invalidate();
       setUpdateStatusId(null);
       toast.success(lang === "ar" ? "تم التحديث" : "Updated");
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const deleteOrder = trpc.admin.deleteOrder.useMutation({
@@ -71,6 +213,7 @@ export default function AdminOrders() {
       utils.admin.listOrders.invalidate();
       toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const handleWhatsAppCustomer = (order: AdminOrder) => {
@@ -181,15 +324,17 @@ export default function AdminOrders() {
                           setUpdateStatusId(order.id);
                           setNewStatus(orderStatus(order.orderStatus));
                         }}
+                        className="focus:outline-none"
                       >
                         <span
-                          className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                          className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border hover:opacity-80 transition-opacity"
                           style={{
                             backgroundColor: `${statusColors[orderStatus(order.orderStatus)]}15`,
                             color: statusColors[orderStatus(order.orderStatus)],
+                            borderColor: `${statusColors[orderStatus(order.orderStatus)]}30`,
                           }}
                         >
-                          {t[orderStatus(order.orderStatus)]}
+                          {t[orderStatus(order.orderStatus)]} ▾
                         </span>
                       </button>
                     </td>
@@ -263,6 +408,29 @@ export default function AdminOrders() {
                 <span className="text-sm text-[#6F6178]">{t.paymentMethod}</span>
                 <span className="text-sm text-[#4B1C71] capitalize">{viewOrder.paymentMethod?.replace(/_/g, " ")}</span>
               </div>
+              <div className="flex justify-between items-center border-t border-[#E7D8F1] pt-4">
+                <span className="text-sm text-[#6F6178]">{t.orderStatus}</span>
+                <select
+                  value={viewOrder.orderStatus || "pending"}
+                  onChange={async (e) => {
+                    const status = e.target.value as OrderStatus;
+                    try {
+                      await updateOrderStatus.mutateAsync({ id: viewOrder.id, status });
+                      setViewOrder({ ...viewOrder, orderStatus: status });
+                    } catch (err: any) {
+                      toast.error(err.message);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-white border border-[#E7D8F1] rounded-xl text-sm font-semibold focus:outline-none"
+                  style={{ color: statusColors[viewOrder.orderStatus || "pending"] }}
+                >
+                  {statuses.map((s) => (
+                    <option key={s} value={s} style={{ color: statusColors[s] }}>
+                      {t[s]}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="border-t border-[#E7D8F1] pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>{t.total}</span>
@@ -284,6 +452,25 @@ export default function AdminOrders() {
                 <MessageCircle className="w-5 h-5" />
                 {t.chatOnWhatsApp}
               </a>
+              
+              <div className="flex gap-2 mt-4 pt-4 border-t border-[#E7D8F1]">
+                <button
+                  onClick={handlePrintInvoice}
+                  disabled={!orderDetails}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#FCF8FF] text-[#4B1C71] font-medium rounded-xl border border-[#E7D8F1] hover:bg-[#F3E8FF] transition-colors disabled:opacity-50"
+                >
+                  <FileText className="w-5 h-5" />
+                  {lang === "ar" ? "الفاتورة" : "Invoice"}
+                </button>
+                <button
+                  onClick={handlePrintLabel}
+                  disabled={!orderDetails}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#4B1C71] text-white font-medium rounded-xl hover:bg-[#3a1558] transition-colors disabled:opacity-50"
+                >
+                  <Printer className="w-5 h-5" />
+                  {lang === "ar" ? "بوليصة الشحن" : "Label"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate } from "react-router";
 import { LanguageProvider } from "./hooks/useLanguage";
 import { TRPCProvider } from "./providers/trpc";
 import MainLayout from "./layouts/MainLayout";
@@ -15,14 +15,13 @@ import FAQ from "./pages/FAQ";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import MyOrders from "./pages/MyOrders";
-import Wishlist from "./pages/Wishlist";
-import ReturnRequest from "./pages/ReturnRequest";
+import Account from "./pages/Account";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
 import AdminCategories from "./pages/admin/Categories";
 import AdminOrders from "./pages/admin/Orders";
+import AdminCustomers from "./pages/admin/Customers";
 import AdminSettings from "./pages/admin/Settings";
 import AdminCoupons from "./pages/admin/Coupons";
 import MediaBuyer from "./pages/admin/MediaBuyer";
@@ -38,10 +37,13 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import ExportBackup from "./pages/admin/ExportBackup";
 import NotFound from "./pages/NotFound";
 
+import { HelmetProvider } from "react-helmet-async";
+
 export default function App() {
   return (
-    <TRPCProvider>
-      <LanguageProvider>
+    <HelmetProvider>
+      <TRPCProvider>
+        <LanguageProvider>
         <Routes>
           {/* Public Routes */}
           <Route element={<MainLayout />}>
@@ -56,9 +58,10 @@ export default function App() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/faq" element={<FAQ />} />
-            <Route path="/my-orders" element={<MyOrders />} />
-            <Route path="/wishlist" element={<Wishlist />} />
-            <Route path="/returns" element={<ReturnRequest />} />
+            <Route path="/my-orders" element={<Navigate to="/account?tab=orders" replace />} />
+            <Route path="/wishlist" element={<Navigate to="/account?tab=wishlist" replace />} />
+            <Route path="/returns" element={<Navigate to="/account?tab=returns" replace />} />
+            <Route path="/account" element={<Account />} />
           </Route>
 
           {/* Auth */}
@@ -73,6 +76,7 @@ export default function App() {
             <Route path="/admin/products" element={<AdminProducts />} />
             <Route path="/admin/categories" element={<AdminCategories />} />
             <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/customers" element={<AdminCustomers />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
             <Route path="/admin/coupons" element={<AdminCoupons />} />
             <Route path="/admin/media-buyer" element={<MediaBuyer />} />
@@ -93,5 +97,6 @@ export default function App() {
         </Routes>
       </LanguageProvider>
     </TRPCProvider>
+    </HelmetProvider>
   );
 }

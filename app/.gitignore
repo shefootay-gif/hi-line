@@ -39,3 +39,5 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+
+testsprite_tests\tmp\config.json

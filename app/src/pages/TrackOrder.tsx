@@ -47,9 +47,9 @@ export default function TrackOrder() {
   const [searched, setSearched] = useState(false);
   const utils = trpc.useUtils();
 
-  const { data: order, isLoading } = trpc.store.getOrderByNumber.useQuery(
+  const { data: order, isLoading, isError } = trpc.store.getOrderByNumber.useQuery(
     { orderNumber, customerPhone },
-    { enabled: searched && orderNumber.trim().length > 0 && customerPhone.trim().length > 0 }
+    { enabled: searched && orderNumber.trim().length > 0 && customerPhone.trim().length > 0, retry: false }
   );
 
   const cancelMutation = trpc.store.cancelOrder.useMutation({
@@ -62,8 +62,15 @@ export default function TrackOrder() {
     },
   });
 
+  const [validationError, setValidationError] = useState("");
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!orderNumber.trim() || !customerPhone.trim()) {
+      setValidationError(ar ? "يرجى إدخال رقم الطلب ورقم الهاتف" : "Please enter both order number and phone number");
+      return;
+    }
+    setValidationError("");
     setSearched(true);
   };
 
@@ -180,7 +187,13 @@ export default function TrackOrder() {
           </button>
         </form>
 
-        {searched && !isLoading && !order && (
+        {validationError && (
+          <div className="text-center py-4 mb-8 max-w-xl mx-auto bg-red-50 text-red-600 rounded-xl border border-red-100">
+            {validationError}
+          </div>
+        )}
+
+        {searched && !isLoading && (!order || isError) && (
           <div className="text-center py-10 bg-white rounded-3xl shadow-sm border border-[#E7D8F1]">
             <Package className="w-16 h-16 text-[#E7D8F1] mx-auto mb-4" />
             <p className="text-[#6F6178]">{t.orderNotFound}</p>

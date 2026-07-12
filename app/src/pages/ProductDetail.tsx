@@ -4,7 +4,7 @@ import { findCatalogProductBySlug } from "@/lib/hiLineCatalog";
 import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
 import { useParams, Link } from "react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ChevronRight,
   Minus,
@@ -16,8 +16,13 @@ import {
   CheckCheck,
   Heart,
   Star,
+  Tag,
+  ShoppingCart,
+  Upload,
+  X,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import CountdownTimer from "@/components/ui/CountdownTimer";
 
 function listValue<T>(value: T[] | string | null | undefined): T[] {
   if (Array.isArray(value)) return value;
@@ -38,7 +43,7 @@ const scentBenefits = [
 
 const scentBenefitsAr = [
   "حماية 48 ساعة",
-  "0% ألمنيوم",
+  "0% ألومنيوم",
   "تركيبة لبنانية",
   "تطبيق سلس",
 ];
@@ -98,12 +103,49 @@ export default function ProductDetail() {
   const [copied, setCopied] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [showStickyCart, setShowStickyCart] = useState(false);
+  const [recentlyViewed, setRecentlyViewed] = useState<any[]>([]);
+
+  // Scroll listener for Sticky Cart
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 600) {
+        setShowStickyCart(true);
+      } else {
+        setShowStickyCart(false);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Recently Viewed Tracking
+  useEffect(() => {
+    if (product) {
+      const currentViewed = JSON.parse(localStorage.getItem("recentlyViewed") || "[]");
+      const filtered = currentViewed.filter((p: any) => p.id !== product.id);
+      // save lightweight product version
+      const lightweight = {
+        id: product.id,
+        nameEn: product.nameEn,
+        nameAr: product.nameAr,
+        slug: product.slug,
+        price: product.price,
+        images: product.images,
+        scentColor: product.scentColor
+      };
+      const newViewed = [lightweight, ...filtered].slice(0, 4);
+      localStorage.setItem("recentlyViewed", JSON.stringify(newViewed));
+      setRecentlyViewed(filtered.slice(0, 4));
+    }
+  }, [product?.id]);
 
   const isWishlisted = wishlist?.some(w => w.product.id === product?.id) ?? false;
 
   const handleToggleWishlist = async () => {
     if (!user) {
-      toast.error(lang === "ar" ? "يجب تسجيل الدخول أولاً" : "Please login first");
+      toast.error(lang === "ar" ? "ط¸ظ¹ط·آ¬ط·آ¨ ط·ع¾ط·آ³ط·آ¬ط¸ظ¹ط¸â€‍ ط·آ§ط¸â€‍ط·آ¯ط·آ®ط¸ث†ط¸â€‍ ط·آ£ط¸ث†ط¸â€‍ط·آ§ط¸â€¹" : "Please login first");
       return;
     }
     if (!product) return;
@@ -111,19 +153,38 @@ export default function ProductDetail() {
       const res = await toggleWishlist.mutateAsync({ productId: product.id });
       refetchWishlist();
       if (res.added) {
-        toast.success(lang === "ar" ? "تمت الإضافة للمفضلة" : "Added to wishlist");
+        toast.success(lang === "ar" ? "ط·ع¾ط¸â€¦ط·ع¾ ط·آ§ط¸â€‍ط·آ¥ط·آ¶ط·آ§ط¸ظ¾ط·آ© ط¸â€‍ط¸â€‍ط¸â€¦ط¸ظ¾ط·آ¶ط¸â€‍ط·آ©" : "Added to wishlist");
       } else {
-        toast.success(lang === "ar" ? "تمت الإزالة من المفضلة" : "Removed from wishlist");
+        toast.success(lang === "ar" ? "ط·ع¾ط¸â€¦ط·ع¾ ط·آ§ط¸â€‍ط·آ¥ط·آ²ط·آ§ط¸â€‍ط·آ© ط¸â€¦ط¸â€  ط·آ§ط¸â€‍ط¸â€¦ط¸ظ¾ط·آ¶ط¸â€‍ط·آ©" : "Removed from wishlist");
       }
     } catch {
-      toast.error(lang === "ar" ? "حدث خطأ" : "An error occurred");
+      toast.error(lang === "ar" ? "ط·آ­ط·آ¯ط·آ« ط·آ®ط·آ·ط·آ£" : "An error occurred");
     }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    Array.from(files).forEach(file => {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error(lang === "ar" ? "حجم الصورة كبير جداً" : "Image size too large");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setReviewImages(prev => [...prev, event.target!.result as string]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      toast.error(lang === "ar" ? "يجب تسجيل الدخول أولاً" : "Please login first");
+      toast.error(lang === "ar" ? "ط¸ظ¹ط·آ¬ط·آ¨ ط·ع¾ط·آ³ط·آ¬ط¸ظ¹ط¸â€‍ ط·آ§ط¸â€‍ط·آ¯ط·آ®ط¸ث†ط¸â€‍ ط·آ£ط¸ث†ط¸â€‍ط·آ§ط¸â€¹" : "Please login first");
       return;
     }
     if (!product) return;
@@ -132,12 +193,14 @@ export default function ProductDetail() {
         productId: product.id,
         rating: reviewRating,
         comment: reviewComment,
+        images: reviewImages,
       });
       setReviewComment("");
       setReviewRating(5);
-      toast.success(lang === "ar" ? "تم إرسال تقييمك بنجاح وسوف يظهر بعد المراجعة" : "Review submitted successfully and will appear after approval");
+      setReviewImages([]);
+      toast.success(lang === "ar" ? "ط·ع¾ط¸â€¦ ط·آ¥ط·آ±ط·آ³ط·آ§ط¸â€‍ ط·ع¾ط¸â€ڑط¸ظ¹ط¸ظ¹ط¸â€¦ط¸ئ’ ط·آ¨ط¸â€ ط·آ¬ط·آ§ط·آ­ ط¸ث†ط·آ³ط¸ث†ط¸ظ¾ ط¸ظ¹ط·آ¸ط¸â€،ط·آ± ط·آ¨ط·آ¹ط·آ¯ ط·آ§ط¸â€‍ط¸â€¦ط·آ±ط·آ§ط·آ¬ط·آ¹ط·آ©" : "Review submitted successfully and will appear after approval");
     } catch {
-      toast.error(lang === "ar" ? "حدث خطأ أثناء إرسال التقييم" : "Error submitting review");
+      toast.error(lang === "ar" ? "ط·آ­ط·آ¯ط·آ« ط·آ®ط·آ·ط·آ£ ط·آ£ط·آ«ط¸â€ ط·آ§ط·طŒ ط·آ¥ط·آ±ط·آ³ط·آ§ط¸â€‍ ط·آ§ط¸â€‍ط·ع¾ط¸â€ڑط¸ظ¹ط¸ظ¹ط¸â€¦" : "Error submitting review");
     }
   };
 
@@ -157,7 +220,7 @@ export default function ProductDetail() {
       });
     }
     setAdded(true);
-    toast.success(lang === "ar" ? "تمت الإضافة إلى السلة!" : "Added to cart!");
+    toast.success(lang === "ar" ? "ط·ع¾ط¸â€¦ط·ع¾ ط·آ§ط¸â€‍ط·آ¥ط·آ¶ط·آ§ط¸ظ¾ط·آ© ط·آ¥ط¸â€‍ط¸â€° ط·آ§ط¸â€‍ط·آ³ط¸â€‍ط·آ©!" : "Added to cart!");
     setTimeout(() => setAdded(false), 1500);
   };
 
@@ -167,7 +230,7 @@ export default function ProductDetail() {
       lang === "ar" && product.nameAr ? product.nameAr : product.nameEn;
     const message =
       lang === "ar"
-        ? `مرحبًا، أريد طلب:\nالمنتج: ${productName}\nالكمية: ${quantity}\nالاسم: \nرقم الهاتف: \nالعنوان: `
+        ? `ط¸â€¦ط·آ±ط·آ­ط·آ¨ط¸â€¹ط·آ§ط·إ’ ط·آ£ط·آ±ط¸ظ¹ط·آ¯ ط·آ·ط¸â€‍ط·آ¨:\nط·آ§ط¸â€‍ط¸â€¦ط¸â€ ط·ع¾ط·آ¬: ${productName}\nط·آ§ط¸â€‍ط¸ئ’ط¸â€¦ط¸ظ¹ط·آ©: ${quantity}\nط·آ§ط¸â€‍ط·آ§ط·آ³ط¸â€¦: \nط·آ±ط¸â€ڑط¸â€¦ ط·آ§ط¸â€‍ط¸â€،ط·آ§ط·ع¾ط¸ظ¾: \nط·آ§ط¸â€‍ط·آ¹ط¸â€ ط¸ث†ط·آ§ط¸â€ : `
         : `Hello! I want to order:\nProduct: ${productName}\nQuantity: ${quantity}\nName: \nPhone: \nAddress: `;
     window.open(
       `https://wa.me/201223863092?text=${encodeURIComponent(message)}`,
@@ -228,7 +291,7 @@ export default function ProductDetail() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex items-center gap-2 text-sm text-[#6F6178]">
             <Link to="/" className="hover:text-[#B57EDC]">
-              {lang === "ar" ? "الرئيسية" : "Home"}
+              {lang === "ar" ? "ط·آ§ط¸â€‍ط·آ±ط·آ¦ط¸ظ¹ط·آ³ط¸ظ¹ط·آ©" : "Home"}
             </Link>
             <ChevronRight className="w-3 h-3" />
             <Link to="/shop" className="hover:text-[#B57EDC]">
@@ -287,12 +350,25 @@ export default function ProductDetail() {
                 : product.nameEn}
             </h1>
 
-            <p className="text-2xl font-bold text-[#4B1C71] mb-6">
-              {parseFloat(product.price).toFixed(0)}{" "}
-              <span className="text-base font-normal text-[#6F6178]">
-                {t.currency}
-              </span>
-            </p>
+            {product.flashSaleEndsAt && new Date(product.flashSaleEndsAt) > new Date() && (
+              <div className="mb-4">
+                <CountdownTimer targetDate={product.flashSaleEndsAt} />
+              </div>
+            )}
+
+            <div className="flex items-end gap-3 mb-6">
+              <p className="text-3xl font-bold text-[#D71920]">
+                {parseFloat(product.flashSalePrice || product.salePrice || product.price).toFixed(0)}{" "}
+                <span className="text-base font-normal text-[#6F6178]">
+                  {t.currency}
+                </span>
+              </p>
+              {(product.flashSalePrice || product.salePrice) && (
+                <p className="text-lg text-[#8D7A97] line-through mb-1">
+                  {parseFloat(product.price).toFixed(0)} {t.currency}
+                </p>
+              )}
+            </div>
 
             <p className="text-[#6F6178] leading-relaxed mb-6">
               {lang === "ar" && product.shortDescriptionAr
@@ -347,10 +423,10 @@ export default function ProductDetail() {
                   {added ? (
                     <>
                       <Check className="w-5 h-5 animate-in zoom-in" />
-                      {lang === "ar" ? "تمت الإضافة" : "Added"}
+                      {lang === "ar" ? "ط·ع¾ط¸â€¦ط·ع¾ ط·آ§ط¸â€‍ط·آ¥ط·آ¶ط·آ§ط¸ظ¾ط·آ©" : "Added"}
                     </>
                   ) : (
-                    lang === "ar" ? "أضف إلى السلة" : "Add to Cart"
+                    lang === "ar" ? "ط·آ£ط·آ¶ط¸ظ¾ ط·آ¥ط¸â€‍ط¸â€° ط·آ§ط¸â€‍ط·آ³ط¸â€‍ط·آ©" : "Add to Cart"
                   )}
                 </button>
 
@@ -361,7 +437,7 @@ export default function ProductDetail() {
                       ? "border-[#B57EDC] bg-[#F7ECFF] text-[#B57EDC] shadow-sm"
                       : "border-[#E7D8F1] bg-white text-[#8D7A97] hover:border-[#B57EDC] hover:text-[#B57EDC]"
                   }`}
-                  title={lang === "ar" ? "المفضلة" : "Wishlist"}
+                  title={lang === "ar" ? "ط·آ§ط¸â€‍ط¸â€¦ط¸ظ¾ط·آ¶ط¸â€‍ط·آ©" : "Wishlist"}
                 >
                   <Heart className={`w-6 h-6 ${isWishlisted ? "fill-[#B57EDC]" : ""}`} />
                 </button>
@@ -382,7 +458,7 @@ export default function ProductDetail() {
             {/* Share */}
             <div className="flex items-center gap-4">
               <span className="text-sm text-[#6F6178]">
-                {lang === "ar" ? "مشاركة:" : "Share:"}
+                {lang === "ar" ? "ط¸â€¦ط·آ´ط·آ§ط·آ±ط¸ئ’ط·آ©:" : "Share:"}
               </span>
               <button
                 onClick={shareOnFacebook}
@@ -490,7 +566,15 @@ export default function ProductDetail() {
                           />
                         ))}
                       </div>
-                      <p className="text-[#6F6178] text-sm leading-relaxed">{review.comment}</p>
+                      <p className="text-[#6F6178] text-sm leading-relaxed mb-4">{review.comment}</p>
+                      
+                      {review.images && listValue<string>(review.images).length > 0 && (
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                          {listValue<string>(review.images).map((img, i) => (
+                            <img key={i} src={img} alt="Review" className="w-20 h-20 object-cover rounded-lg border border-[#E7D8F1] flex-shrink-0" />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -498,7 +582,7 @@ export default function ProductDetail() {
                 <div className="bg-white p-8 rounded-2xl border border-[#E7D8F1] text-center">
                   <Star className="w-12 h-12 text-[#E7D8F1] mx-auto mb-3" />
                   <p className="text-[#6F6178]">
-                    {lang === "ar" ? "لا توجد تقييمات حتى الآن. كن أول من يقيّم!" : "No reviews yet. Be the first to review!"}
+                    {lang === "ar" ? "لا توجد تقييمات حتى الآن. كن أول من يقيم!" : "No reviews yet. Be the first to review!"}
                   </p>
                 </div>
               )}
@@ -540,8 +624,39 @@ export default function ProductDetail() {
                       onChange={(e) => setReviewComment(e.target.value)}
                       rows={4}
                       className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30 resize-none text-sm"
-                      placeholder={lang === "ar" ? "شاركنا رأيك بالمنتج..." : "Share your experience..."}
+                      placeholder={lang === "ar" ? "شاركونا رأيكم بالمنتج..." : "Share your experience..."}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-[#6F6178] mb-2">
+                      {lang === "ar" ? "صور المنتج (اختياري)" : "Product Photos (optional)"}
+                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {reviewImages.map((img, i) => (
+                        <div key={i} className="relative w-16 h-16">
+                          <img src={img} alt="Upload" className="w-full h-full object-cover rounded-lg border border-[#E7D8F1]" />
+                          <button
+                            type="button"
+                            onClick={() => setReviewImages(prev => prev.filter((_, index) => index !== i))}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      {reviewImages.length < 3 && (
+                        <label className="w-16 h-16 flex flex-col items-center justify-center border-2 border-dashed border-[#E7D8F1] rounded-lg cursor-pointer hover:border-[#B57EDC] hover:bg-[#F7ECFF] transition-colors">
+                          <Upload className="w-5 h-5 text-[#B57EDC]" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleImageUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
                   </div>
                   <button
                     type="submit"
@@ -556,6 +671,55 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      
+      {/* Dynamic Product Bundling */}
+      {product.relatedProductsList && product.relatedProductsList.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-gradient-to-r from-[#fcf8ff] to-[#fff] rounded-3xl p-8 border border-[#B57EDC]/20 shadow-sm">
+            <h2 className="text-2xl font-bold text-[#4B1C71] mb-6 flex items-center gap-2">
+              <Tag className="w-6 h-6 text-[#B57EDC]" />
+              {lang === 'ar' ? 'اشترك معاً ووفر 10%' : 'Buy Together & Save 10%'}
+            </h2>
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="flex-1 flex items-center justify-center gap-4 w-full">
+                {/* Current Product */}
+                <div className="flex-1 beauty-card p-4 rounded-xl text-center bg-white">
+                  <img src={images[0]} alt={product.nameEn} className="w-24 h-24 mx-auto object-contain mb-2" loading="lazy" />
+                  <p className="text-sm font-semibold text-[#4B1C71] truncate">{lang === 'ar' && product.nameAr ? product.nameAr : product.nameEn}</p>
+                  <p className="text-xs text-[#B57EDC]">{parseFloat(product.price).toFixed(0)} {t.currency}</p>
+                </div>
+                <Plus className="w-8 h-8 text-[#B57EDC] flex-shrink-0" />
+                {/* Recommended Product */}
+                <div className="flex-1 beauty-card p-4 rounded-xl text-center bg-white">
+                  <img src={listValue(product.relatedProductsList[0].images)[0]} alt={product.relatedProductsList[0].nameEn} className="w-24 h-24 mx-auto object-contain mb-2" loading="lazy" />
+                  <p className="text-sm font-semibold text-[#4B1C71] truncate">{lang === 'ar' && product.relatedProductsList[0].nameAr ? product.relatedProductsList[0].nameAr : product.relatedProductsList[0].nameEn}</p>
+                  <p className="text-xs text-[#B57EDC]">{parseFloat(product.relatedProductsList[0].price).toFixed(0)} {t.currency}</p>
+                </div>
+              </div>
+              <div className="flex-shrink-0 bg-white p-6 rounded-2xl shadow-sm text-center min-w-[200px]">
+                <p className="text-sm text-[#6F6178] line-through mb-1">
+                  {(parseFloat(product.price) + parseFloat(product.relatedProductsList[0].price)).toFixed(0)} {t.currency}
+                </p>
+                <p className="text-3xl font-bold text-[#4B1C71] mb-4">
+                  {((parseFloat(product.price) + parseFloat(product.relatedProductsList[0].price)) * 0.9).toFixed(0)} {t.currency}
+                </p>
+                <button 
+                  onClick={() => {
+                    addItem({ productId: product.id, name: product.nameEn, nameAr: product.nameAr, scent: product.scent, scentColor: product.scentColor, price: (parseFloat(product.price)*0.9).toFixed(2), salePrice: null, image: images[0], stock: productStock });
+                    const rel = product.relatedProductsList[0];
+                    addItem({ productId: rel.id, name: rel.nameEn, nameAr: rel.nameAr, scent: rel.scent, scentColor: rel.scentColor, price: (parseFloat(rel.price)*0.9).toFixed(2), salePrice: null, image: listValue(rel.images)[0], stock: 10 });
+                    toast.success(lang === 'ar' ? 'تم إضافة العرض للسلة!' : 'Bundle added to cart!');
+                  }}
+                  className="w-full beauty-button py-3 rounded-xl font-bold text-white shadow-lg shadow-[#B57EDC]/30"
+                >
+                  {lang === 'ar' ? 'أضف العرض للسلة' : 'Add Bundle to Cart'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Related Products */}
       {product.relatedProductsList &&
@@ -602,6 +766,79 @@ export default function ProductDetail() {
             </div>
           </div>
         )}
+
+      {/* Recently Viewed */}
+      {recentlyViewed && recentlyViewed.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+          <h2 className="text-2xl font-bold text-[#4B1C71] mb-8 text-center">
+            {lang === "ar" ? "شوهد مؤخراً" : "Recently Viewed"}
+          </h2>
+          <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar">
+            {recentlyViewed.map((recent) => {
+              const relImages = listValue<string>(recent.images);
+              return (
+                <Link
+                  key={recent.id}
+                  to={`/shop/${recent.slug}`}
+                  className="group beauty-card rounded-2xl overflow-hidden min-w-[240px] snap-start"
+                >
+                  <div
+                    className="aspect-square flex items-center justify-center p-6"
+                    style={{
+                      background: `linear-gradient(145deg, ${recent.scentColor || "#B57EDC"}12, #fcf8ff)`,
+                    }}
+                  >
+                    <img
+                      src={relImages[0] || "/products/hero-product.jpg"}
+                      alt={recent.nameEn}
+                      loading="lazy"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="text-sm font-semibold text-[#4B1C71]">
+                      {lang === "ar" && recent.nameAr
+                        ? recent.nameAr
+                        : recent.nameEn}
+                    </h3>
+                    <p className="text-base font-bold text-[#4B1C71] mt-1">
+                      {parseFloat(recent.price).toFixed(0)} {t.currency}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Mobile Add To Cart */}
+      {showStickyCart && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E7D8F1] p-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] sm:hidden animate-in slide-in-from-bottom-full">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <p className="text-sm font-bold text-[#4B1C71] line-clamp-1">
+                {lang === "ar" && product.nameAr ? product.nameAr : product.nameEn}
+              </p>
+              <p className="text-[#D71920] font-bold text-sm">
+                {parseFloat(product.flashSalePrice || product.salePrice || product.price).toFixed(0)} {t.currency}
+              </p>
+            </div>
+            <button
+              onClick={handleAddToCart}
+              disabled={added || productStock === 0}
+              className={`px-6 py-2.5 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md ${
+                added
+                  ? "bg-green-500 text-white"
+                  : "bg-[#4B1C71] text-white"
+              } ${productStock === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {added ? <Check className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
+              {added ? (lang === "ar" ? "تم" : "Added") : (lang === "ar" ? "إضافة" : "Add")}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,30 @@ import { users, passwordResetTokens } from "@db/schema";
 
 export const authRouter = createRouter({
   me: authedQuery.query((opts) => opts.ctx.user),
+  updateProfile: authedQuery
+    .input(
+      z.object({
+        name: z.string().trim().min(1).max(100),
+        phone: z.string().trim().max(50).nullable().optional(),
+        gender: z.string().trim().max(20).nullable().optional(),
+        birthday: z.string().trim().max(50).nullable().optional(),
+        nationality: z.string().trim().max(100).nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      await db
+        .update(users)
+        .set({
+          name: input.name,
+          phone: input.phone,
+          gender: input.gender,
+          birthday: input.birthday,
+          nationality: input.nationality,
+        })
+        .where(eq(users.id, ctx.user.id));
+      return { success: true };
+    }),
   localAdminLogin: publicQuery
     .input(
       z.object({

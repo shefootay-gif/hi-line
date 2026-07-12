@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "post-apitrpcstoregetproducts-should-return-active-products",
+    "description": "Verify that POST /api/trpc/store.getProducts returns a 200 status with a list of active products when called with a valid request payload."
+  },
+  {
+    "id": "TC002",
+    "title": "post-apitrpcstoreplaceorder-should-create-new-order",
+    "description": "Verify that POST /api/trpc/store.placeOrder creates a new order and returns a 200 status with order confirmation and order number when called with valid customer and cart details."
+  },
+  {
+    "id": "TC003",
+    "title": "post-apitrpcstorecancelorder-should-cancel-order",
+    "description": "Verify that POST /api/trpc/store.cancelOrder cancels an order and returns a 200 status with cancellation confirmation when called with a valid order number and the order is in a cancelable state."
+  },
+  {
+    "id": "TC004",
+    "title": "post-apitrpcstoregetorderbynumber-should-return-order-status",
+    "description": "Verify that POST /api/trpc/store.getOrderByNumber returns a 200 status with order status details when called with a valid order number."
+  },
+  {
+    "id": "TC005",
+    "title": "post-apitrpcauthlogin-should-authenticate-admin",
+    "description": "Verify that POST /api/trpc/auth.login authenticates an admin and returns a 200 status with an authentication token or session context when called with valid admin credentials."
+  },
+  {
+    "id": "TC006",
+    "title": "post-apitrpcadminlistorders-should-return-orders-with-auth",
+    "description": "Verify that POST /api/trpc/admin.listOrders returns a 200 status with a list of orders when called with valid authentication."
+  },
+  {
+    "id": "TC007",
+    "title": "post-apitrpcadminupdateorderstatus-should-update-status",
+    "description": "Verify that POST /api/trpc/admin.updateOrderStatus updates the order status and returns a 200 status with updated order details when called with valid authentication and valid order data."
+  },
+  {
+    "id": "TC008",
+    "title": "post-apitrpcadmincreateproduct-should-create-product",
+    "description": "Verify that POST /api/trpc/admin.createProduct creates a new product and returns a 200 status with created product details when called with valid authentication and complete product data."
+  },
+  {
+    "id": "TC009",
+    "title": "post-apitrpcadminupdateproduct-should-update-product",
+    "description": "Verify that POST /api/trpc/admin.updateProduct updates an existing product and returns a 200 status with updated product details when called with valid authentication and existing product data."
+  },
+  {
+    "id": "TC010",
+    "title": "post-apitrpcadmindeleteorder-should-delete-order",
+    "description": "Verify that POST /api/trpc/admin.deleteOrder deletes an existing order and returns a 200 status with deletion confirmation when called with valid authentication and existing order identifier."
+  }
+]

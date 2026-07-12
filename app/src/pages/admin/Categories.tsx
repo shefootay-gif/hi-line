@@ -56,6 +56,7 @@ export default function AdminCategories() {
       setEditing(emptyCategory);
       toast.success(lang === "ar" ? "تمت إضافة القسم" : "Category created");
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const updateCategory = trpc.admin.updateCategory.useMutation({
@@ -66,6 +67,7 @@ export default function AdminCategories() {
       setEditing(emptyCategory);
       toast.success(lang === "ar" ? "تم حفظ القسم" : "Category saved");
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const deleteCategory = trpc.admin.deleteCategory.useMutation({
@@ -75,6 +77,7 @@ export default function AdminCategories() {
       setDeleteId(null);
       toast.success(lang === "ar" ? "تم حذف القسم" : "Category deleted");
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const openCreate = () => {

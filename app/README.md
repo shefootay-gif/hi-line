@@ -1,73 +1,96 @@
-# React + TypeScript + Vite
+# Hi Line Pro Care E-commerce 🛍️
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A complete, modern, and high-performance e-commerce web application built for **Hi Line Pro Care**, specializing in cosmetic and personal care products. 
 
-Currently, two official plugins are available:
+The platform offers a seamless shopping experience for customers and a robust, feature-rich admin dashboard for store management.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🌟 Key Features
 
-## React Compiler
+### 🛍️ For Customers (Storefront)
+- **Dynamic Catalog:** Browse products dynamically fetched from the database with real-time stock availability.
+- **Cart & Checkout:** Advanced shopping cart system with automatic calculation of totals, discounts, and shipping fees.
+- **Payment Gateways:** Support for multiple payment methods including:
+  - Cash on Delivery (COD)
+  - Paymob Integration
+  - Vodafone Cash / InstaPay (with automated UI instructions)
+- **Order Tracking & Notifications:** Customers can track their orders and instantly contact support via WhatsApp using dynamic links.
+- **RTL & LTR Support:** Full localization and RTL layout specifically tailored for Arabic users.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### ⚙️ For Managers (Admin Dashboard)
+- **Comprehensive Analytics:** Track total revenue, daily orders, sales by category, and low stock warnings.
+- **Order Management:** View, update status, and manage orders effortlessly.
+- **Integrated Printing System:** Print beautifully formatted A4 Invoices and 10x15cm Shipping Labels directly from the dashboard.
+- **Inventory Tracking:** Real-time logging of stock changes (sales, restocks, adjustments) via `inventory_movements`.
+- **Marketing Tools:** Full management over Discount Coupons, Media/Ads Banners, and SEO settings.
+- **Store Settings:** Customize shipping rates by governorate, control active payment methods, and edit store policies dynamically.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🛠️ Tech Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Frontend:** React, TypeScript, Tailwind CSS, Vite.
+- **Backend/API:** Node.js, Express, tRPC (Type-safe APIs).
+- **Database:** MySQL, Drizzle ORM (Schema-driven).
+- **Icons & UI Elements:** Lucide React, Custom modern CSS.
+- **Deployment:** ESBuild bundle for ultra-fast performance.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🚀 Getting Started
+
+### Prerequisites
+Make sure you have [Node.js](https://nodejs.org/) installed along with a MySQL instance running.
+
+### 1. Installation
+Clone the repository and install the dependencies:
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Environment Variables
+Create a `.env` file in the root directory (based on `.env.example` if available) and add your connection strings:
+```env
+DATABASE_URL=mysql://user:password@localhost:3306/hiline_db
+WHATSAPP_API_URL=
+WHATSAPP_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+PAYMOB_API_KEY=
 ```
+
+### 3. Database Initialization
+Push the Drizzle schema to your MySQL database to create the necessary tables:
+```bash
+npx drizzle-kit push
+```
+Then, optionally run the seed script to populate the database with default products and settings:
+```bash
+npx tsx db/seed.ts
+```
+
+### 4. Running Locally
+Start the development server:
+```bash
+npm run dev
+```
+The application will be accessible at `http://localhost:5173`.
+
+### 5. Building for Production
+Check for TypeScript errors, build the client, and bundle the server:
+```bash
+npm run check
+npm run build
+```
+Once built, you can serve the application using Node.js.
+
+---
+
+## 🏗️ Project Structure
+- `api/` - Backend tRPC router, middleware, and external service integrations (WhatsApp, Paymob).
+- `db/` - Drizzle ORM schema, migrations, and seeding scripts.
+- `src/pages/` - React pages (Home, Shop, Cart, Checkout, OrderConfirmation).
+- `src/pages/admin/` - Admin Dashboard components (Orders, Products, Analytics, Settings, etc.).
+- `src/components/` - Reusable UI components.
+- `src/lib/` - Utilities and Translation libraries for bilingual support.
+
+---
+*Built with ❤️ for Hi Line Pro Care.*

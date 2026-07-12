@@ -12,8 +12,8 @@ export default function OrderConfirmation() {
   const customerPhone = searchParams.get("phone") || "";
 
   const { data: order, isLoading } = trpc.store.getOrderByNumber.useQuery(
-    { orderNumber: orderNumber || "", customerPhone },
-    { enabled: !!orderNumber && !!customerPhone, retry: false }
+    { orderNumber: orderNumber || "", customerPhone: customerPhone || undefined },
+    { enabled: !!orderNumber, retry: false }
   );
 
   if (isLoading) {
@@ -90,6 +90,38 @@ export default function OrderConfirmation() {
             </div>
           </div>
         </div>
+
+        {order.paymentMethod === "vodafone_cash" && (
+          <div className="bg-[#FFF8E7] rounded-2xl p-6 my-8 text-start shadow-sm border border-[#FDE68A]">
+            <h3 className="text-lg font-bold text-[#D97706] mb-2">
+              {lang === "ar" ? "تحويل فودافون كاش" : "Vodafone Cash Transfer"}
+            </h3>
+            <p className="text-[#92400E] mb-4">
+              {lang === "ar" 
+                ? "يرجى تحويل إجمالي المبلغ إلى الرقم التالي ثم إرسال إيصال التحويل عبر الواتساب لتأكيد الطلب." 
+                : "Please transfer the total amount to the following number, then send the receipt via WhatsApp to confirm the order."}
+            </p>
+            <div className="bg-white rounded-lg p-4 border border-[#FDE68A] text-center">
+              <p className="text-xl font-bold text-[#D97706] tracking-widest">0122 386 3092</p>
+            </div>
+          </div>
+        )}
+
+        {order.paymentMethod === "instapay" && (
+          <div className="bg-[#F0FDF4] rounded-2xl p-6 my-8 text-start shadow-sm border border-[#BBF7D0]">
+            <h3 className="text-lg font-bold text-[#166534] mb-2">
+              {lang === "ar" ? "تحويل إنستاباي (InstaPay)" : "InstaPay Transfer"}
+            </h3>
+            <p className="text-[#15803D] mb-4">
+              {lang === "ar" 
+                ? "يرجى تحويل إجمالي المبلغ إلى حساب إنستاباي التالي ثم إرسال الإيصال عبر الواتساب." 
+                : "Please transfer the total amount to the following InstaPay account, then send the receipt via WhatsApp."}
+            </p>
+            <div className="bg-white rounded-lg p-4 border border-[#BBF7D0] text-center">
+              <p className="text-xl font-bold text-[#166534] tracking-widest">hiline@instapay</p>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3">
           <Link

@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { createRouter, publicQuery, adminQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
+import { getCached, setCached } from "./cache";
+import { initializePaymobPayment } from "./payment-service";
+import { sendWhatsAppMessage } from "./whatsapp-service";
+import { sendMetaCAPIEvent } from "./meta-capi";
 import {
   products,
   categories,
@@ -17,6 +21,9 @@ import {
   inventoryMovements,
   returnRequests,
   adminNotifications,
+  abandonedCarts,
+  userAddresses,
+  customers,
 } from "@db/schema";
 import { eq, desc, and, or, like, sql, inArray, notInArray } from "drizzle-orm";
 
@@ -180,12 +187,17 @@ export const storeRouter = createRouter({
 
   // Store Settings
   getSettings: publicQuery.query(async () => {
+    const cached = getCached<Record<string, string>>("settings");
+    if (cached) return cached;
+    
     const db = getDb();
     const settings = await db.select().from(storeSettings);
     const settingsMap: Record<string, string> = {};
     for (const s of settings) {
       settingsMap[s.key] = s.value ?? "";
     }
+    
+    setCached("settings", settingsMap, 300); // 5 minutes
     return settingsMap;
   }),
 
@@ -238,6 +250,7 @@ export const storeRouter = createRouter({
           "vodafone_cash",
           "instapay",
           "bank_transfer",
+          "paymob",
         ]),
         notes: z.string().max(2000).optional(),
         source: z.enum(["website", "whatsapp"]).default("website"),
@@ -352,6 +365,7 @@ export const storeRouter = createRouter({
 
         const orderResult = await tx.insert(orders).values({
           orderNumber,
+          userId: ctx.user?.id || null,
           customerName: input.customerName,
           customerPhone: input.customerPhone,
           customerWhatsapp: input.customerWhatsapp,
@@ -368,10 +382,46 @@ export const storeRouter = createRouter({
           paymentMethod: input.paymentMethod,
           notes: input.notes,
           source: input.source,
-          userId: ctx.user?.id || null,
         });
 
         const orderId = Number(orderResult[0].insertId);
+
+        // Sync with customers directory
+        const existingCustomer = await tx
+          .select()
+          .from(customers)
+          .where(eq(customers.phone, input.customerPhone))
+          .limit(1);
+
+        if (existingCustomer[0]) {
+          await tx
+            .update(customers)
+            .set({
+              name: input.customerName,
+              email: input.customerEmail || existingCustomer[0].email,
+              whatsapp: input.customerWhatsapp || existingCustomer[0].whatsapp,
+              address: input.shippingAddress,
+              governorate: input.governorate || existingCustomer[0].governorate,
+              city: input.city || existingCustomer[0].city,
+              totalOrders: sql`${customers.totalOrders} + 1`,
+              totalSpent: sql`${customers.totalSpent} + ${total.toFixed(2)}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(customers.id, existingCustomer[0].id));
+        } else {
+          await tx.insert(customers).values({
+            name: input.customerName,
+            phone: input.customerPhone,
+            whatsapp: input.customerWhatsapp || null,
+            email: input.customerEmail || null,
+            address: input.shippingAddress,
+            governorate: input.governorate || null,
+            city: input.city || null,
+            totalOrders: 1,
+            totalSpent: total.toFixed(2),
+            source: input.source || "website",
+          });
+        }
 
         // Atomic stock deduction: prevents stock from going below zero in concurrent orders.
         for (const item of input.items) {
@@ -417,10 +467,69 @@ export const storeRouter = createRouter({
           }
         }
 
-        return { orderId, orderNumber, total: total.toFixed(2), discountAmount: discountAmount.toFixed(2) };
+        return { orderId, orderNumber, total: total.toFixed(2), discountAmount: discountAmount.toFixed(2), totalNumber: total, input };
       });
 
-      return result;
+      let paymobUrl: string | null = null;
+      if (result.input.paymentMethod === "paymob") {
+        paymobUrl = await initializePaymobPayment(
+          Math.round(result.totalNumber * 100),
+          result.orderNumber,
+          {
+            firstName: result.input.customerName.split(" ")[0] || result.input.customerName,
+            lastName: result.input.customerName.split(" ").slice(1).join(" ") || "Customer",
+            email: result.input.customerEmail || "customer@hilineprocare.com",
+            phoneNumber: result.input.customerPhone,
+            city: result.input.city || "Cairo",
+            country: "EG",
+            street: result.input.shippingAddress || "N/A",
+          }
+        );
+      }
+
+      sendWhatsAppMessage(result.input.customerPhone, `Hi ${result.input.customerName}, your order #${result.orderNumber} has been received successfully! Total: ${result.total} EGP.`);
+
+      // Send to Meta CAPI
+      // Note: we can extract user ip & user agent from ctx if available, else empty
+      sendMetaCAPIEvent(
+        "Purchase",
+        {
+          value: result.totalNumber,
+          currency: "EGP",
+          content_ids: result.input.items.map(i => i.productId.toString()),
+          content_type: "product",
+        },
+        {
+          phone: result.input.customerPhone,
+          email: result.input.customerEmail,
+          firstName: result.input.customerName.split(" ")[0],
+          lastName: result.input.customerName.split(" ").slice(1).join(" "),
+        }
+      ).catch(() => {});
+
+      return {
+        orderId: result.orderId,
+        orderNumber: result.orderNumber,
+        total: result.total,
+        discountAmount: result.discountAmount,
+        paymobUrl,
+      };
+    }),
+
+  saveCart: publicQuery
+    .input(z.object({
+      phone: z.string(),
+      cartData: z.any()
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db.insert(abandonedCarts).values({
+        phone: input.phone,
+        cartData: input.cartData
+      }).onDuplicateKeyUpdate({
+        set: { cartData: input.cartData, updatedAt: new Date() }
+      });
+      return { success: true };
     }),
 
   validateCoupon: publicQuery
@@ -470,7 +579,7 @@ export const storeRouter = createRouter({
   getOrderByNumber: publicQuery
     .input(z.object({
       orderNumber: z.string().trim().min(1),
-      customerPhone: z.string().trim().min(1),
+      customerPhone: z.string().trim().optional(),
     }))
     .query(async ({ input }) => {
       const db = getDb();
@@ -483,7 +592,7 @@ export const storeRouter = createRouter({
       if (orderResult.length === 0) return null;
 
       const order = orderResult[0];
-      if (order.customerPhone.trim() !== input.customerPhone.trim()) {
+      if (input.customerPhone && order.customerPhone.trim() !== input.customerPhone.trim()) {
         return null;
       }
 
@@ -574,11 +683,13 @@ export const storeRouter = createRouter({
     }),
 
   // Reviews endpoints
+      // Reviews endpoints
   addReview: authedQuery
     .input(z.object({
       productId: z.number(),
       rating: z.number().min(1).max(5),
       comment: z.string().optional(),
+      images: z.array(z.string()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -590,6 +701,7 @@ export const storeRouter = createRouter({
         userId: userId,
         rating: input.rating,
         comment: input.comment,
+        images: input.images,
         status: "pending", // require admin approval by default
       });
       return { success: true };
@@ -740,14 +852,110 @@ export const storeRouter = createRouter({
     const userId = ctx.user.id;
     if (!userId) return [];
 
+    const conditions = [eq(orders.userId, userId)];
+    if (ctx.user.email) {
+      conditions.push(eq(orders.customerEmail, ctx.user.email));
+    }
+
     const myOrders = await db
       .select()
       .from(orders)
-      .where(eq(orders.userId, userId))
+      .where(or(...conditions))
       .orderBy(desc(orders.createdAt));
 
     return myOrders;
   }),
+
+  // Address Management
+  listAddresses: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    return db
+      .select()
+      .from(userAddresses)
+      .where(eq(userAddresses.userId, ctx.user.id))
+      .orderBy(desc(userAddresses.isDefault), desc(userAddresses.createdAt));
+  }),
+
+  createAddress: authedQuery
+    .input(
+      z.object({
+        title: z.string().trim().min(1).max(100),
+        fullName: z.string().trim().min(1).max(255),
+        phone: z.string().trim().min(1).max(50),
+        governorate: z.string().trim().min(1).max(100),
+        city: z.string().trim().max(100).optional(),
+        address: z.string().trim().min(1),
+        isDefault: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      if (input.isDefault) {
+        // unset other defaults
+        await db
+          .update(userAddresses)
+          .set({ isDefault: false })
+          .where(eq(userAddresses.userId, ctx.user.id));
+      }
+      await db.insert(userAddresses).values({
+        userId: ctx.user.id,
+        title: input.title,
+        fullName: input.fullName,
+        phone: input.phone,
+        governorate: input.governorate,
+        city: input.city || null,
+        address: input.address,
+        isDefault: input.isDefault,
+      });
+      return { success: true };
+    }),
+
+  updateAddress: authedQuery
+    .input(
+      z.object({
+        id: z.number(),
+        title: z.string().trim().min(1).max(100),
+        fullName: z.string().trim().min(1).max(255),
+        phone: z.string().trim().min(1).max(50),
+        governorate: z.string().trim().min(1).max(100),
+        city: z.string().trim().max(100).optional(),
+        address: z.string().trim().min(1),
+        isDefault: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      if (input.isDefault) {
+        // unset other defaults
+        await db
+          .update(userAddresses)
+          .set({ isDefault: false })
+          .where(eq(userAddresses.userId, ctx.user.id));
+      }
+      await db
+        .update(userAddresses)
+        .set({
+          title: input.title,
+          fullName: input.fullName,
+          phone: input.phone,
+          governorate: input.governorate,
+          city: input.city || null,
+          address: input.address,
+          isDefault: input.isDefault,
+        })
+        .where(and(eq(userAddresses.id, input.id), eq(userAddresses.userId, ctx.user.id)));
+      return { success: true };
+    }),
+
+  deleteAddress: authedQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      await db
+        .delete(userAddresses)
+        .where(and(eq(userAddresses.id, input.id), eq(userAddresses.userId, ctx.user.id)));
+      return { success: true };
+    }),
 
   // Stats for admin
   getStats: adminQuery.query(async () => {

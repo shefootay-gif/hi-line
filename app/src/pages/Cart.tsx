@@ -7,9 +7,10 @@ import { ShoppingBag, Minus, Plus, Trash2, MessageCircle } from "lucide-react";
 export default function Cart() {
   const { lang, isRTL } = useLanguage();
   const t = useTranslations(lang);
-  const { items, getTotalPrice, updateQuantity, removeItem } = useCart();
+  const { items, getTotalPrice, getDiscountAmount, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
   const total = getTotalPrice();
+  const discount = getDiscountAmount();
 
   const handleWhatsAppCart = () => {
     const itemsList = items
@@ -137,9 +138,17 @@ export default function Cart() {
                   <div className="flex justify-between text-sm">
                     <span className="text-[#6F6178]">{t.subtotal}</span>
                     <span className="font-medium">
-                      {total.toFixed(0)} {t.currency}
+                      {(total + discount).toFixed(0)} {t.currency}
                     </span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm text-[#D71920]">
+                      <span className="font-semibold">{lang === 'ar' ? 'خصم (3+ منتجات)' : 'Discount (3+ items)'}</span>
+                      <span className="font-semibold">
+                        -{discount.toFixed(0)} {t.currency}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-[#6F6178]">{t.shipping}</span>
                     <span className="text-[#8D7A97]">

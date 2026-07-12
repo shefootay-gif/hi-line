@@ -19,6 +19,7 @@ import { useState, useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
+
 gsap.registerPlugin(ScrollTrigger);
 
 const benefitCards = [
@@ -76,17 +77,7 @@ const howToSteps = [
   },
 ];
 
-const scentNameAr: Record<string, string> = {
-  "Sweet mango": "سويت مانجو",
-  "Tropical Breeze": "تروبيكال بريز",
-  Voyage: "فوياج",
-  "Candy pop": "كاندي بوب",
-  "Fragrance free": "بدون عطر",
-};
-
-function getArabicScentName(scent: string) {
-  return scentNameAr[scent] || scent;
-}
+import { getArabicScentName } from "../lib/translations";
 
 type HomeProduct = CatalogProduct;
 
@@ -97,6 +88,29 @@ export default function Home() {
   const { addItem } = useCart();
   const { data: faqs } = trpc.store.getFaqs.useQuery();
   const { data: settings } = trpc.store.getSettings.useQuery();
+  const { data: apiProducts, error: apiError } = trpc.store.getProducts.useQuery();
+
+  const sourceProducts = (!apiError && apiProducts && apiProducts.length > 0)
+    ? apiProducts.map((p) => ({
+        id: p.id,
+        nameEn: p.nameEn,
+        nameAr: p.nameAr ?? p.nameEn,
+        slug: p.slug,
+        scent: p.scent,
+        scentColor: p.scentColor ?? "#B57EDC",
+        price: p.price,
+        salePrice: p.salePrice,
+        originalPrice: p.price,
+        images: Array.isArray(p.images) ? p.images as string[] : ["/products/hi-line-tropical-breeze.webp"],
+        discountLabel: p.salePrice ? `${Math.round((1 - parseFloat(p.salePrice) / parseFloat(p.price)) * 100)}% OFF` : "NEW",
+        brand: "Hi Line" as const,
+        section: "Roll On" as const,
+        category: "Roll On" as const,
+        shortDescriptionEn: "",
+        shortDescriptionAr: "",
+        descriptionEn: "",
+      }))
+    : rollOnProducts;
 
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [email, setEmail] = useState("");
@@ -205,10 +219,7 @@ export default function Home() {
     }, 1500);
   };
 
-  const getProductPrice = (product?: HomeProduct) => {
-    if (!product) return "285";
-    return parseFloat(product.salePrice).toFixed(0);
-  };
+
 
   const visibleFaqs = faqs?.slice(0, 4) || [];
 
@@ -329,7 +340,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-            {rollOnProducts.map((product) => {
+            {sourceProducts.slice(0, 5).map((product) => {
               const variant = {
                 id: product.id,
                 name: product.nameEn,
@@ -352,9 +363,11 @@ export default function Home() {
                         background: `linear-gradient(145deg, ${variant.color}12, #fcf8ff)`,
                       }}
                     >
-                      <span className="absolute left-3 top-3 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white">
-                        50% OFF
-                      </span>
+                      {product.discountLabel && (
+                        <span className="absolute left-3 top-3 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                          {product.discountLabel}
+                        </span>
+                      )}
                       <img
                         src={variant.image}
                         alt={lang === "ar" ? variant.nameAr : variant.name}
@@ -385,16 +398,22 @@ export default function Home() {
                     </p>
                     <div className="mt-3 flex flex-wrap items-baseline justify-center gap-2">
                       <span className="text-base font-black text-[#D71920]">
-                        LE {getProductPrice(product)}.00
+                        {product.salePrice ? product.salePrice : product.price} {lang === "ar" ? "ج.م" : "LE"}
                       </span>
-                      <span className="text-sm text-[#8D7A97] line-through">
-                        LE 570.00
-                      </span>
+                      {product.salePrice && (
+                        <span className="text-sm text-[#8D7A97] line-through">
+                          {product.price} {lang === "ar" ? "ج.م" : "LE"}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="px-4 pb-4">
                     <button
-                      onClick={() => product && handleAddToCart(product)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (product) handleAddToCart(product);
+                      }}
                       className={`w-full py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                         addedIds.has(product?.id || 0)
                           ? "bg-green-500 text-white"

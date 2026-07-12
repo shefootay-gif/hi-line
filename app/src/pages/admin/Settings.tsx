@@ -78,19 +78,27 @@ function Field({
   fieldKey: string;
   value: string;
   placeholder?: string;
-  onSave: (key: string, val: string) => void;
+  onSave: (key: string, val: string) => Promise<any>;
   type?: string;
   multiline?: boolean;
 }) {
   const [local, setLocal] = useState(value);
   const [saved, setSaved] = useState(false);
+  const [isPending, setIsPending] = useState(false);
 
   useEffect(() => { setLocal(value); }, [value]);
 
-  const save = () => {
-    onSave(fieldKey, local);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const save = async () => {
+    setIsPending(true);
+    try {
+      await onSave(fieldKey, local);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      // Error is handled by trpc onError
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -116,13 +124,20 @@ function Field({
         )}
         <button
           onClick={save}
-          className={`px-4 py-2.5 rounded-xl flex items-center gap-1.5 text-sm font-medium transition-all ${
+          disabled={isPending}
+          className={`px-4 py-2.5 rounded-xl flex items-center justify-center min-w-[3rem] gap-1.5 text-sm font-medium transition-all disabled:opacity-50 ${
             saved
               ? "bg-green-500 text-white"
               : "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
           }`}
         >
-          {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          {isPending ? (
+            <svg className="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          ) : saved ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
         </button>
       </div>
     </div>
@@ -139,18 +154,26 @@ function ColorField({
   label: string;
   fieldKey: string;
   value: string;
-  onSave: (key: string, val: string) => void;
+  onSave: (key: string, val: string) => Promise<any>;
 }) {
   const [local, setLocal] = useState(value || "#4B1C71");
   const [saved, setSaved] = useState(false);
+  const [isPending, setIsPending] = useState(false);
 
   useEffect(() => { if (value) setLocal(value); }, [value]);
 
-  const save = (v: string) => {
+  const save = async (v: string) => {
     setLocal(v);
-    onSave(fieldKey, v);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    setIsPending(true);
+    try {
+      await onSave(fieldKey, v);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (err) {
+      // handled
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -175,10 +198,12 @@ function ColorField({
           maxLength={7}
         />
         <div
-          className="w-11 h-11 rounded-xl border border-[#EDE5F7] flex-shrink-0 transition-all"
+          className="w-11 h-11 rounded-xl border border-[#EDE5F7] flex-shrink-0 transition-all flex items-center justify-center"
           style={{ backgroundColor: local }}
-        />
-        {saved && <Check className="w-4 h-4 text-green-500 flex-shrink-0" />}
+        >
+          {isPending && <svg className="w-4 h-4 animate-spin text-white/70 mix-blend-difference" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+        </div>
+        {saved && !isPending && <Check className="w-4 h-4 text-green-500 flex-shrink-0" />}
       </div>
     </div>
   );
@@ -196,10 +221,11 @@ function ImageField({
   fieldKey: string;
   value: string;
   description?: string;
-  onSave: (key: string, val: string) => void;
+  onSave: (key: string, val: string) => Promise<any>;
 }) {
   const [preview, setPreview] = useState(value);
   const [urlInput, setUrlInput] = useState(value);
+  const [isPending, setIsPending] = useState(false);
 
   useEffect(() => { setPreview(value); setUrlInput(value); }, [value]);
 
@@ -225,10 +251,17 @@ function ImageField({
     reader.readAsDataURL(file);
   };
 
-  const handleUrlSave = () => {
+  const handleUrlSave = async () => {
     setPreview(urlInput);
-    onSave(fieldKey, urlInput);
-    toast.success("Saved ✓");
+    setIsPending(true);
+    try {
+      await onSave(fieldKey, urlInput);
+      toast.success("Saved ✓");
+    } catch (err) {
+      // Error handled
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -267,9 +300,14 @@ function ImageField({
             />
             <button
               onClick={handleUrlSave}
-              className="px-3 py-2 bg-[#7C3AED] text-white rounded-xl hover:bg-[#6D28D9] transition-colors"
+              disabled={isPending}
+              className="px-3 py-2 bg-[#7C3AED] text-white rounded-xl hover:bg-[#6D28D9] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              <Save className="w-3.5 h-3.5" />
+              {isPending ? (
+                <svg className="w-3.5 h-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
             </button>
           </div>
         </div>
@@ -364,7 +402,9 @@ export default function AdminSettings() {
 
   const ar = lang === "ar";
   const g = (key: string) => settings?.[key] || "";
-  const save = (key: string, value: string) => updateSetting.mutate({ key, value });
+  const save = async (key: string, value: string) => {
+    return updateSetting.mutateAsync({ key, value });
+  };
 
   const isDbError = settingsError && paymentError && shippingError;
 

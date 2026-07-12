@@ -22,6 +22,7 @@ interface CartState {
   clearCart: () => void;
   getTotalItems: () => number;
   getTotalPrice: () => number;
+  getDiscountAmount: () => number;
 }
 
 type NormalizedCartItem = Omit<CartItem, "stock"> & { stock: number };
@@ -129,10 +130,21 @@ export const useCart = create<CartState>()(
         );
       },
       getTotalPrice: () => {
-        return normalizeCartItems(get().items).reduce((sum, item) => {
+        const totalItems = get().getTotalItems();
+        const baseTotal = normalizeCartItems(get().items).reduce((sum, item) => {
           const price = item.salePrice ? parseMoney(item.salePrice) : parseMoney(item.price);
           return sum + price * item.quantity;
         }, 0);
+        return totalItems >= 3 ? baseTotal * 0.85 : baseTotal;
+      },
+      getDiscountAmount: () => {
+        const totalItems = get().getTotalItems();
+        if (totalItems < 3) return 0;
+        const baseTotal = normalizeCartItems(get().items).reduce((sum, item) => {
+          const price = item.salePrice ? parseMoney(item.salePrice) : parseMoney(item.price);
+          return sum + price * item.quantity;
+        }, 0);
+        return baseTotal * 0.15;
       },
     }),
     {

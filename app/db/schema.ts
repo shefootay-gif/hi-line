@@ -1,7 +1,6 @@
 import {
   mysqlTable,
   mysqlEnum,
-  serial,
   varchar,
   text,
   timestamp,
@@ -10,17 +9,22 @@ import {
   boolean,
   json,
   bigint,
+  index,
 } from "drizzle-orm/mysql-core";
 
 // Users table (from auth)
 export const users = mysqlTable("users", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   unionId: varchar("unionId", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   passwordHash: varchar("password_hash", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  gender: varchar("gender", { length: 20 }),
+  birthday: varchar("birthday", { length: 50 }),
+  nationality: varchar("nationality", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -34,7 +38,7 @@ export type InsertUser = typeof users.$inferInsert;
 
 // Categories table
 export const categories = mysqlTable("categories", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   nameEn: varchar("name_en", { length: 255 }).notNull(),
   nameAr: varchar("name_ar", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
@@ -55,7 +59,7 @@ export type Category = typeof categories.$inferSelect;
 
 // Products table
 export const products = mysqlTable("products", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   nameEn: varchar("name_en", { length: 255 }).notNull(),
   nameAr: varchar("name_ar", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
@@ -84,6 +88,8 @@ export const products = mysqlTable("products", {
   seoTitle: varchar("seo_title", { length: 255 }),
   seoDescription: text("seo_description"),
   relatedProducts: json("related_products").$type<number[]>(),
+  flashSalePrice: decimal("flash_sale_price", { precision: 10, scale: 2 }),
+  flashSaleEndsAt: timestamp("flash_sale_ends_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -95,7 +101,7 @@ export type Product = typeof products.$inferSelect;
 
 // Customers table
 export const customers = mysqlTable("customers", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 50 }),
   whatsapp: varchar("whatsapp", { length: 50 }),
@@ -118,7 +124,7 @@ export type Customer = typeof customers.$inferSelect;
 
 // Orders table
 export const orders = mysqlTable("orders", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   orderNumber: varchar("order_number", { length: 50 }).notNull().unique(),
   userId: bigint("user_id", { mode: "number", unsigned: true }),
   customerId: bigint("customer_id", { mode: "number", unsigned: true }),
@@ -140,6 +146,7 @@ export const orders = mysqlTable("orders", {
     "vodafone_cash",
     "instapay",
     "bank_transfer",
+    "paymob",
   ]).default("cash_on_delivery"),
   paymentStatus: mysqlEnum("payment_status", ["pending", "paid", "failed", "refunded"])
     .default("pending"),
@@ -158,13 +165,18 @@ export const orders = mysqlTable("orders", {
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
+}, (table) => {
+  return {
+    phoneIdx: index("customer_phone_idx").on(table.customerPhone),
+    statusIdx: index("order_status_idx").on(table.orderStatus),
+  };
 });
 
 export type Order = typeof orders.$inferSelect;
 
 // Order Items table
 export const orderItems = mysqlTable("order_items", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull(),
   productId: bigint("product_id", { mode: "number", unsigned: true }).notNull(),
   productName: varchar("product_name", { length: 255 }).notNull(),
@@ -180,7 +192,7 @@ export type OrderItem = typeof orderItems.$inferSelect;
 
 // Store Settings table
 export const storeSettings = mysqlTable("store_settings", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   key: varchar("key", { length: 255 }).notNull().unique(),
   value: text("value"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -194,7 +206,7 @@ export type StoreSetting = typeof storeSettings.$inferSelect;
 
 // Payment Settings table
 export const paymentSettings = mysqlTable("payment_settings", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   method: varchar("method", { length: 50 }).notNull().unique(),
   isEnabled: boolean("is_enabled").default(true),
   displayName: varchar("display_name", { length: 255 }),
@@ -215,7 +227,7 @@ export type PaymentSetting = typeof paymentSettings.$inferSelect;
 
 // Shipping Settings table
 export const shippingSettings = mysqlTable("shipping_settings", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   governorate: varchar("governorate", { length: 100 }).notNull(),
   governorateAr: varchar("governorate_ar", { length: 100 }),
   baseFee: decimal("base_fee", { precision: 10, scale: 2 }).default("0"),
@@ -233,7 +245,7 @@ export type ShippingSetting = typeof shippingSettings.$inferSelect;
 
 // Media/Ads table
 export const mediaAds = mysqlTable("media_ads", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   type: mysqlEnum("type", ["banner", "video", "slider", "hero"]).default("banner"),
   mediaUrl: text("media_url").notNull(),
@@ -254,7 +266,7 @@ export type MediaAd = typeof mediaAds.$inferSelect;
 
 // FAQ table
 export const faqs = mysqlTable("faqs", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   questionEn: text("question_en").notNull(),
   questionAr: text("question_ar").notNull(),
   answerEn: text("answer_en").notNull(),
@@ -269,7 +281,7 @@ export type Faq = typeof faqs.$inferSelect;
 
 // Coupons table
 export const coupons = mysqlTable("coupons", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   discountType: mysqlEnum("discount_type", ["percentage", "fixed"]).notNull(),
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
@@ -289,11 +301,12 @@ export type Coupon = typeof coupons.$inferSelect;
 
 // Reviews table
 export const reviews = mysqlTable("reviews", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   productId: bigint("product_id", { mode: "number", unsigned: true }).notNull(),
   userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   rating: int("rating").notNull(),
   comment: text("comment"),
+  images: json("images").$type<string[]>(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
@@ -306,7 +319,7 @@ export type Review = typeof reviews.$inferSelect;
 
 // Wishlists table
 export const wishlists = mysqlTable("wishlists", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   productId: bigint("product_id", { mode: "number", unsigned: true }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -316,7 +329,7 @@ export type Wishlist = typeof wishlists.$inferSelect;
 
 // Contact Messages table
 export const contactMessages = mysqlTable("contact_messages", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("phone", { length: 50 }),
@@ -329,7 +342,7 @@ export type ContactMessage = typeof contactMessages.$inferSelect;
 
 // Password Reset Tokens table
 export const passwordResetTokens = mysqlTable("password_reset_tokens", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   token: varchar("token", { length: 255 }).notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
@@ -342,7 +355,7 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 // Dropshipping Suppliers table
 export const dropshippingSuppliers = mysqlTable("dropshipping_suppliers", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   country: varchar("country", { length: 100 }).notNull(),
   category: varchar("category", { length: 150 }).default("Beauty & Personal Care"),
@@ -366,7 +379,7 @@ export type DropshippingSupplier = typeof dropshippingSuppliers.$inferSelect;
 
 // Dropshipping Supplier Products / Catalog table
 export const dropshippingSupplierProducts = mysqlTable("dropshipping_supplier_products", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   supplierId: bigint("supplier_id", { mode: "number", unsigned: true }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   sku: varchar("sku", { length: 100 }),
@@ -390,7 +403,7 @@ export type DropshippingSupplierProduct = typeof dropshippingSupplierProducts.$i
 
 // Dropshipping Import Logs table
 export const dropshippingImportLogs = mysqlTable("dropshipping_import_logs", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   supplierId: bigint("supplier_id", { mode: "number", unsigned: true }).notNull(),
   importedCount: int("imported_count").default(0),
   source: varchar("source", { length: 100 }).default("manual"),
@@ -403,7 +416,7 @@ export type DropshippingImportLog = typeof dropshippingImportLogs.$inferSelect;
 
 // Media Buyer Campaigns table
 export const mediaBuyerCampaigns = mysqlTable("media_buyer_campaigns", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   platform: mysqlEnum("platform", ["facebook", "instagram", "tiktok", "google"]).default("facebook"),
   status: mysqlEnum("status", ["active", "paused", "draft"]).default("draft"),
@@ -432,7 +445,7 @@ export type MediaBuyerCampaign = typeof mediaBuyerCampaigns.$inferSelect;
 
 // Inventory movement audit table
 export const inventoryMovements = mysqlTable("inventory_movements", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   productId: bigint("product_id", { mode: "number", unsigned: true }).notNull(),
   orderId: bigint("order_id", { mode: "number", unsigned: true }),
   supplierProductId: bigint("supplier_product_id", { mode: "number", unsigned: true }),
@@ -449,7 +462,7 @@ export type InventoryMovement = typeof inventoryMovements.$inferSelect;
 
 // Admin activity log table
 export const adminActivityLogs = mysqlTable("admin_activity_logs", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   adminUserId: bigint("admin_user_id", { mode: "number", unsigned: true }),
   action: varchar("action", { length: 100 }).notNull(),
   entityType: varchar("entity_type", { length: 100 }).notNull(),
@@ -464,7 +477,7 @@ export type AdminActivityLog = typeof adminActivityLogs.$inferSelect;
 
 // Payment transactions table
 export const paymentTransactions = mysqlTable("payment_transactions", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   orderId: bigint("order_id", { mode: "number", unsigned: true }),
   orderNumber: varchar("order_number", { length: 50 }),
   provider: mysqlEnum("provider", ["manual", "tap", "hyperpay", "paytabs", "stripe", "moyasar", "myfatoorah"]).default("manual"),
@@ -483,7 +496,7 @@ export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
 
 // Shipping providers table
 export const shippingProviders = mysqlTable("shipping_providers", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 50 }),
   website: text("website"),
@@ -498,7 +511,7 @@ export type ShippingProvider = typeof shippingProviders.$inferSelect;
 
 // Shipments table
 export const shipments = mysqlTable("shipments", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull(),
   providerId: bigint("provider_id", { mode: "number", unsigned: true }),
   trackingNumber: varchar("tracking_number", { length: 150 }),
@@ -515,7 +528,7 @@ export type Shipment = typeof shipments.$inferSelect;
 
 // Invoices table
 export const invoices = mysqlTable("invoices", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull(),
   invoiceNumber: varchar("invoice_number", { length: 80 }).notNull().unique(),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).default("0"),
@@ -532,7 +545,7 @@ export type Invoice = typeof invoices.$inferSelect;
 
 // Notifications table
 export const adminNotifications = mysqlTable("admin_notifications", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message").notNull(),
   type: mysqlEnum("type", ["order", "payment", "shipping", "inventory", "system", "return"]).default("system"),
@@ -545,7 +558,7 @@ export type AdminNotification = typeof adminNotifications.$inferSelect;
 
 // Return / refund requests table
 export const returnRequests = mysqlTable("return_requests", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   orderId: bigint("order_id", { mode: "number", unsigned: true }),
   orderNumber: varchar("order_number", { length: 50 }).notNull(),
   customerName: varchar("customer_name", { length: 255 }),
@@ -563,7 +576,7 @@ export type ReturnRequest = typeof returnRequests.$inferSelect;
 
 // Upload / media assets table
 export const uploadAssets = mysqlTable("upload_assets", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }),
   url: text("url").notNull(),
   altText: varchar("alt_text", { length: 255 }),
@@ -578,7 +591,7 @@ export type UploadAsset = typeof uploadAssets.$inferSelect;
 
 // SEO pages / metadata table
 export const seoPages = mysqlTable("seo_pages", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   path: varchar("path", { length: 255 }).notNull().unique(),
   titleEn: varchar("title_en", { length: 255 }),
   titleAr: varchar("title_ar", { length: 255 }),
@@ -595,7 +608,7 @@ export type SeoPage = typeof seoPages.$inferSelect;
 
 // Admin staff / permissions registry table
 export const adminStaffUsers = mysqlTable("admin_staff_users", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }),
   role: mysqlEnum("role", ["owner", "admin", "orders", "inventory", "marketing", "support", "viewer"]).default("viewer"),
@@ -609,7 +622,7 @@ export type AdminStaffUser = typeof adminStaffUsers.$inferSelect;
 
 // Export jobs table
 export const exportJobs = mysqlTable("export_jobs", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   type: mysqlEnum("type", ["orders", "customers", "products", "inventory", "campaigns", "activity", "returns"]).notNull(),
   status: mysqlEnum("status", ["ready", "failed"]).default("ready"),
   fileName: varchar("file_name", { length: 255 }),
@@ -621,7 +634,7 @@ export type ExportJob = typeof exportJobs.$inferSelect;
 
 // Backup jobs table
 export const backupJobs = mysqlTable("backup_jobs", {
-  id: serial("id").primaryKey(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
   label: varchar("label", { length: 255 }).notNull(),
   status: mysqlEnum("status", ["ready", "failed"]).default("ready"),
   content: json("content").$type<Record<string, unknown>>(),
@@ -629,3 +642,32 @@ export const backupJobs = mysqlTable("backup_jobs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type BackupJob = typeof backupJobs.$inferSelect;
+
+
+export const abandonedCarts = mysqlTable("abandoned_carts", {
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  cartData: json("cart_data").notNull(),
+  status: mysqlEnum("status", ["pending", "recovered", "ignored"]).default("pending"),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export const userAddresses = mysqlTable("user_addresses", {
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  title: varchar("title", { length: 100 }).default("Home").notNull(),
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }).notNull(),
+  governorate: varchar("governorate", { length: 100 }).notNull(),
+  city: varchar("city", { length: 100 }),
+  address: text("address").notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UserAddress = typeof userAddresses.$inferSelect;
+

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
+import { clearCachePrefix } from "./cache";
+import { sendWhatsAppMessage } from "./whatsapp-service";
 import {
   products,
   categories,
@@ -404,10 +406,49 @@ export const adminRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      const orderRes = await db.select().from(orders).where(eq(orders.id, input.id)).limit(1);
+      
       await db
         .update(orders)
         .set({ orderStatus: input.status })
         .where(eq(orders.id, input.id));
+
+      // Get the existing shipment for this order
+      const [existingShipment] = await db
+        .select()
+        .from(shipments)
+        .where(eq(shipments.orderId, input.id))
+        .limit(1);
+
+      let shipmentStatus: "pending" | "ready" | "shipped" | "out_for_delivery" | "delivered" | "failed" | "returned" = "pending";
+      if (input.status === "processing") shipmentStatus = "ready";
+      else if (input.status === "shipped") shipmentStatus = "shipped";
+      else if (input.status === "delivered") shipmentStatus = "delivered";
+      else if (input.status === "cancelled") shipmentStatus = "returned";
+      else if (input.status === "refunded") shipmentStatus = "returned";
+
+      if (existingShipment) {
+        await db
+          .update(shipments)
+          .set({
+            status: shipmentStatus,
+            shippedAt: input.status === "shipped" ? new Date() : existingShipment.shippedAt,
+            deliveredAt: input.status === "delivered" ? new Date() : existingShipment.deliveredAt,
+          })
+          .where(eq(shipments.id, existingShipment.id));
+      } else {
+        await db.insert(shipments).values({
+          orderId: input.id,
+          status: shipmentStatus,
+          shippedAt: input.status === "shipped" ? new Date() : null,
+          deliveredAt: input.status === "delivered" ? new Date() : null,
+        });
+      }
+        
+      if (orderRes[0]) {
+        sendWhatsAppMessage(orderRes[0].customerPhone, `Hi ${orderRes[0].customerName}, your order #${orderRes[0].orderNumber} status has been updated to: ${input.status}.`);
+      }
+      
       await logAdminActivity(db, ctx.user.id, "update_status", "order", input.id, { status: input.status });
       return { success: true };
     }),
@@ -491,6 +532,7 @@ export const adminRouter = createRouter({
           set: { value: input.value, updatedAt: new Date() },
         });
       await logAdminActivity(db, ctx.user.id, "update", "setting", null, { key: input.key });
+      clearCachePrefix("settings");
       return { success: true };
     }),
 

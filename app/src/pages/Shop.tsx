@@ -1,5 +1,5 @@
 import { useLanguage } from "@/hooks/useLanguage";
-import { useTranslations } from "@/lib/translations";
+import { useTranslations, getArabicScentName } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
 import { trpc } from "@/providers/trpc";
 import { rollOnProducts } from "@/lib/hiLineCatalog";
@@ -129,10 +129,10 @@ export default function Shop() {
         slug: p.slug,
         scent: p.scent,
         scentColor: p.scentColor ?? "#B57EDC",
-        price: p.salePrice ?? p.price,
-        salePrice: p.salePrice ?? p.price,
+        price: p.price,
+        salePrice: p.salePrice,
         originalPrice: p.price,
-        images: Array.isArray(p.images) ? p.images as string[] : ["/products/tropical-breeze.jpg"],
+        images: Array.isArray(p.images) ? p.images as string[] : ["/products/hi-line-tropical-breeze.webp"],
         discountLabel: p.salePrice ? `${Math.round((1 - parseFloat(p.salePrice) / parseFloat(p.price)) * 100)}% OFF` : "NEW",
         brand: "Hi Line",
         section: "Roll On",
@@ -312,17 +312,19 @@ export default function Shop() {
 
                   <div className="p-4 pt-3">
                     <h3 className="min-h-[3.25rem] text-sm font-semibold leading-snug text-[#241A2E] sm:text-base">
-                      <span className="block">{product.nameEn}</span>
-                      <span className="block">{product.scent}</span>
+                      <span className="block">{lang === "ar" && product.nameAr ? product.nameAr : product.nameEn}</span>
+                      <span className="block">{lang === "ar" ? getArabicScentName(product.scent) : product.scent}</span>
                     </h3>
 
                     <div className="mt-3 flex flex-wrap items-baseline gap-2">
                       <span className="text-base font-black text-[#D71920] sm:text-lg">
-                        {formatLE(product.salePrice)}
+                        {formatLE(product.salePrice ? product.salePrice : product.originalPrice)}
                       </span>
-                      <span className="text-xs text-[#8D7A97] line-through sm:text-sm">
-                        {formatLE(product.originalPrice)}
-                      </span>
+                      {product.salePrice && (
+                        <span className="text-xs text-[#8D7A97] line-through sm:text-sm">
+                          {formatLE(product.originalPrice)}
+                        </span>
+                      )}
                     </div>
 
                     <button

@@ -626,3 +626,7 @@ export type Translations = typeof translations.en;
 export function useTranslations(lang: "en" | "ar") {
   return translations[lang];
 }
+
+export const scentNameAr: Record<string, string> = { 'Sweet mango': 'سويت مانجو', 'Tropical Breeze': 'تروبيكال بريز', 'Voyage': 'فوياج', 'Candy pop': 'كاندي بوب', 'Fragrance free': 'بدون عطر' };
+
+export function getArabicScentName(scent: string) { return scentNameAr[scent] || scent; }

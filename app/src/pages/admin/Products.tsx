@@ -99,6 +99,9 @@ export default function AdminProducts() {
       setEditing(emptyProduct);
       toast.success(lang === "ar" ? "تمت الإضافة" : "Created successfully");
     },
+    onError: (err) => {
+      toast.error(err.message);
+    },
   });
 
   const updateProduct = trpc.admin.updateProduct.useMutation({
@@ -108,6 +111,9 @@ export default function AdminProducts() {
       setEditing(emptyProduct);
       toast.success(lang === "ar" ? "تم التحديث" : "Updated successfully");
     },
+    onError: (err) => {
+      toast.error(err.message);
+    },
   });
 
   const deleteProduct = trpc.admin.deleteProduct.useMutation({
@@ -115,6 +121,9 @@ export default function AdminProducts() {
       utils.admin.listProducts.invalidate();
       setDeleteId(null);
       toast.success(lang === "ar" ? "تم الحذف" : "Deleted successfully");
+    },
+    onError: (err) => {
+      toast.error(err.message);
     },
   });
 
