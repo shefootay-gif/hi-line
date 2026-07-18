@@ -14,8 +14,6 @@ local-dev.log
 local-dev.err.log
 mysql-local/
 /backups/
-testsprite_tests/tmp/
-app/testsprite_tests/tmp/
 .env
 .env.local
 .env.production

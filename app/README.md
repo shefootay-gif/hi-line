@@ -157,7 +157,6 @@ This sets `NODE_ENV=production` and runs the compiled bundle `dist/boot.js` list
 - `src/pages/admin/` - Admin Dashboard pages and views (Orders, Products, Analytics, Settings).
 - `src/components/` - Reusable UI widgets and layout containers.
 - `src/lib/` - Utility functions, translation catalog, and custom React hooks.
-- `testsprite_tests/` - QA automation files and API endpoint reports.
 
 ---
 *Built with ❤️ for Hi Line Pro Care.*
