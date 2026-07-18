@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
+type SaveSetting = (key: string, value: string) => Promise<unknown>;
+
 /* ─── Tabs ─────────────────────────────────────────────────────────── */
 const tabs = [
   { key: "store",      labelEn: "Store Identity",  labelAr: "هوية المتجر",   icon: Store },
@@ -78,7 +80,7 @@ function Field({
   fieldKey: string;
   value: string;
   placeholder?: string;
-  onSave: (key: string, val: string) => Promise<any>;
+  onSave: SaveSetting;
   type?: string;
   multiline?: boolean;
 }) {
@@ -94,7 +96,7 @@ function Field({
       await onSave(fieldKey, local);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
+    } catch {
       // Error is handled by trpc onError
     } finally {
       setIsPending(false);
@@ -154,7 +156,7 @@ function ColorField({
   label: string;
   fieldKey: string;
   value: string;
-  onSave: (key: string, val: string) => Promise<any>;
+  onSave: SaveSetting;
 }) {
   const [local, setLocal] = useState(value || "#4B1C71");
   const [saved, setSaved] = useState(false);
@@ -169,7 +171,7 @@ function ColorField({
       await onSave(fieldKey, v);
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
-    } catch (err) {
+    } catch {
       // handled
     } finally {
       setIsPending(false);
@@ -221,7 +223,7 @@ function ImageField({
   fieldKey: string;
   value: string;
   description?: string;
-  onSave: (key: string, val: string) => Promise<any>;
+  onSave: SaveSetting;
 }) {
   const [preview, setPreview] = useState(value);
   const [urlInput, setUrlInput] = useState(value);
@@ -257,7 +259,7 @@ function ImageField({
     try {
       await onSave(fieldKey, urlInput);
       toast.success("Saved ✓");
-    } catch (err) {
+    } catch {
       // Error handled
     } finally {
       setIsPending(false);

@@ -4,6 +4,11 @@ export interface PaymobConfig {
   iframeId: string;
 }
 
+export interface PaymobPaymentSession {
+  checkoutUrl: string;
+  providerOrderId: string;
+}
+
 const getPaymobConfig = (): PaymobConfig => {
   return {
     apiKey: process.env.PAYMOB_API_KEY || "",
@@ -24,27 +29,33 @@ export const initializePaymobPayment = async (
     country: string;
     street: string;
   }
-): Promise<string | null> => {
-  try {
-    const config = getPaymobConfig();
-    if (!config.apiKey || !config.integrationId || !config.iframeId) {
-      console.warn("Paymob configuration is missing. Skipping payment initialization.");
-      return null;
-    }
+): Promise<PaymobPaymentSession> => {
+  const config = getPaymobConfig();
+  if (!config.apiKey || !config.integrationId || !config.iframeId) {
+    throw new Error("Paymob configuration is incomplete");
+  }
 
-    // 1. Authentication Request
-    const authResponse = await fetch("https://accept.paymob.com/api/auth/tokens", {
+  // 1. Authentication Request
+  const authResponse = await fetch(
+    "https://accept.paymob.com/api/auth/tokens",
+    {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: config.apiKey }),
-    });
-    const authData = (await authResponse.json()) as any;
-    const token = authData.token;
+    }
+  );
+  if (!authResponse.ok)
+    throw new Error(`Paymob authentication failed (${authResponse.status})`);
+  const authData = (await authResponse.json()) as { token?: string };
+  const token = authData.token;
 
-    if (!token) throw new Error("Paymob auth failed");
+  if (!token)
+    throw new Error("Paymob authentication response did not include a token");
 
-    // 2. Order Registration Request
-    const orderResponse = await fetch("https://accept.paymob.com/api/ecommerce/orders", {
+  // 2. Order Registration Request
+  const orderResponse = await fetch(
+    "https://accept.paymob.com/api/ecommerce/orders",
+    {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -54,14 +65,22 @@ export const initializePaymobPayment = async (
         currency: "EGP",
         merchant_order_id: orderNumber,
       }),
-    });
-    const orderData = (await orderResponse.json()) as any;
-    const paymobOrderId = orderData.id;
+    }
+  );
+  if (!orderResponse.ok)
+    throw new Error(
+      `Paymob order registration failed (${orderResponse.status})`
+    );
+  const orderData = (await orderResponse.json()) as { id?: string | number };
+  const paymobOrderId = orderData.id;
 
-    if (!paymobOrderId) throw new Error("Paymob order registration failed");
+  if (!paymobOrderId)
+    throw new Error("Paymob order response did not include an order ID");
 
-    // 3. Payment Key Request
-    const paymentKeyResponse = await fetch("https://accept.paymob.com/api/acceptance/payment_keys", {
+  // 3. Payment Key Request
+  const paymentKeyResponse = await fetch(
+    "https://accept.paymob.com/api/acceptance/payment_keys",
+    {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -87,16 +106,22 @@ export const initializePaymobPayment = async (
         currency: "EGP",
         integration_id: parseInt(config.integrationId, 10),
       }),
-    });
-    const paymentKeyData = (await paymentKeyResponse.json()) as any;
-    const paymentKey = paymentKeyData.token;
+    }
+  );
+  if (!paymentKeyResponse.ok)
+    throw new Error(
+      `Paymob payment-key request failed (${paymentKeyResponse.status})`
+    );
+  const paymentKeyData = (await paymentKeyResponse.json()) as {
+    token?: string;
+  };
+  const paymentKey = paymentKeyData.token;
 
-    if (!paymentKey) throw new Error("Paymob payment key request failed");
+  if (!paymentKey)
+    throw new Error("Paymob payment-key response did not include a token");
 
-    // Return the iframe URL
-    return `https://accept.paymob.com/api/acceptance/iframes/${config.iframeId}?payment_token=${paymentKey}`;
-  } catch (error) {
-    console.error("Paymob initialization error:", error);
-    return null;
-  }
+  return {
+    checkoutUrl: `https://accept.paymob.com/api/acceptance/iframes/${config.iframeId}?payment_token=${paymentKey}`,
+    providerOrderId: String(paymobOrderId),
+  };
 };

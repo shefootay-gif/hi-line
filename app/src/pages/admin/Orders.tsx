@@ -14,6 +14,11 @@ import {
   FileText
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { getErrorMessage } from "@/lib/errors";
+import {
+  buildInvoiceDocument,
+  buildShippingLabelDocument,
+} from "@/lib/printDocuments";
 
 const statusColors: Record<string, string> = {
   pending: "#B57EDC",
@@ -69,71 +74,12 @@ export default function AdminOrders() {
     if (!orderDetails) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    
-    printWindow.document.write(`
-      <html dir="${isRTL ? "rtl" : "ltr"}">
-        <head>
-          <title>Invoice #${orderDetails.orderNumber}</title>
-          <style>
-            body { font-family: 'Inter', 'Cairo', sans-serif; padding: 40px; color: #333; }
-            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
-            .logo { font-size: 24px; font-weight: bold; color: #4B1C71; }
-            .invoice-title { font-size: 20px; color: #666; }
-            .info-section { display: flex; justify-content: space-between; margin-bottom: 30px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-            th, td { border: 1px solid #ddd; padding: 12px; text-align: ${isRTL ? "right" : "left"}; }
-            th { background-color: #f9f9f9; }
-            .total-section { text-align: ${isRTL ? "left" : "right"}; font-size: 18px; font-weight: bold; }
-            @media print { @page { size: A4; margin: 0; } body { padding: 2cm; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="logo">Hi Line Pro Care</div>
-            <div class="invoice-title">INVOICE</div>
-          </div>
-          <div class="info-section">
-            <div>
-              <strong>Bill To:</strong><br/>
-              ${orderDetails.customerName}<br/>
-              ${orderDetails.customerPhone}<br/>
-              ${orderDetails.shippingAddress}
-            </div>
-            <div>
-              <strong>Order #:</strong> ${orderDetails.orderNumber}<br/>
-              <strong>Date:</strong> ${new Date(orderDetails.createdAt).toLocaleDateString()}<br/>
-              <strong>Payment:</strong> ${orderDetails.paymentMethod?.replace(/_/g, " ")}
-            </div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${orderDetails.items.map((item: any) => `
-                <tr>
-                  <td>${item.productName} ${item.scent ? `(${item.scent})` : ''}</td>
-                  <td>${item.quantity}</td>
-                  <td>${item.unitPrice} EGP</td>
-                  <td>${item.totalPrice} EGP</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="total-section">
-            Grand Total: ${orderDetails.total} EGP
-          </div>
-          <script>
-            setTimeout(() => window.print(), 500);
-          </script>
-        </body>
-      </html>
-    `);
+    printWindow.document.write(
+      buildInvoiceDocument(
+        { ...orderDetails, createdAt: new Date(orderDetails.createdAt) },
+        isRTL ? "rtl" : "ltr"
+      )
+    );
     printWindow.document.close();
     printWindow.focus();
   };
@@ -142,59 +88,12 @@ export default function AdminOrders() {
     if (!orderDetails) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    
-    printWindow.document.write(`
-      <html dir="${isRTL ? "rtl" : "ltr"}">
-        <head>
-          <title>Shipping Label #${orderDetails.orderNumber}</title>
-          <style>
-            body { font-family: 'Inter', 'Cairo', sans-serif; padding: 20px; display: flex; justify-content: center; background: #eee; }
-            .label { width: 10cm; height: 15cm; background: #fff; padding: 20px; border: 1px solid #000; box-sizing: border-box; }
-            .header { border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 15px; text-align: center; font-weight: bold; font-size: 24px; }
-            .barcode { text-align: center; margin: 20px 0; font-family: 'Libre Barcode 39', monospace; font-size: 48px; }
-            .section { border: 1px solid #000; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
-            .title { font-size: 12px; color: #666; margin-bottom: 5px; text-transform: uppercase; }
-            .content { font-size: 18px; font-weight: bold; }
-            .cod { font-size: 24px; font-weight: bold; text-align: center; border: 2px dashed #000; padding: 10px; margin-top: 20px; }
-            @media print { @page { size: 10cm 15cm; margin: 0; } body { padding: 0; background: #fff; } .label { border: none; } }
-          </style>
-          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
-        </head>
-        <body>
-          <div class="label">
-            <div class="header">HI LINE - SHIPPING</div>
-            
-            <div class="section">
-              <div class="title">Deliver To</div>
-              <div class="content">
-                ${orderDetails.customerName}<br/>
-                ${orderDetails.customerPhone}<br/>
-                ${orderDetails.shippingAddress}
-              </div>
-            </div>
-
-            <div class="section">
-              <div class="title">Order Details</div>
-              <div class="content" style="font-size: 14px;">
-                Order #: ${orderDetails.orderNumber}<br/>
-                Items: ${orderDetails.items.reduce((acc: number, item: any) => acc + item.quantity, 0)}
-              </div>
-            </div>
-
-            <div class="barcode">*${orderDetails.orderNumber}*</div>
-            <div style="text-align:center; font-family:monospace;">${orderDetails.orderNumber}</div>
-
-            ${orderDetails.paymentMethod === 'cash_on_delivery' 
-              ? `<div class="cod">COD: ${orderDetails.total} EGP</div>`
-              : `<div class="cod" style="color: green; border-color: green;">PAID (${orderDetails.paymentMethod})</div>`
-            }
-          </div>
-          <script>
-            setTimeout(() => window.print(), 500);
-          </script>
-        </body>
-      </html>
-    `);
+    printWindow.document.write(
+      buildShippingLabelDocument(
+        { ...orderDetails, createdAt: new Date(orderDetails.createdAt) },
+        isRTL ? "rtl" : "ltr"
+      )
+    );
     printWindow.document.close();
     printWindow.focus();
   };
@@ -417,8 +316,8 @@ export default function AdminOrders() {
                     try {
                       await updateOrderStatus.mutateAsync({ id: viewOrder.id, status });
                       setViewOrder({ ...viewOrder, orderStatus: status });
-                    } catch (err: any) {
-                      toast.error(err.message);
+                    } catch (error: unknown) {
+                      toast.error(getErrorMessage(error, lang === "ar" ? "تعذر تحديث حالة الطلب" : "Could not update order status"));
                     }
                   }}
                   className="px-3 py-1.5 bg-white border border-[#E7D8F1] rounded-xl text-sm font-semibold focus:outline-none"

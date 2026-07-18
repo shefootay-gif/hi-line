@@ -3,7 +3,10 @@ import { trpc } from "@/providers/trpc";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Lock } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { getErrorMessage } from "@/lib/errors";
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
+import { pathForLocale } from "@/lib/localeRouting";
 
 export default function ResetPassword() {
   const { lang, isRTL } = useLanguage();
@@ -32,20 +35,24 @@ export default function ResetPassword() {
     try {
       await resetPassword.mutateAsync({ token, password });
       toast.success(lang === "ar" ? "تم إعادة تعيين كلمة المرور بنجاح" : "Password reset successful");
-      setTimeout(() => navigate("/login"), 2000);
-    } catch (err: any) {
-      toast.error(err.message || (lang === "ar" ? "حدث خطأ" : "An error occurred"));
+      setTimeout(() => navigate(pathForLocale("/login", lang)), 2000);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, lang === "ar" ? "حدث خطأ" : "An error occurred"));
     }
   };
 
   if (!token) {
     return (
       <div className={`min-h-screen bg-[#FCF8FF] flex items-center justify-center px-4 ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
+        <Helmet>
+          <title>Hi Line Password Reset</title>
+          <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
         <div className="text-center">
           <h2 className="text-2xl font-bold text-[#4B1C71] mb-2">
             {lang === "ar" ? "رابط غير صالح" : "Invalid Link"}
           </h2>
-          <Link to="/forgot-password" className="text-[#B57EDC] hover:underline">
+          <Link to={pathForLocale("/forgot-password", lang)} className="text-[#B57EDC] hover:underline">
             {lang === "ar" ? "اطلب رابطاً جديداً" : "Request a new link"}
           </Link>
         </div>
@@ -55,6 +62,10 @@ export default function ResetPassword() {
 
   return (
     <div className={`min-h-screen bg-[#FCF8FF] flex items-center justify-center pt-20 px-4 ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
+      <Helmet>
+        <title>Hi Line Password Reset</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <Toaster position="top-center" />
       <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(75,28,113,0.04)] border border-[#E7D8F1]">
         <div className="text-center mb-8">

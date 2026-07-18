@@ -1,4 +1,5 @@
 import { useLanguage } from "@/hooks/useLanguage";
+import { pathForLocale } from "@/lib/localeRouting";
 import { useTranslations } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
 import { Link, useNavigate } from "react-router";
@@ -48,7 +49,7 @@ export default function Cart() {
             <ShoppingBag className="w-20 h-20 text-[#E7D8F1] mx-auto mb-6" />
             <p className="text-lg text-[#6F6178] mb-6">{t.emptyCart}</p>
             <button
-              onClick={() => navigate("/shop")}
+              onClick={() => navigate(pathForLocale("/shop", lang))}
               className="px-8 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#A66DCC] transition-colors"
             >
               {t.startShopping}
@@ -165,7 +166,7 @@ export default function Cart() {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate("/checkout")}
+                  onClick={() => navigate(pathForLocale("/checkout", lang))}
                   className="w-full py-4 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#A66DCC] transition-colors mb-3"
                 >
                   {t.proceedToCheckout}
@@ -178,7 +179,7 @@ export default function Cart() {
                   {t.orderViaWhatsApp}
                 </button>
                 <button
-                  onClick={() => navigate("/shop")}
+                  onClick={() => navigate(pathForLocale("/shop", lang))}
                   className="w-full text-center py-3 text-sm text-[#6F6178] hover:text-[#4B1C71] transition-colors mt-2"
                 >
                   {t.continueShopping}

@@ -1,8 +1,15 @@
 import { z } from "zod";
-import { createRouter, publicQuery, adminQuery, authedQuery } from "./middleware";
+import {
+  createRouter,
+  publicQuery,
+  adminQuery,
+  authedQuery,
+} from "./middleware";
 import { getDb } from "./queries/connection";
 import { getCached, setCached } from "./cache";
 import { initializePaymobPayment } from "./payment-service";
+import { TRPCError } from "@trpc/server";
+import crypto from "crypto";
 import { sendWhatsAppMessage } from "./whatsapp-service";
 import { sendMetaCAPIEvent } from "./meta-capi";
 import {
@@ -24,8 +31,51 @@ import {
   abandonedCarts,
   userAddresses,
   customers,
+  paymentTransactions,
 } from "@db/schema";
 import { eq, desc, and, or, like, sql, inArray, notInArray } from "drizzle-orm";
+
+function calculateOrderFingerprint(input: {
+  customerName: string;
+  customerPhone: string;
+  customerWhatsapp?: string;
+  customerEmail?: string;
+  shippingAddress: string;
+  governorate?: string;
+  city?: string;
+  postalCode?: string;
+  paymentMethod: string;
+  notes?: string;
+  source: string;
+  items: { productId: number; quantity: number }[];
+  couponCode?: string;
+}) {
+  const sortedItems = [...input.items].sort(
+    (a, b) => a.productId - b.productId
+  );
+  const normalized = {
+    customerName: input.customerName.trim(),
+    customerPhone: input.customerPhone.trim(),
+    customerWhatsapp: input.customerWhatsapp?.trim() || null,
+    customerEmail: input.customerEmail?.trim().toLowerCase() || null,
+    shippingAddress: input.shippingAddress.trim(),
+    governorate: input.governorate?.trim() || null,
+    city: input.city?.trim() || null,
+    postalCode: input.postalCode?.trim() || null,
+    paymentMethod: input.paymentMethod,
+    notes: input.notes?.trim() || null,
+    source: input.source,
+    items: sortedItems.map(item => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    })),
+    couponCode: input.couponCode?.trim().toUpperCase() || null,
+  };
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(normalized))
+    .digest("hex");
+}
 
 const categoryAliases: Record<string, string> = {
   all: "all",
@@ -46,13 +96,15 @@ export const storeRouter = createRouter({
   // Products
   getProducts: publicQuery
     .input(
-      z.object({
-        category: z.string().optional(),
-        scent: z.string().optional(),
-        featured: z.boolean().optional(),
-        bestSeller: z.boolean().optional(),
-        search: z.string().optional(),
-      }).optional()
+      z
+        .object({
+          category: z.string().optional(),
+          scent: z.string().optional(),
+          featured: z.boolean().optional(),
+          bestSeller: z.boolean().optional(),
+          search: z.string().optional(),
+        })
+        .optional()
     )
     .query(async ({ input }) => {
       const db = getDb();
@@ -72,18 +124,23 @@ export const storeRouter = createRouter({
         const searchCondition = or(
           like(products.nameEn, term),
           like(products.nameAr, term),
-          like(products.scent, term),
+          like(products.scent, term)
         );
         if (searchCondition) conditions.push(searchCondition);
       }
       if (input?.category) {
-        const categorySlug = categoryAliases[input.category.toLowerCase()] || input.category;
+        const categorySlug =
+          categoryAliases[input.category.toLowerCase()] || input.category;
         if (categorySlug === "best-sellers") {
           conditions.push(eq(products.isBestSeller, true));
         } else if (categorySlug === "fresh-scents") {
-          conditions.push(inArray(products.scent, ["Tropical Breeze", "Voyage"]));
+          conditions.push(
+            inArray(products.scent, ["Tropical Breeze", "Voyage"])
+          );
         } else if (categorySlug === "fruity-scents") {
-          conditions.push(inArray(products.scent, ["Candy Pop", "Sweet Mango"]));
+          conditions.push(
+            inArray(products.scent, ["Candy Pop", "Sweet Mango"])
+          );
         } else if (categorySlug === "fragrance-free") {
           conditions.push(eq(products.scent, "Fragrance Free"));
         } else if (categorySlug !== "all") {
@@ -165,7 +222,12 @@ export const storeRouter = createRouter({
     return db
       .select()
       .from(categories)
-      .where(and(eq(categories.isActive, true), notInArray(categories.slug, hiddenMarketingCategories)))
+      .where(
+        and(
+          eq(categories.isActive, true),
+          notInArray(categories.slug, hiddenMarketingCategories)
+        )
+      )
       .orderBy(categories.sortOrder);
   }),
 
@@ -189,14 +251,14 @@ export const storeRouter = createRouter({
   getSettings: publicQuery.query(async () => {
     const cached = getCached<Record<string, string>>("settings");
     if (cached) return cached;
-    
+
     const db = getDb();
     const settings = await db.select().from(storeSettings);
     const settingsMap: Record<string, string> = {};
     for (const s of settings) {
       settingsMap[s.key] = s.value ?? "";
     }
-    
+
     setCached("settings", settingsMap, 300); // 5 minutes
     return settingsMap;
   }),
@@ -237,6 +299,7 @@ export const storeRouter = createRouter({
   createOrder: publicQuery
     .input(
       z.object({
+        idempotencyKey: z.string().trim().uuid(),
         customerName: z.string().trim().min(1).max(255),
         customerPhone: z.string().trim().min(1).max(50),
         customerWhatsapp: z.string().trim().max(50).optional(),
@@ -254,258 +317,558 @@ export const storeRouter = createRouter({
         ]),
         notes: z.string().max(2000).optional(),
         source: z.enum(["website", "whatsapp"]).default("website"),
-        items: z.array(
-          z.object({
-            productId: z.number().int().positive(),
-            quantity: z.number().int().min(1).max(99),
-          })
-        ).min(1),
+        items: z
+          .array(
+            z.object({
+              productId: z.number().int().positive(),
+              quantity: z.number().int().min(1).max(99),
+            })
+          )
+          .min(1),
         couponCode: z.string().trim().max(50).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      const currentFingerprint = calculateOrderFingerprint(input);
+
+      // End-to-end public order creation idempotency pre-check
+      if (input.idempotencyKey) {
+        const [existingOrder] = await db
+          .select()
+          .from(orders)
+          .where(eq(orders.idempotencyKey, input.idempotencyKey))
+          .limit(1);
+
+        if (existingOrder) {
+          if (existingOrder.requestFingerprint !== currentFingerprint) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message:
+                "Idempotency key conflict: another order exists with this key but different details.",
+            });
+          }
+
+          if (
+            existingOrder.paymentStatus === "failed" ||
+            existingOrder.orderStatus === "cancelled"
+          ) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message:
+                "The previous payment attempt failed. Please submit the order again.",
+            });
+          }
+
+          // Fetch the paymob transaction if method is paymob
+          let paymobUrl: string | null = null;
+          if (existingOrder.paymentMethod === "paymob") {
+            const [transaction] = await db
+              .select()
+              .from(paymentTransactions)
+              .where(
+                and(
+                  eq(paymentTransactions.orderId, existingOrder.id),
+                  eq(paymentTransactions.provider, "paymob")
+                )
+              )
+              .limit(1);
+            if (transaction) {
+              paymobUrl = transaction.checkoutUrl;
+            }
+            if (!paymobUrl) {
+              throw new TRPCError({
+                code: "CONFLICT",
+                message:
+                  "Payment initialization is still in progress. Please retry shortly.",
+              });
+            }
+          }
+
+          return {
+            orderId: existingOrder.id,
+            orderNumber: existingOrder.orderNumber,
+            total: existingOrder.total,
+            discountAmount: existingOrder.discountAmount,
+            paymobUrl,
+          };
+        }
+      }
+
       const { nanoid } = await import("nanoid");
       const orderNumber = `HL${Date.now().toString(36).toUpperCase()}${nanoid(4).toUpperCase()}`;
 
       const getAffectedRows = (result: unknown) => {
         const packet = Array.isArray(result) ? result[0] : result;
-        return Number((packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+        return Number(
+          (packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0
+        );
       };
 
-      const result = await db.transaction(async (tx) => {
-        // Fetch products and calculate all financial values server-side.
-        const productIds = input.items.map((item) => item.productId);
-        const productDetails = await tx
-          .select()
-          .from(products)
-          .where(inArray(products.id, productIds));
+      let result;
+      try {
+        result = await db.transaction(async tx => {
+          // Fetch products and calculate all financial values server-side.
+          const productIds = input.items.map(item => item.productId);
+          const productDetails = await tx
+            .select()
+            .from(products)
+            .where(inArray(products.id, productIds));
 
-        if (productDetails.length !== new Set(productIds).size) {
-          throw new Error("One or more products were not found");
-        }
+          if (productDetails.length !== new Set(productIds).size) {
+            throw new Error("One or more products were not found");
+          }
 
-        let subtotal = 0;
-        const orderItemsData = input.items.map((item) => {
-          const product = productDetails.find((p) => p.id === item.productId);
-          if (!product) throw new Error(`Product ${item.productId} not found`);
-          if (!product.isActive) throw new Error(`Product ${product.nameEn} is not available`);
-          if (product.stock < item.quantity) {
-            throw new Error(
-              `Insufficient stock for "${product.nameEn}". Available: ${product.stock}, Requested: ${item.quantity}`
+          let subtotal = 0;
+          const orderItemsData = input.items.map(item => {
+            const product = productDetails.find(
+              (p: typeof products.$inferSelect) => p.id === item.productId
             );
-          }
+            if (!product)
+              throw new Error(`Product ${item.productId} not found`);
+            if (!product.isActive)
+              throw new Error(`Product ${product.nameEn} is not available`);
+            if (product.stock < item.quantity) {
+              throw new Error(
+                `Insufficient stock for "${product.nameEn}". Available: ${product.stock}, Requested: ${item.quantity}`
+              );
+            }
 
-          const unitPrice = parseFloat(product.salePrice ?? product.price);
-          const totalPrice = unitPrice * item.quantity;
-          subtotal += totalPrice;
+            const unitPrice = parseFloat(product.salePrice ?? product.price);
+            const totalPrice = unitPrice * item.quantity;
+            subtotal += totalPrice;
 
-          return {
-            productId: item.productId,
-            productName: product.nameEn,
-            productNameAr: product.nameAr,
-            scent: product.scent,
-            quantity: item.quantity,
-            unitPrice: unitPrice.toFixed(2),
-            totalPrice: totalPrice.toFixed(2),
-          };
-        });
+            return {
+              productId: item.productId,
+              productName: product.nameEn,
+              productNameAr: product.nameAr,
+              scent: product.scent,
+              quantity: item.quantity,
+              unitPrice: unitPrice.toFixed(2),
+              totalPrice: totalPrice.toFixed(2),
+            };
+          });
 
-        // Shipping is calculated server-side from the selected governorate.
-        let shippingFee = 0;
-        if (input.governorate) {
-          const shipping = await tx
-            .select()
-            .from(shippingSettings)
-            .where(and(eq(shippingSettings.governorate, input.governorate), eq(shippingSettings.isActive, true)))
-            .limit(1);
-          if (shipping[0]) {
-            shippingFee = parseFloat(shipping[0].baseFee ?? "0");
-          }
-        }
-
-        const freeShippingSetting = await tx
-          .select()
-          .from(storeSettings)
-          .where(eq(storeSettings.key, "free_shipping_threshold"))
-          .limit(1);
-        if (freeShippingSetting[0]) {
-          const threshold = parseFloat(freeShippingSetting[0].value ?? "999999");
-          if (subtotal >= threshold) shippingFee = 0;
-        }
-
-        let discountAmount = 0;
-        let appliedCouponId: number | null = null;
-        const normalizedCouponCode = input.couponCode?.trim().toUpperCase();
-
-        if (normalizedCouponCode) {
-          const [coupon] = await tx
-            .select()
-            .from(coupons)
-            .where(eq(coupons.code, normalizedCouponCode))
-            .limit(1);
-
-          if (coupon) {
-            const isValid =
-              coupon.isActive &&
-              (!coupon.expiresAt || new Date(coupon.expiresAt) > new Date()) &&
-              (coupon.maxUsage === null || (coupon.currentUsage ?? 0) < coupon.maxUsage) &&
-              subtotal >= parseFloat(coupon.minOrderValue ?? "0");
-
-            if (isValid) {
-              const val = parseFloat(coupon.discountValue);
-              discountAmount = coupon.discountType === "percentage" ? (subtotal * val) / 100 : val;
-              appliedCouponId = coupon.id;
+          // Shipping is calculated server-side from the selected governorate.
+          let shippingFee = 0;
+          if (input.governorate) {
+            const shipping = await tx
+              .select()
+              .from(shippingSettings)
+              .where(
+                and(
+                  eq(shippingSettings.governorate, input.governorate),
+                  eq(shippingSettings.isActive, true)
+                )
+              )
+              .limit(1);
+            if (shipping[0]) {
+              shippingFee = parseFloat(shipping[0].baseFee ?? "0");
             }
           }
-        }
 
-        if (discountAmount > subtotal) discountAmount = subtotal;
-        const total = subtotal - discountAmount + shippingFee;
+          const freeShippingSetting = await tx
+            .select()
+            .from(storeSettings)
+            .where(eq(storeSettings.key, "free_shipping_threshold"))
+            .limit(1);
+          if (freeShippingSetting[0]) {
+            const threshold = parseFloat(
+              freeShippingSetting[0].value ?? "999999"
+            );
+            if (subtotal >= threshold) shippingFee = 0;
+          }
 
-        const orderResult = await tx.insert(orders).values({
-          orderNumber,
-          userId: ctx.user?.id || null,
-          customerName: input.customerName,
-          customerPhone: input.customerPhone,
-          customerWhatsapp: input.customerWhatsapp,
-          customerEmail: input.customerEmail,
-          shippingAddress: input.shippingAddress,
-          governorate: input.governorate,
-          city: input.city,
-          postalCode: input.postalCode,
-          subtotal: subtotal.toFixed(2),
-          shippingFee: shippingFee.toFixed(2),
-          discountAmount: discountAmount.toFixed(2),
-          couponCode: normalizedCouponCode || null,
-          total: total.toFixed(2),
-          paymentMethod: input.paymentMethod,
-          notes: input.notes,
-          source: input.source,
-        });
+          let discountAmount = 0;
+          let appliedCouponId: number | null = null;
+          const normalizedCouponCode = input.couponCode?.trim().toUpperCase();
 
-        const orderId = Number(orderResult[0].insertId);
+          if (normalizedCouponCode) {
+            const [coupon] = await tx
+              .select()
+              .from(coupons)
+              .where(eq(coupons.code, normalizedCouponCode))
+              .limit(1);
 
-        // Sync with customers directory
-        const existingCustomer = await tx
-          .select()
-          .from(customers)
-          .where(eq(customers.phone, input.customerPhone))
-          .limit(1);
+            if (coupon) {
+              const isValid =
+                coupon.isActive &&
+                (!coupon.expiresAt ||
+                  new Date(coupon.expiresAt) > new Date()) &&
+                (coupon.maxUsage === null ||
+                  (coupon.currentUsage ?? 0) < coupon.maxUsage) &&
+                subtotal >= parseFloat(coupon.minOrderValue ?? "0");
 
-        if (existingCustomer[0]) {
-          await tx
-            .update(customers)
-            .set({
+              if (isValid) {
+                const val = parseFloat(coupon.discountValue);
+                discountAmount =
+                  coupon.discountType === "percentage"
+                    ? (subtotal * val) / 100
+                    : val;
+                appliedCouponId = coupon.id;
+              }
+            }
+          }
+
+          if (discountAmount > subtotal) discountAmount = subtotal;
+          const total = subtotal - discountAmount + shippingFee;
+
+          const orderResult = await tx.insert(orders).values({
+            orderNumber,
+            idempotencyKey: input.idempotencyKey,
+            requestFingerprint: currentFingerprint,
+            userId: ctx.user?.id || null,
+            customerName: input.customerName,
+            customerPhone: input.customerPhone,
+            customerWhatsapp: input.customerWhatsapp,
+            customerEmail: input.customerEmail,
+            shippingAddress: input.shippingAddress,
+            governorate: input.governorate,
+            city: input.city,
+            postalCode: input.postalCode,
+            subtotal: subtotal.toFixed(2),
+            shippingFee: shippingFee.toFixed(2),
+            discountAmount: discountAmount.toFixed(2),
+            couponCode: normalizedCouponCode || null,
+            total: total.toFixed(2),
+            paymentMethod: input.paymentMethod,
+            notes: input.notes,
+            source: input.source,
+          });
+
+          const orderId = Number(orderResult[0].insertId);
+
+          // Sync with customers directory
+          const existingCustomer = await tx
+            .select()
+            .from(customers)
+            .where(eq(customers.phone, input.customerPhone))
+            .limit(1);
+
+          if (existingCustomer[0]) {
+            await tx
+              .update(customers)
+              .set({
+                name: input.customerName,
+                email: input.customerEmail || existingCustomer[0].email,
+                whatsapp:
+                  input.customerWhatsapp || existingCustomer[0].whatsapp,
+                address: input.shippingAddress,
+                governorate:
+                  input.governorate || existingCustomer[0].governorate,
+                city: input.city || existingCustomer[0].city,
+                totalOrders: sql`${customers.totalOrders} + 1`,
+                totalSpent: sql`${customers.totalSpent} + ${total.toFixed(2)}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(customers.id, existingCustomer[0].id));
+          } else {
+            await tx.insert(customers).values({
               name: input.customerName,
-              email: input.customerEmail || existingCustomer[0].email,
-              whatsapp: input.customerWhatsapp || existingCustomer[0].whatsapp,
+              phone: input.customerPhone,
+              whatsapp: input.customerWhatsapp || null,
+              email: input.customerEmail || null,
               address: input.shippingAddress,
-              governorate: input.governorate || existingCustomer[0].governorate,
-              city: input.city || existingCustomer[0].city,
-              totalOrders: sql`${customers.totalOrders} + 1`,
-              totalSpent: sql`${customers.totalSpent} + ${total.toFixed(2)}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(customers.id, existingCustomer[0].id));
-        } else {
-          await tx.insert(customers).values({
-            name: input.customerName,
-            phone: input.customerPhone,
-            whatsapp: input.customerWhatsapp || null,
-            email: input.customerEmail || null,
-            address: input.shippingAddress,
-            governorate: input.governorate || null,
-            city: input.city || null,
-            totalOrders: 1,
-            totalSpent: total.toFixed(2),
-            source: input.source || "website",
-          });
-        }
-
-        // Atomic stock deduction: prevents stock from going below zero in concurrent orders.
-        for (const item of input.items) {
-          const product = productDetails.find((p) => p.id === item.productId);
-          if (!product) throw new Error(`Product ${item.productId} not found`);
-
-          const stockUpdate = await tx
-            .update(products)
-            .set({ stock: sql`${products.stock} - ${item.quantity}` })
-            .where(and(eq(products.id, item.productId), sql`${products.stock} >= ${item.quantity}`));
-
-          if (getAffectedRows(stockUpdate) !== 1) {
-            throw new Error("Insufficient stock. Please refresh your cart and try again.");
+              governorate: input.governorate || null,
+              city: input.city || null,
+              totalOrders: 1,
+              totalSpent: total.toFixed(2),
+              source: input.source || "website",
+            });
           }
 
-          await tx.insert(inventoryMovements).values({
-            productId: item.productId,
+          // Atomic stock deduction: prevents stock from going below zero in concurrent orders.
+          for (const item of input.items) {
+            const product = productDetails.find(
+              (p: typeof products.$inferSelect) => p.id === item.productId
+            );
+            if (!product)
+              throw new Error(`Product ${item.productId} not found`);
+
+            const stockUpdate = await tx
+              .update(products)
+              .set({ stock: sql`${products.stock} - ${item.quantity}` })
+              .where(
+                and(
+                  eq(products.id, item.productId),
+                  sql`${products.stock} >= ${item.quantity}`
+                )
+              );
+
+            if (getAffectedRows(stockUpdate) !== 1) {
+              throw new Error(
+                "Insufficient stock. Please refresh your cart and try again."
+              );
+            }
+
+            const [updatedProd] = await tx
+              .select()
+              .from(products)
+              .where(eq(products.id, item.productId))
+              .limit(1);
+
+            const newStock = updatedProd ? updatedProd.stock : 0;
+            const previousStock = newStock + item.quantity;
+
+            await tx.insert(inventoryMovements).values({
+              productId: item.productId,
+              orderId,
+              type: "sale",
+              quantity: -item.quantity,
+              previousStock,
+              newStock,
+              reason: "Order stock deduction",
+              reference: orderNumber,
+            });
+          }
+
+          await tx
+            .insert(orderItems)
+            .values(orderItemsData.map(item => ({ orderId, ...item })));
+
+          if (appliedCouponId) {
+            const couponUpdate = await tx
+              .update(coupons)
+              .set({ currentUsage: sql`${coupons.currentUsage} + 1` })
+              .where(
+                and(
+                  eq(coupons.id, appliedCouponId),
+                  or(
+                    sql`${coupons.maxUsage} IS NULL`,
+                    sql`${coupons.currentUsage} < ${coupons.maxUsage}`
+                  )
+                )
+              );
+
+            if (getAffectedRows(couponUpdate) !== 1) {
+              throw new Error(
+                "Coupon usage limit reached. Please remove the coupon and try again."
+              );
+            }
+          }
+
+          return {
             orderId,
-            type: "sale",
-            quantity: -item.quantity,
-            previousStock: product.stock,
-            newStock: product.stock - item.quantity,
-            reason: "Order stock deduction",
-            reference: orderNumber,
-          });
-        }
+            orderNumber,
+            total: total.toFixed(2),
+            discountAmount: discountAmount.toFixed(2),
+            totalNumber: total,
+            input,
+            appliedCouponId,
+          };
+        });
+      } catch (err) {
+        const error = err as { code?: string; message?: string };
+        // Handle concurrent insert race condition via db constraint violation
+        if (
+          error.code === "ER_DUP_ENTRY" ||
+          error.message?.includes("idempotency_key") ||
+          error.message?.includes("Duplicate entry")
+        ) {
+          const [existingOrder] = await db
+            .select()
+            .from(orders)
+            .where(eq(orders.idempotencyKey, input.idempotencyKey))
+            .limit(1);
 
-        await tx.insert(orderItems).values(
-          orderItemsData.map((item) => ({ orderId, ...item }))
-        );
+          if (existingOrder) {
+            if (existingOrder.requestFingerprint !== currentFingerprint) {
+              throw new TRPCError({
+                code: "CONFLICT",
+                message:
+                  "Idempotency key conflict: another order exists with this key but different details.",
+              });
+            }
 
-        if (appliedCouponId) {
-          const couponUpdate = await tx
-            .update(coupons)
-            .set({ currentUsage: sql`${coupons.currentUsage} + 1` })
-            .where(and(
-              eq(coupons.id, appliedCouponId),
-              or(sql`${coupons.maxUsage} IS NULL`, sql`${coupons.currentUsage} < ${coupons.maxUsage}`)
-            ));
+            if (
+              existingOrder.paymentStatus === "failed" ||
+              existingOrder.orderStatus === "cancelled"
+            ) {
+              throw new TRPCError({
+                code: "PRECONDITION_FAILED",
+                message:
+                  "The previous payment attempt failed. Please submit the order again.",
+              });
+            }
 
-          if (getAffectedRows(couponUpdate) !== 1) {
-            throw new Error("Coupon usage limit reached. Please remove the coupon and try again.");
+            // Fetch the paymob transaction if method is paymob
+            let paymobUrl: string | null = null;
+            if (existingOrder.paymentMethod === "paymob") {
+              const [transaction] = await db
+                .select()
+                .from(paymentTransactions)
+                .where(
+                  and(
+                    eq(paymentTransactions.orderId, existingOrder.id),
+                    eq(paymentTransactions.provider, "paymob")
+                  )
+                )
+                .limit(1);
+              if (transaction) {
+                paymobUrl = transaction.checkoutUrl;
+              }
+              if (!paymobUrl) {
+                throw new TRPCError({
+                  code: "CONFLICT",
+                  message:
+                    "Payment initialization is still in progress. Please retry shortly.",
+                });
+              }
+            }
+
+            return {
+              orderId: existingOrder.id,
+              orderNumber: existingOrder.orderNumber,
+              total: existingOrder.total,
+              discountAmount: existingOrder.discountAmount,
+              paymobUrl,
+            };
           }
         }
-
-        return { orderId, orderNumber, total: total.toFixed(2), discountAmount: discountAmount.toFixed(2), totalNumber: total, input };
-      });
+        throw err;
+      }
 
       let paymobUrl: string | null = null;
       if (result.input.paymentMethod === "paymob") {
-        paymobUrl = await initializePaymobPayment(
-          Math.round(result.totalNumber * 100),
-          result.orderNumber,
-          {
-            firstName: result.input.customerName.split(" ")[0] || result.input.customerName,
-            lastName: result.input.customerName.split(" ").slice(1).join(" ") || "Customer",
-            email: result.input.customerEmail || "customer@hilineprocare.com",
-            phoneNumber: result.input.customerPhone,
-            city: result.input.city || "Cairo",
-            country: "EG",
-            street: result.input.shippingAddress || "N/A",
-          }
-        );
+        let providerOrderId: string | null = null;
+        try {
+          const paymentSession = await initializePaymobPayment(
+            Math.round(result.totalNumber * 100),
+            result.orderNumber,
+            {
+              firstName:
+                result.input.customerName.split(" ")[0] ||
+                result.input.customerName,
+              lastName:
+                result.input.customerName.split(" ").slice(1).join(" ") ||
+                "Customer",
+              email: result.input.customerEmail || "customer@hilineprocare.com",
+              phoneNumber: result.input.customerPhone,
+              city: result.input.city || "Cairo",
+              country: "EG",
+              street: result.input.shippingAddress || "N/A",
+            }
+          );
+          paymobUrl = paymentSession.checkoutUrl;
+          providerOrderId = paymentSession.providerOrderId;
+        } catch (paymobErr) {
+          console.error("Paymob initialization exception:", paymobErr);
+          paymobUrl = null;
+        }
+
+        if (!paymobUrl) {
+          // If Paymob initialization fails, transition the order safely to failed/cancelled
+          // and restore inventory exactly once in a transaction (guarded by conditional transition status).
+          await db.transaction(async tx => {
+            const updateResult = await tx
+              .update(orders)
+              .set({
+                orderStatus: "cancelled",
+                paymentStatus: "failed",
+                notes: sql`CONCAT(COALESCE(${orders.notes}, ''), ' [System: Cancelled due to Paymob initialization failure]')`,
+              })
+              .where(
+                and(
+                  eq(orders.id, result.orderId),
+                  eq(orders.paymentStatus, "pending")
+                )
+              );
+
+            const affected = getAffectedRows(updateResult);
+
+            if (affected === 1) {
+              for (const item of result.input.items) {
+                await tx
+                  .update(products)
+                  .set({ stock: sql`${products.stock} + ${item.quantity}` })
+                  .where(eq(products.id, item.productId));
+
+                const [product] = await tx
+                  .select()
+                  .from(products)
+                  .where(eq(products.id, item.productId))
+                  .limit(1);
+
+                if (product) {
+                  const newStock = product.stock;
+                  const previousStock = newStock - item.quantity;
+
+                  await tx.insert(inventoryMovements).values({
+                    productId: item.productId,
+                    orderId: result.orderId,
+                    type: "cancel",
+                    quantity: item.quantity,
+                    previousStock,
+                    newStock,
+                    reason: "Paymob initialization failure - Stock restored",
+                    reference: result.orderNumber,
+                  });
+                }
+              }
+
+              if (result.appliedCouponId) {
+                await tx
+                  .update(coupons)
+                  .set({
+                    currentUsage: sql`GREATEST(${coupons.currentUsage} - 1, 0)`,
+                  })
+                  .where(eq(coupons.id, result.appliedCouponId));
+              }
+
+              await tx
+                .update(customers)
+                .set({
+                  totalOrders: sql`GREATEST(${customers.totalOrders} - 1, 0)`,
+                  totalSpent: sql`GREATEST(${customers.totalSpent} - ${result.total}, 0)`,
+                })
+                .where(eq(customers.phone, result.input.customerPhone));
+            }
+          });
+
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              "Payment initialization failed. Your order has been cancelled and stock released. Please try again.",
+          });
+        } else {
+          // Persist the Paymob order/transaction details needed for reconciliation
+          await db.insert(paymentTransactions).values({
+            orderId: result.orderId,
+            orderNumber: result.orderNumber,
+            provider: "paymob",
+            method: "paymob",
+            amount: result.total,
+            currency: "EGP",
+            status: "pending",
+            providerOrderId,
+            checkoutUrl: paymobUrl,
+            paidAt: null,
+          });
+        }
       }
 
-      sendWhatsAppMessage(result.input.customerPhone, `Hi ${result.input.customerName}, your order #${result.orderNumber} has been received successfully! Total: ${result.total} EGP.`);
+      sendWhatsAppMessage(
+        result.input.customerPhone,
+        `Hi ${result.input.customerName}, your order #${result.orderNumber} has been received successfully! Total: ${result.total} EGP.`
+      );
 
       // Send to Meta CAPI
-      // Note: we can extract user ip & user agent from ctx if available, else empty
-      sendMetaCAPIEvent(
-        "Purchase",
-        {
-          value: result.totalNumber,
-          currency: "EGP",
-          content_ids: result.input.items.map(i => i.productId.toString()),
-          content_type: "product",
-        },
-        {
-          phone: result.input.customerPhone,
-          email: result.input.customerEmail,
-          firstName: result.input.customerName.split(" ")[0],
-          lastName: result.input.customerName.split(" ").slice(1).join(" "),
-        }
-      ).catch(() => {});
+      if (result.input.paymentMethod !== "paymob")
+        sendMetaCAPIEvent(
+          "Purchase",
+          {
+            value: result.totalNumber,
+            currency: "EGP",
+            content_ids: result.input.items.map(i => i.productId.toString()),
+            content_type: "product",
+          },
+          {
+            phone: result.input.customerPhone,
+            email: result.input.customerEmail,
+            firstName: result.input.customerName.split(" ")[0],
+            lastName: result.input.customerName.split(" ").slice(1).join(" "),
+          }
+        ).catch(() => {});
 
       return {
         orderId: result.orderId,
@@ -517,18 +880,23 @@ export const storeRouter = createRouter({
     }),
 
   saveCart: publicQuery
-    .input(z.object({
-      phone: z.string(),
-      cartData: z.any()
-    }))
+    .input(
+      z.object({
+        phone: z.string(),
+        cartData: z.any(),
+      })
+    )
     .mutation(async ({ input }) => {
       const db = getDb();
-      await db.insert(abandonedCarts).values({
-        phone: input.phone,
-        cartData: input.cartData
-      }).onDuplicateKeyUpdate({
-        set: { cartData: input.cartData, updatedAt: new Date() }
-      });
+      await db
+        .insert(abandonedCarts)
+        .values({
+          phone: input.phone,
+          cartData: input.cartData,
+        })
+        .onDuplicateKeyUpdate({
+          set: { cartData: input.cartData, updatedAt: new Date() },
+        });
       return { success: true };
     }),
 
@@ -555,7 +923,9 @@ export const storeRouter = createRouter({
         throw new Error("This coupon has reached its usage limit");
       }
       if (input.subtotal < parseFloat(coupon.minOrderValue ?? "0")) {
-        throw new Error(`Minimum order value to use this coupon is ${coupon.minOrderValue}`);
+        throw new Error(
+          `Minimum order value to use this coupon is ${coupon.minOrderValue}`
+        );
       }
 
       const val = parseFloat(coupon.discountValue);
@@ -577,10 +947,12 @@ export const storeRouter = createRouter({
     }),
 
   getOrderByNumber: publicQuery
-    .input(z.object({
-      orderNumber: z.string().trim().min(1),
-      customerPhone: z.string().trim().optional(),
-    }))
+    .input(
+      z.object({
+        orderNumber: z.string().trim().min(1),
+        customerPhone: z.string().trim().optional(),
+      })
+    )
     .query(async ({ input }) => {
       const db = getDb();
       const orderResult = await db
@@ -592,7 +964,10 @@ export const storeRouter = createRouter({
       if (orderResult.length === 0) return null;
 
       const order = orderResult[0];
-      if (input.customerPhone && order.customerPhone.trim() !== input.customerPhone.trim()) {
+      if (
+        input.customerPhone &&
+        order.customerPhone.trim() !== input.customerPhone.trim()
+      ) {
         return null;
       }
 
@@ -605,18 +980,22 @@ export const storeRouter = createRouter({
     }),
 
   cancelOrder: publicQuery
-    .input(z.object({
-      orderNumber: z.string().trim().min(1),
-      customerPhone: z.string().trim().min(1),
-    }))
+    .input(
+      z.object({
+        orderNumber: z.string().trim().min(1),
+        customerPhone: z.string().trim().min(1),
+      })
+    )
     .mutation(async ({ input }) => {
       const db = getDb();
       const getAffectedRows = (result: unknown) => {
         const packet = Array.isArray(result) ? result[0] : result;
-        return Number((packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+        return Number(
+          (packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0
+        );
       };
 
-      await db.transaction(async (tx) => {
+      await db.transaction(async tx => {
         const orderResult = await tx
           .select()
           .from(orders)
@@ -636,7 +1015,12 @@ export const storeRouter = createRouter({
         const statusUpdate = await tx
           .update(orders)
           .set({ orderStatus: "cancelled" })
-          .where(and(eq(orders.id, order.id), inArray(orders.orderStatus, ["pending", "processing"])));
+          .where(
+            and(
+              eq(orders.id, order.id),
+              inArray(orders.orderStatus, ["pending", "processing"])
+            )
+          );
 
         if (getAffectedRows(statusUpdate) !== 1) {
           throw new Error("Cannot cancel order at this stage");
@@ -674,7 +1058,9 @@ export const storeRouter = createRouter({
         if (order.couponCode) {
           await tx
             .update(coupons)
-            .set({ currentUsage: sql`GREATEST(${coupons.currentUsage} - 1, 0)` })
+            .set({
+              currentUsage: sql`GREATEST(${coupons.currentUsage} - 1, 0)`,
+            })
             .where(eq(coupons.code, order.couponCode));
         }
       });
@@ -683,19 +1069,21 @@ export const storeRouter = createRouter({
     }),
 
   // Reviews endpoints
-      // Reviews endpoints
+  // Reviews endpoints
   addReview: authedQuery
-    .input(z.object({
-      productId: z.number(),
-      rating: z.number().min(1).max(5),
-      comment: z.string().optional(),
-      images: z.array(z.string()).optional(),
-    }))
+    .input(
+      z.object({
+        productId: z.number(),
+        rating: z.number().min(1).max(5),
+        comment: z.string().optional(),
+        images: z.array(z.string()).optional(),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
       const userId = ctx.user.id;
       if (!userId) throw new Error("Invalid user session for review");
-      
+
       await db.insert(reviews).values({
         productId: input.productId,
         userId: userId,
@@ -711,7 +1099,15 @@ export const storeRouter = createRouter({
     .input(z.object({ productId: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
-      const res = await db.select().from(reviews).where(and(eq(reviews.productId, input.productId), eq(reviews.status, "approved")));
+      const res = await db
+        .select()
+        .from(reviews)
+        .where(
+          and(
+            eq(reviews.productId, input.productId),
+            eq(reviews.status, "approved")
+          )
+        );
       return res;
     }),
 
@@ -726,7 +1122,12 @@ export const storeRouter = createRouter({
       const existing = await db
         .select()
         .from(wishlists)
-        .where(and(eq(wishlists.productId, input.productId), eq(wishlists.userId, userId)))
+        .where(
+          and(
+            eq(wishlists.productId, input.productId),
+            eq(wishlists.userId, userId)
+          )
+        )
         .limit(1);
 
       if (existing.length > 0) {
@@ -758,7 +1159,6 @@ export const storeRouter = createRouter({
     return res;
   }),
 
-
   // Return / exchange request endpoint
   createReturnRequest: publicQuery
     .input(
@@ -784,7 +1184,9 @@ export const storeRouter = createRouter({
         .limit(1);
 
       if (orderResult.length === 0) {
-        throw new Error("Order not found. Please check the order number and phone.");
+        throw new Error(
+          "Order not found. Please check the order number and phone."
+        );
       }
 
       const order = orderResult[0];
@@ -829,12 +1231,14 @@ export const storeRouter = createRouter({
 
   // Contact Message endpoint
   submitContactMessage: publicQuery
-    .input(z.object({
-      name: z.string().min(2),
-      email: z.string().email(),
-      phone: z.string().optional(),
-      message: z.string().min(10),
-    }))
+    .input(
+      z.object({
+        name: z.string().min(2),
+        email: z.string().email(),
+        phone: z.string().optional(),
+        message: z.string().min(10),
+      })
+    )
     .mutation(async ({ input }) => {
       const db = getDb();
       await db.insert(contactMessages).values({
@@ -943,7 +1347,12 @@ export const storeRouter = createRouter({
           address: input.address,
           isDefault: input.isDefault,
         })
-        .where(and(eq(userAddresses.id, input.id), eq(userAddresses.userId, ctx.user.id)));
+        .where(
+          and(
+            eq(userAddresses.id, input.id),
+            eq(userAddresses.userId, ctx.user.id)
+          )
+        );
       return { success: true };
     }),
 
@@ -953,7 +1362,12 @@ export const storeRouter = createRouter({
       const db = getDb();
       await db
         .delete(userAddresses)
-        .where(and(eq(userAddresses.id, input.id), eq(userAddresses.userId, ctx.user.id)));
+        .where(
+          and(
+            eq(userAddresses.id, input.id),
+            eq(userAddresses.userId, ctx.user.id)
+          )
+        );
       return { success: true };
     }),
 

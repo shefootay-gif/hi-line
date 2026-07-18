@@ -14,6 +14,10 @@ import {
   ToggleRight,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../api/router";
+
+type Coupon = inferRouterOutputs<AppRouter>["admin"]["listCoupons"][number];
 
 interface CouponForm {
   id?: number;
@@ -74,7 +78,7 @@ export default function AdminCoupons() {
     setIsEditing(false);
   };
 
-  const handleEdit = (coupon: any) => {
+  const handleEdit = (coupon: Coupon) => {
     setForm({
       id: coupon.id,
       code: coupon.code,
@@ -82,7 +86,7 @@ export default function AdminCoupons() {
       discountValue: coupon.discountValue,
       minOrderValue: coupon.minOrderValue ?? "0",
       maxUsage: coupon.maxUsage?.toString() ?? "",
-      isActive: coupon.isActive,
+      isActive: coupon.isActive ?? false,
       expiresAt: coupon.expiresAt
         ? new Date(coupon.expiresAt).toISOString().slice(0, 16)
         : "",

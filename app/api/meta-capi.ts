@@ -1,4 +1,19 @@
-export const sendMetaCAPIEvent = async (eventName: string, eventData: any, userData: any) => {
+type MetaEventData = Record<string, unknown>;
+
+type MetaUserData = {
+  phone?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  clientIp?: string;
+  userAgent?: string;
+};
+
+export const sendMetaCAPIEvent = async (
+  eventName: string,
+  eventData: MetaEventData,
+  userData: MetaUserData
+) => {
   const PIXEL_ID = process.env.META_PIXEL_ID;
   const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 

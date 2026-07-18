@@ -1,4 +1,5 @@
 import { useLanguage } from "@/hooks/useLanguage";
+import { pathForLocale } from "@/lib/localeRouting";
 import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { useState, useEffect } from "react";
@@ -13,17 +14,30 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Calendar,
-  Check,
-  UserCheck,
+  Package,
   ChevronRight,
-  Info,
-  Map,
   X,
   Loader2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { useCart } from "@/hooks/useCart";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../api/router";
+
+type RouterOutputs = inferRouterOutputs<AppRouter>;
+type AuthUser = NonNullable<RouterOutputs["auth"]["me"]>;
+type WishlistProduct = RouterOutputs["store"]["getWishlist"][number]["product"];
+type UserAddress = RouterOutputs["store"]["listAddresses"][number];
+type Translations = ReturnType<typeof useTranslations>;
+type UpdateProfileMutation = {
+  mutateAsync: (input: {
+    name: string;
+    phone: string | null;
+    gender: string | null;
+    birthday: string | null;
+    nationality: string | null;
+  }) => Promise<unknown>;
+};
 
 const EGYPT_GOVERNORATES = [
   { en: "Cairo", ar: "القاهرة" },
@@ -69,9 +83,9 @@ export default function Account() {
   // Redirect if not logged in
   useEffect(() => {
     if (!userLoading && !user) {
-      navigate("/login");
+      navigate(pathForLocale("/login", lang));
     }
-  }, [user, userLoading, navigate]);
+  }, [lang, navigate, user, userLoading]);
 
   // Tab State Handlers
   const handleTabChange = (tab: string) => {
@@ -235,9 +249,9 @@ export default function Account() {
 
           {/* MAIN CONTENT AREA */}
           <div className="flex-1 w-full bg-white rounded-2xl border border-[#E7D8F1] p-6 lg:p-8 min-h-[500px]">
-            {activeTab === "orders" && <OrdersTab user={user} ar={ar} t={t} />}
+            {activeTab === "orders" && <OrdersTab ar={ar} t={t} />}
             {activeTab === "returns" && <ReturnsTab ar={ar} />}
-            {activeTab === "wishlist" && <WishlistTab user={user} ar={ar} t={t} />}
+            {activeTab === "wishlist" && <WishlistTab ar={ar} t={t} />}
             {activeTab === "profile" && <ProfileTab user={user} ar={ar} updateProfile={updateProfile} />}
             {activeTab === "addresses" && <AddressesTab user={user} ar={ar} />}
           </div>
@@ -249,7 +263,8 @@ export default function Account() {
 }
 
 // ======================== ORDERS TAB ========================
-function OrdersTab({ user, ar, t }: { user: any; ar: boolean; t: any }) {
+function OrdersTab({ ar, t }: { ar: boolean; t: Translations }) {
+  const { lang } = useLanguage();
   const { data: orders, isLoading } = trpc.store.getMyOrders.useQuery();
 
   const getStatusIcon = (status: string) => {
@@ -302,7 +317,7 @@ function OrdersTab({ user, ar, t }: { user: any; ar: boolean; t: any }) {
         <ShoppingBag className="w-16 h-16 text-[#E7D8F1] mx-auto mb-4" />
         <h2 className="text-xl font-bold text-[#4B1C71] mb-2">{ar ? "لا توجد طلبات سابقة" : "No orders found"}</h2>
         <p className="text-[#6F6178] mb-6 text-sm">{ar ? "لم تقم بأي طلبات بعد." : "You haven't placed any orders yet."}</p>
-        <Link to="/shop" className="inline-block px-8 py-3 bg-[#4B1C71] text-white font-semibold rounded-xl hover:bg-[#3a1558] transition-colors">
+        <Link to={pathForLocale("/shop", lang)} className="inline-block px-8 py-3 bg-[#4B1C71] text-white font-semibold rounded-xl hover:bg-[#3a1558] transition-colors">
           {t.startShopping}
         </Link>
       </div>
@@ -349,7 +364,7 @@ function OrdersTab({ user, ar, t }: { user: any; ar: boolean; t: any }) {
               </div>
 
               <Link
-                to={`/order-confirmation?order=${order.orderNumber}&phone=${encodeURIComponent(order.customerPhone)}`}
+                to={`${pathForLocale("/order-confirmation", lang)}?order=${order.orderNumber}&phone=${encodeURIComponent(order.customerPhone)}`}
                 className="px-5 py-2 border border-[#B57EDC] text-[#4B1C71] text-xs font-bold rounded-xl hover:bg-[#F7ECFF] transition-colors w-full md:w-auto text-center"
               >
                 {ar ? "تفاصيل الطلب" : "Order Details"}
@@ -383,7 +398,8 @@ function ReturnsTab({ ar }: { ar: boolean }) {
 }
 
 // ======================== WISHLIST TAB ========================
-function WishlistTab({ user, ar, t }: { user: any; ar: boolean; t: any }) {
+function WishlistTab({ ar, t }: { ar: boolean; t: Translations }) {
+  const { lang } = useLanguage();
   const { data: wishlist, refetch, isLoading } = trpc.store.getWishlist.useQuery();
   const toggleWishlist = trpc.store.toggleWishlist.useMutation();
   const { addItem } = useCart();
@@ -399,7 +415,7 @@ function WishlistTab({ user, ar, t }: { user: any; ar: boolean; t: any }) {
     }
   };
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: WishlistProduct) => {
     setAddingId(product.id);
     addItem({
       productId: product.id,
@@ -431,7 +447,7 @@ function WishlistTab({ user, ar, t }: { user: any; ar: boolean; t: any }) {
         <Heart className="w-16 h-16 text-[#E7D8F1] mx-auto mb-4" />
         <h2 className="text-xl font-bold text-[#4B1C71] mb-2">{ar ? "قائمتك فارغة" : "Your wishlist is empty"}</h2>
         <p className="text-[#6F6178] mb-6 text-sm">{ar ? "تصفح المتجر وأضف منتجاتك المفضلة هنا" : "Browse our shop and add your favorite products here"}</p>
-        <Link to="/shop" className="inline-block px-8 py-3 bg-[#4B1C71] text-white font-semibold rounded-xl hover:bg-[#3a1558] transition-colors">
+        <Link to={pathForLocale("/shop", lang)} className="inline-block px-8 py-3 bg-[#4B1C71] text-white font-semibold rounded-xl hover:bg-[#3a1558] transition-colors">
           {t.startShopping}
         </Link>
       </div>
@@ -455,7 +471,7 @@ function WishlistTab({ user, ar, t }: { user: any; ar: boolean; t: any }) {
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-                <Link to={`/shop/${product.slug}`} className="block w-full h-full">
+                <Link to={pathForLocale(`/shop/${product.slug}`, lang)} className="block w-full h-full">
                   <img
                     src={Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : ""}
                     alt={product.nameEn}
@@ -501,7 +517,7 @@ function WishlistTab({ user, ar, t }: { user: any; ar: boolean; t: any }) {
 }
 
 // ======================== PROFILE TAB ========================
-function ProfileTab({ user, ar, updateProfile }: { user: any; ar: boolean; updateProfile: any }) {
+function ProfileTab({ user, ar, updateProfile }: { user: AuthUser; ar: boolean; updateProfile: UpdateProfileMutation }) {
   const [name, setName] = useState(user.name || "");
   const [phone, setPhone] = useState(user.phone || "");
   const [gender, setGender] = useState(user.gender || "");
@@ -545,7 +561,7 @@ function ProfileTab({ user, ar, updateProfile }: { user: any; ar: boolean; updat
             <label className="block text-xs font-semibold text-[#8D7A97] mb-1.5">{ar ? "البريد الإلكتروني" : "Email Address"}</label>
             <input
               type="email"
-              value={user.email}
+              value={user.email ?? ""}
               disabled
               className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] text-sm bg-[#F7F6F9] text-gray-500 cursor-not-allowed"
             />
@@ -646,14 +662,14 @@ function ProfileTab({ user, ar, updateProfile }: { user: any; ar: boolean; updat
 }
 
 // ======================== ADDRESSES TAB ========================
-function AddressesTab({ user, ar }: { user: any; ar: boolean }) {
+function AddressesTab({ user, ar }: { user: AuthUser; ar: boolean }) {
   const { data: addresses, refetch, isLoading } = trpc.store.listAddresses.useQuery();
   const createAddress = trpc.store.createAddress.useMutation();
   const updateAddress = trpc.store.updateAddress.useMutation();
   const deleteAddress = trpc.store.deleteAddress.useMutation();
 
   const [showModal, setShowModal] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<any>(null);
+  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
 
   // Form Fields State
   const [title, setTitle] = useState("البيت");
@@ -676,7 +692,7 @@ function AddressesTab({ user, ar }: { user: any; ar: boolean }) {
     setShowModal(true);
   };
 
-  const openEditModal = (addr: any) => {
+  const openEditModal = (addr: UserAddress) => {
     setEditingAddress(addr);
     setTitle(addr.title);
     setFullName(addr.fullName);

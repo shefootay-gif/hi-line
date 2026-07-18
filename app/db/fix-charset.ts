@@ -37,8 +37,9 @@ async function main() {
       await connection.query(
         `ALTER TABLE \`${table}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
       );
-    } catch (err: any) {
-      console.warn(`Could not convert table ${table}: ${err.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`Could not convert table ${table}: ${message}`);
     }
   }
   

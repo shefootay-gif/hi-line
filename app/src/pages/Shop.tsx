@@ -1,4 +1,5 @@
 import { useLanguage } from "@/hooks/useLanguage";
+import { pathForLocale } from "@/lib/localeRouting";
 import { useTranslations, getArabicScentName } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
 import { trpc } from "@/providers/trpc";
@@ -34,7 +35,7 @@ type ShopProduct = {
   scent: string;
   scentColor: string;
   price: string;
-  salePrice: string;
+  salePrice: string | null;
   originalPrice: string;
   images: string[];
   discountLabel: string;
@@ -238,6 +239,7 @@ export default function Shop() {
               <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7F4CA5]" />
               <input
                 type="text"
+                aria-label={t.search}
                 value={searchQuery}
                 onChange={(event) => updateSearch(event.target.value)}
                 placeholder={t.search}
@@ -296,7 +298,7 @@ export default function Shop() {
                   key={product.slug}
                   className="overflow-hidden rounded-lg border border-[#E7D8F1]/80 bg-white shadow-[0_10px_30px_rgba(75,28,113,0.07)]"
                 >
-                  <Link to={`/shop/${product.slug}`} className="block">
+                  <Link to={pathForLocale(`/shop/${product.slug}`, lang)} className="block">
                     <div className="relative flex aspect-square items-center justify-center bg-white p-4 sm:p-5">
                       <span className="absolute left-3 top-3 z-10 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm sm:text-xs">
                         {product.discountLabel}

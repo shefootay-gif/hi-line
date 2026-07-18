@@ -9,7 +9,7 @@ export type CatalogProduct = {
   scentColor: string;
   slug: string;
   price: string;
-  salePrice: string;
+  salePrice: string | null;
   originalPrice: string;
   discountLabel: string;
   shortDescriptionEn: string;

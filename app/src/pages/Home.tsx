@@ -1,4 +1,5 @@
 import { useLanguage } from "@/hooks/useLanguage";
+import { pathForLocale } from "@/lib/localeRouting";
 import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
@@ -270,7 +271,7 @@ export default function Home() {
                 } justify-center lg:justify-start mb-8`}
               >
                 <button
-                  onClick={() => navigate("/shop")}
+                  onClick={() => navigate(pathForLocale("/shop", lang))}
                   className="px-8 py-3.5 beauty-button font-semibold rounded-xl"
                 >
                   {t.shopNow}
@@ -356,7 +357,7 @@ export default function Home() {
                   key={variant.id}
                   className="scent-card group overflow-hidden rounded-lg border border-[#E7D8F1]/80 bg-white shadow-[0_10px_30px_rgba(75,28,113,0.07)]"
                 >
-                  <Link to={`/shop/${variant.slug}`} className="block">
+                  <Link to={pathForLocale(`/shop/${variant.slug}`, lang)} className="block">
                     <div
                       className="aspect-square relative flex items-center justify-center bg-white p-5"
                       style={{
@@ -458,7 +459,7 @@ export default function Home() {
                   : "Daily freshness that lasts"}
               </p>
               <button
-                onClick={() => navigate("/shop")}
+                onClick={() => navigate(pathForLocale("/shop", lang))}
                 className="inline-flex items-center gap-2 px-6 py-2.5 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium hover:bg-white/30 transition-colors"
               >
                 {t.shopNow} <ArrowRight className="w-4 h-4" />
@@ -581,7 +582,7 @@ export default function Home() {
 
           <div className="text-center mt-8">
             <Link
-              to="/faq"
+              to={pathForLocale("/faq", lang)}
               className="inline-flex items-center gap-2 text-sm font-medium text-[#4B1C71] hover:text-[#B57EDC] transition-colors"
             >
               {t.viewAllFaqs} <ArrowRight className="w-4 h-4" />
@@ -634,6 +635,8 @@ export default function Home() {
           >
             <input
               type="email"
+              aria-label={t.emailPlaceholder}
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t.emailPlaceholder}

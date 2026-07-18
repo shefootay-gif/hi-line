@@ -3,6 +3,10 @@ import { Link } from "react-router";
 import { Play, Volume2, VolumeX, ShoppingCart } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTranslations } from "@/lib/translations";
+import {
+  pathForLocale,
+  type StorefrontLocale,
+} from "@/lib/localeRouting";
 
 interface VideoAd {
   id: string;
@@ -58,7 +62,7 @@ export default function VideoShopping() {
   );
 }
 
-function VideoCard({ video, lang, t }: { video: VideoAd; lang: string; t: any }) {
+function VideoCard({ video, lang, t }: { video: VideoAd; lang: StorefrontLocale; t: ReturnType<typeof useTranslations> }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -122,7 +126,7 @@ function VideoCard({ video, lang, t }: { video: VideoAd; lang: string; t: any })
           {parseFloat(video.price).toFixed(0)} {t.currency}
         </p>
         <Link
-          to={`/shop/${video.productSlug}`}
+          to={pathForLocale(`/shop/${video.productSlug}`, lang)}
           onClick={(e) => e.stopPropagation()}
           className="w-full py-3 bg-[#B57EDC] hover:bg-[#9b62c3] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-transform hover:scale-105"
         >

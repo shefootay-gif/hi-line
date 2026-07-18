@@ -1,11 +1,11 @@
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
-import type { User } from "@db/schema";
+import type { SafeUser } from "@db/schema";
 import { authenticateRequest } from "./lib/auth";
 
 export type TrpcContext = {
   req: Request;
   resHeaders: Headers;
-  user?: User;
+  user?: SafeUser;
 };
 
 export async function createContext(

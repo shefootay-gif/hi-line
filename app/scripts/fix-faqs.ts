@@ -1,6 +1,5 @@
 import { getDb } from "../api/queries/connection";
 import { faqs } from "../db/schema";
-import { eq } from "drizzle-orm";
 
 async function fixFaqs() {
   const db = getDb();

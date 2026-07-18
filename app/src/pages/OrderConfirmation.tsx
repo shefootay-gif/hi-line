@@ -1,4 +1,5 @@
 import { useLanguage } from "@/hooks/useLanguage";
+import { pathForLocale } from "@/lib/localeRouting";
 import { useTranslations } from "@/lib/translations";
 import { Link, useSearchParams } from "react-router";
 import { CheckCircle, MessageCircle, Home, Loader2, MapPin } from "lucide-react";
@@ -31,7 +32,7 @@ export default function OrderConfirmation() {
           {lang === "ar" ? "لم يتم العثور على الطلب" : "No order found"}
         </p>
         <Link
-          to="/shop"
+          to={pathForLocale("/shop", lang)}
           className="px-6 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#a66ecf] transition-colors"
         >
           {t.startShopping}
@@ -125,7 +126,7 @@ export default function OrderConfirmation() {
 
         <div className="space-y-3">
           <Link
-            to="/track-order"
+            to={pathForLocale("/track-order", lang)}
             className="w-full flex items-center justify-center gap-2 py-4 bg-[#4B1C71] text-white font-semibold rounded-xl hover:bg-[#3a1558] transition-colors shadow-md shadow-[#4B1C71]/20"
           >
             {lang === "ar" ? "تتبع حالة الطلب هنا" : "Track Order Status"}

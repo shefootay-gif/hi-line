@@ -1,5 +1,4 @@
 import { useLanguage } from "@/hooks/useLanguage";
-import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { useState } from "react";
 import {
@@ -12,14 +11,12 @@ import {
   Mail,
   Phone,
   MapPin,
-  ShoppingBag,
-  DollarSign
+  ShoppingBag
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 export default function AdminCustomers() {
   const { lang, isRTL } = useLanguage();
-  const t = useTranslations(lang);
   const ar = lang === "ar";
   const utils = trpc.useUtils();
   const [search, setSearch] = useState("");

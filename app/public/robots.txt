@@ -1,0 +1,28 @@
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /admin/
+Disallow: /account
+Disallow: /cart
+Disallow: /checkout
+Disallow: /forgot-password
+Disallow: /login
+Disallow: /order-confirmation
+Disallow: /reset-password
+Disallow: /ar/account
+Disallow: /ar/cart
+Disallow: /ar/checkout
+Disallow: /ar/forgot-password
+Disallow: /ar/login
+Disallow: /ar/order-confirmation
+Disallow: /ar/reset-password
+Disallow: /en/account
+Disallow: /en/cart
+Disallow: /en/checkout
+Disallow: /en/forgot-password
+Disallow: /en/login
+Disallow: /en/order-confirmation
+Disallow: /en/reset-password
+
+# The production server adds the canonical host dynamically at /sitemap.xml.

@@ -1,13 +1,47 @@
 import { useLanguage } from "@/hooks/useLanguage";
+import { pathForLocale } from "@/lib/localeRouting";
 import { useTranslations } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
 import { trpc } from "@/providers/trpc";
 import { Link, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
-import { CreditCard, Banknote, Smartphone, Building, Loader2, Tag, X, CheckCircle2, ChevronDown } from "lucide-react";
+import {
+  CreditCard,
+  Banknote,
+  Smartphone,
+  Building,
+  Loader2,
+  Tag,
+  X,
+  CheckCircle2,
+} from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
-type PaymentMethod = "cash_on_delivery" | "vodafone_cash" | "instapay" | "bank_transfer" | "paymob";
+type PaymentMethod =
+  | "cash_on_delivery"
+  | "vodafone_cash"
+  | "instapay"
+  | "bank_transfer"
+  | "paymob";
+
+function createIdempotencyKey() {
+  if (typeof window === "undefined" || !window.crypto) {
+    throw new Error("Secure random generation is unavailable");
+  }
+  if (typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  if (typeof window.crypto.getRandomValues === "function") {
+    return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, character =>
+      (
+        Number(character) ^
+        (window.crypto.getRandomValues(new Uint8Array(1))[0] &
+          (15 >> (Number(character) / 4)))
+      ).toString(16)
+    );
+  }
+  throw new Error("Secure random generation is unavailable");
+}
 
 export default function Checkout() {
   const { lang, isRTL } = useLanguage();
@@ -25,7 +59,7 @@ export default function Checkout() {
 
   useEffect(() => {
     if (user) {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         fullName: prev.fullName || user.name || "",
         email: prev.email || user.email || "",
@@ -49,13 +83,32 @@ export default function Checkout() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discountAmount: number;
+  } | null>(null);
+
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    createIdempotencyKey()
+  );
+
+  useEffect(() => {
+    setIdempotencyKey(createIdempotencyKey());
+  }, [
+    formData.fullName,
+    formData.phone,
+    formData.address,
+    formData.governorate,
+    formData.paymentMethod,
+    items,
+    appliedCoupon?.code,
+  ]);
 
   const subtotal = getTotalPrice();
   const volumeDiscount = getDiscountAmount();
 
   const selectedGov = governorates?.find(
-    (g) => g.governorate === formData.governorate
+    g => g.governorate === formData.governorate
   );
   const shippingFee = selectedGov ? parseFloat(selectedGov.baseFee ?? "0") : 0;
   const effectiveShipping = shippingFee;
@@ -63,9 +116,11 @@ export default function Checkout() {
   const total = subtotal - couponDiscount - volumeDiscount + effectiveShipping;
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleApplyCoupon = async () => {
@@ -80,10 +135,18 @@ export default function Checkout() {
           code: couponCode.trim(),
           discountAmount: result.discountAmount,
         });
-        toast.success(lang === "ar" ? "تم تطبيق كود الخصم بنجاح" : "Coupon applied successfully");
+        toast.success(
+          lang === "ar"
+            ? "تم تطبيق كود الخصم بنجاح"
+            : "Coupon applied successfully"
+        );
       }
-    } catch (err: any) {
-      toast.error(err.message || (lang === "ar" ? "كود الخصم غير صالح" : "Invalid coupon code"));
+    } catch (err) {
+      const error = err as { message?: string };
+      toast.error(
+        error.message ||
+          (lang === "ar" ? "كود الخصم غير صالح" : "Invalid coupon code")
+      );
       setAppliedCoupon(null);
     }
   };
@@ -95,12 +158,18 @@ export default function Checkout() {
 
   const validateStep1 = () => {
     if (!formData.phone) {
-      toast.error(lang === "ar" ? "يرجى إدخال رقم الهاتف" : "Please enter phone number");
+      toast.error(
+        lang === "ar" ? "يرجى إدخال رقم الهاتف" : "Please enter phone number"
+      );
       return false;
     }
     const phoneRegex = /^01[0125][0-9]{8}$/;
     if (!phoneRegex.test(formData.phone)) {
-      toast.error(lang === "ar" ? "يرجى إدخال رقم هاتف مصري صحيح" : "Please enter a valid Egyptian phone number");
+      toast.error(
+        lang === "ar"
+          ? "يرجى إدخال رقم هاتف مصري صحيح"
+          : "Please enter a valid Egyptian phone number"
+      );
       return false;
     }
     return true;
@@ -108,7 +177,11 @@ export default function Checkout() {
 
   const validateStep2 = () => {
     if (!formData.fullName || !formData.address || !formData.governorate) {
-      toast.error(lang === "ar" ? "يرجى ملء جميع الحقول المطلوبة" : "Please fill all required fields");
+      toast.error(
+        lang === "ar"
+          ? "يرجى ملء جميع الحقول المطلوبة"
+          : "Please fill all required fields"
+      );
       return false;
     }
     return true;
@@ -121,6 +194,7 @@ export default function Checkout() {
     setIsSubmitting(true);
     try {
       const result = await createOrder.mutateAsync({
+        idempotencyKey,
         customerName: formData.fullName,
         customerPhone: formData.phone,
         customerWhatsapp: formData.phone,
@@ -132,7 +206,7 @@ export default function Checkout() {
         paymentMethod: formData.paymentMethod as PaymentMethod,
         notes: formData.notes || undefined,
         couponCode: appliedCoupon?.code,
-        items: items.map((item) => ({
+        items: items.map(item => ({
           productId: item.productId,
           quantity: item.quantity,
         })),
@@ -142,12 +216,24 @@ export default function Checkout() {
       if (result.paymobUrl) {
         window.location.href = result.paymobUrl;
       } else {
-        navigate(`/order-confirmation?order=${result.orderNumber}&phone=${encodeURIComponent(formData.phone)}`, {
-          state: { total: result.total },
-        });
+        navigate(
+          `/order-confirmation?order=${result.orderNumber}&phone=${encodeURIComponent(formData.phone)}`,
+          {
+            state: { total: result.total },
+          }
+        );
       }
-    } catch (err: any) {
-      toast.error(err?.message || (lang === "ar" ? "حدث خطأ أثناء إتمام الطلب" : "An error occurred during checkout"));
+    } catch (err) {
+      const error = err as { message?: string; data?: { code?: string } };
+      if (error.data?.code === "PRECONDITION_FAILED") {
+        setIdempotencyKey(createIdempotencyKey());
+      }
+      toast.error(
+        error?.message ||
+          (lang === "ar"
+            ? "حدث خطأ أثناء إتمام الطلب"
+            : "An error occurred during checkout")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -155,22 +241,33 @@ export default function Checkout() {
 
   const getPaymentIcon = (method: string) => {
     switch (method) {
-      case "cash_on_delivery": return <Banknote className="w-5 h-5" />;
-      case "vodafone_cash": return <Smartphone className="w-5 h-5" />;
-      case "instapay": return <Smartphone className="w-5 h-5" />;
-      case "bank_transfer": return <Building className="w-5 h-5" />;
-      default: return <CreditCard className="w-5 h-5" />;
+      case "cash_on_delivery":
+        return <Banknote className="w-5 h-5" />;
+      case "vodafone_cash":
+        return <Smartphone className="w-5 h-5" />;
+      case "instapay":
+        return <Smartphone className="w-5 h-5" />;
+      case "bank_transfer":
+        return <Building className="w-5 h-5" />;
+      default:
+        return <CreditCard className="w-5 h-5" />;
     }
   };
 
   if (items.length === 0) {
     return (
-      <div className={`pt-24 pb-16 min-h-screen ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
+      <div
+        className={`pt-24 pb-16 min-h-screen ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}
+      >
         <div className="max-w-xl mx-auto px-4 text-center py-20">
+          <h1 className="text-3xl font-bold text-[#4B1C71] mb-4">{t.checkout}</h1>
           <p className="text-lg text-[#6F6178] mb-4">
             {lang === "ar" ? "سلة التسوق فارغة" : "Your cart is empty"}
           </p>
-          <Link to="/shop" className="px-6 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl">
+          <Link
+            to={pathForLocale("/shop", lang)}
+            className="px-6 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl"
+          >
             {t.startShopping}
           </Link>
         </div>
@@ -179,32 +276,54 @@ export default function Checkout() {
   }
 
   return (
-    <div className={`pt-24 pb-16 min-h-screen ${isRTL ? "font-[Cairo]" : "font-[Inter]"} bg-[#FCF8FF]`}>
+    <div
+      className={`pt-24 pb-16 min-h-screen ${isRTL ? "font-[Cairo]" : "font-[Inter]"} bg-[#FCF8FF]`}
+    >
       <Toaster position="top-center" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold text-[#4B1C71] mb-2">{t.checkout}</h1>
         <nav className="flex items-center gap-2 text-sm text-[#8D7A97] mb-8">
-          <Link to="/" className="hover:text-[#B57EDC]">{lang === "ar" ? "الرئيسية" : "Home"}</Link>
+          <Link to="/" className="hover:text-[#B57EDC]">
+            {lang === "ar" ? "الرئيسية" : "Home"}
+          </Link>
           <span>/</span>
-          <Link to="/cart" className="hover:text-[#B57EDC]">{t.cart}</Link>
+          <Link to={pathForLocale("/cart", lang)} className="hover:text-[#B57EDC]">
+            {t.cart}
+          </Link>
           <span>/</span>
           <span className="text-[#4B1C71]">{t.checkout}</span>
         </nav>
 
-        <div className={`flex flex-col lg:flex-row gap-8 ${isRTL ? "lg:flex-row-reverse" : ""}`}>
+        <div
+          className={`flex flex-col lg:flex-row gap-8 ${isRTL ? "lg:flex-row-reverse" : ""}`}
+        >
           <div className="flex-1 space-y-6">
-            
             {/* Step 1: Contact Info */}
-            <div className={`bg-white rounded-2xl border ${step === 1 ? 'border-[#B57EDC] shadow-md' : 'border-[#E7D8F1]'}`}>
-              <div className="p-6 cursor-pointer" onClick={() => { if (step > 1) setStep(1); }}>
+            <div
+              className={`bg-white rounded-2xl border ${step === 1 ? "border-[#B57EDC] shadow-md" : "border-[#E7D8F1]"}`}
+            >
+              <div
+                className="p-6 cursor-pointer"
+                onClick={() => {
+                  if (step > 1) setStep(1);
+                }}
+              >
                 <div className="flex items-center justify-between">
-                  <h2 className={`text-lg font-semibold flex items-center gap-3 ${step === 1 ? 'text-[#4B1C71]' : 'text-[#8D7A97]'}`}>
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === 1 ? 'bg-[#4B1C71] text-white' : step > 1 ? 'bg-green-500 text-white' : 'bg-[#E7D8F1] text-[#6F6178]'}`}>
+                  <h2
+                    className={`text-lg font-semibold flex items-center gap-3 ${step === 1 ? "text-[#4B1C71]" : "text-[#8D7A97]"}`}
+                  >
+                    <span
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === 1 ? "bg-[#4B1C71] text-white" : step > 1 ? "bg-green-500 text-white" : "bg-[#E7D8F1] text-[#6F6178]"}`}
+                    >
                       {step > 1 ? <CheckCircle2 className="w-5 h-5" /> : "1"}
                     </span>
                     {t.contactInfo}
                   </h2>
-                  {step > 1 && <span className="text-sm font-semibold text-[#B57EDC]">{lang === "ar" ? "تعديل" : "Edit"}</span>}
+                  {step > 1 && (
+                    <span className="text-sm font-semibold text-[#B57EDC]">
+                      {lang === "ar" ? "تعديل" : "Edit"}
+                    </span>
+                  )}
                 </div>
                 {step > 1 && (
                   <div className="mt-4 ms-11 text-sm text-[#6F6178]">
@@ -213,40 +332,84 @@ export default function Checkout() {
                   </div>
                 )}
               </div>
-              
+
               {step === 1 && (
                 <div className="p-6 pt-0 border-t border-[#E7D8F1] animate-in slide-in-from-top-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                     <div>
-                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">{t.phone} *</label>
-                      <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="+20 1XX XXX XXXX" className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none" />
+                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">
+                        {t.phone} *
+                      </label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="+20 1XX XXX XXXX"
+                        className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none"
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">{t.email} <span className="text-[#8D7A97]">({lang === "ar" ? "اختياري" : "optional"})</span></label>
-                      <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none" />
+                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">
+                        {t.email}{" "}
+                        <span className="text-[#8D7A97]">
+                          ({lang === "ar" ? "اختياري" : "optional"})
+                        </span>
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none"
+                      />
                     </div>
                   </div>
-                  <button onClick={() => { if(validateStep1()) setStep(2); }} className="mt-6 px-8 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#A66DCC] transition-colors">{lang === "ar" ? "متابعة للشحن" : "Continue to Shipping"}</button>
+                  <button
+                    onClick={() => {
+                      if (validateStep1()) setStep(2);
+                    }}
+                    className="mt-6 px-8 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#A66DCC] transition-colors"
+                  >
+                    {lang === "ar" ? "متابعة للشحن" : "Continue to Shipping"}
+                  </button>
                 </div>
               )}
             </div>
 
             {/* Step 2: Shipping */}
-            <div className={`bg-white rounded-2xl border ${step === 2 ? 'border-[#B57EDC] shadow-md' : 'border-[#E7D8F1]'}`}>
-              <div className={`p-6 ${step >= 2 ? 'cursor-pointer' : 'opacity-50'}`} onClick={() => { if (step > 2) setStep(2); }}>
+            <div
+              className={`bg-white rounded-2xl border ${step === 2 ? "border-[#B57EDC] shadow-md" : "border-[#E7D8F1]"}`}
+            >
+              <div
+                className={`p-6 ${step >= 2 ? "cursor-pointer" : "opacity-50"}`}
+                onClick={() => {
+                  if (step > 2) setStep(2);
+                }}
+              >
                 <div className="flex items-center justify-between">
-                  <h2 className={`text-lg font-semibold flex items-center gap-3 ${step === 2 ? 'text-[#4B1C71]' : 'text-[#8D7A97]'}`}>
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === 2 ? 'bg-[#4B1C71] text-white' : step > 2 ? 'bg-green-500 text-white' : 'bg-[#E7D8F1] text-[#6F6178]'}`}>
+                  <h2
+                    className={`text-lg font-semibold flex items-center gap-3 ${step === 2 ? "text-[#4B1C71]" : "text-[#8D7A97]"}`}
+                  >
+                    <span
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === 2 ? "bg-[#4B1C71] text-white" : step > 2 ? "bg-green-500 text-white" : "bg-[#E7D8F1] text-[#6F6178]"}`}
+                    >
                       {step > 2 ? <CheckCircle2 className="w-5 h-5" /> : "2"}
                     </span>
                     {t.shippingAddress}
                   </h2>
-                  {step > 2 && <span className="text-sm font-semibold text-[#B57EDC]">{lang === "ar" ? "تعديل" : "Edit"}</span>}
+                  {step > 2 && (
+                    <span className="text-sm font-semibold text-[#B57EDC]">
+                      {lang === "ar" ? "تعديل" : "Edit"}
+                    </span>
+                  )}
                 </div>
                 {step > 2 && (
                   <div className="mt-4 ms-11 text-sm text-[#6F6178]">
                     <p>{formData.fullName}</p>
-                    <p>{formData.address}, {formData.governorate}</p>
+                    <p>
+                      {formData.address}, {formData.governorate}
+                    </p>
                   </div>
                 )}
               </div>
@@ -256,27 +419,38 @@ export default function Checkout() {
                   {userAddresses && userAddresses.length > 0 && (
                     <div className="mt-6 p-4 bg-[#FCF8FF] rounded-2xl border border-[#E7D8F1]">
                       <h3 className="text-sm font-bold text-[#4B1C71] mb-3">
-                        {lang === "ar" ? "اختر من عناوينك المحفوظة للشحن التلقائي:" : "Select from your saved addresses to autofill:"}
+                        {lang === "ar"
+                          ? "اختر من عناوينك المحفوظة للشحن التلقائي:"
+                          : "Select from your saved addresses to autofill:"}
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {userAddresses.map((addr) => (
+                        {userAddresses.map(addr => (
                           <button
                             key={addr.id}
                             type="button"
                             onClick={() => {
-                              setFormData((prev) => ({
+                              setFormData(prev => ({
                                 ...prev,
-                                fullName: addr.recipientName || prev.fullName || user?.name || "",
-                                phone: addr.recipientPhone || prev.phone || user?.phone || "",
-                                address: addr.addressDetails || "",
+                                fullName:
+                                  addr.fullName ||
+                                  prev.fullName ||
+                                  user?.name ||
+                                  "",
+                                phone:
+                                  addr.phone || prev.phone || user?.phone || "",
+                                address: addr.address || "",
                                 governorate: addr.governorate || "",
                                 city: addr.city || "",
                               }));
-                              toast.success(lang === "ar" ? `تم تحديد عنوان الشحن: ${addr.label}` : `Shipping address selected: ${addr.label}`);
+                              toast.success(
+                                lang === "ar"
+                                  ? `تم تحديد عنوان الشحن: ${addr.title}`
+                                  : `Shipping address selected: ${addr.title}`
+                              );
                             }}
                             className="px-4 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E7D8F1] hover:border-[#B57EDC] hover:text-[#4B1C71] transition-colors shadow-sm flex items-center gap-1.5"
                           >
-                            📍 {addr.label} ({addr.city || addr.governorate})
+                            📍 {addr.title} ({addr.city || addr.governorate})
                           </button>
                         ))}
                       </div>
@@ -284,88 +458,193 @@ export default function Checkout() {
                   )}
                   <div className="space-y-4 mt-6">
                     <div>
-                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">{t.fullName} *</label>
-                      <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none" />
+                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">
+                        {t.fullName} *
+                      </label>
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={formData.fullName}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none"
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">{t.address} *</label>
-                      <input type="text" name="address" value={formData.address} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none" />
+                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">
+                        {t.address} *
+                      </label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none"
+                      />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">{t.governorate} *</label>
-                        <select name="governorate" value={formData.governorate} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 bg-white outline-none">
-                          <option value="">{lang === "ar" ? "اختر المحافظة" : "Select Governorate"}</option>
-                          {governorates?.map((gov) => (
-                            <option key={gov.id} value={gov.governorate}>{lang === "ar" && gov.governorateAr ? gov.governorateAr : gov.governorate}</option>
+                        <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">
+                          {t.governorate} *
+                        </label>
+                        <select
+                          name="governorate"
+                          value={formData.governorate}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 bg-white outline-none"
+                        >
+                          <option value="">
+                            {lang === "ar"
+                              ? "اختر المحافظة"
+                              : "Select Governorate"}
+                          </option>
+                          {governorates?.map(gov => (
+                            <option key={gov.id} value={gov.governorate}>
+                              {lang === "ar" && gov.governorateAr
+                                ? gov.governorateAr
+                                : gov.governorate}
+                            </option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">{t.city}</label>
-                        <input type="text" name="city" value={formData.city} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none" />
+                        <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">
+                          {t.city}
+                        </label>
+                        <input
+                          type="text"
+                          name="city"
+                          value={formData.city}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none"
+                        />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">{t.orderNotes}</label>
-                      <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder={t.notesPlaceholder} rows={2} className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none resize-none" />
+                      <label className="block text-sm font-medium text-[#4B1C71] mb-1.5">
+                        {t.orderNotes}
+                      </label>
+                      <textarea
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleChange}
+                        placeholder={t.notesPlaceholder}
+                        rows={2}
+                        className="w-full px-4 py-3 rounded-xl border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 outline-none resize-none"
+                      />
                     </div>
                   </div>
-                  <button onClick={() => { if(validateStep2()) setStep(3); }} className="mt-6 px-8 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#A66DCC] transition-colors">{lang === "ar" ? "متابعة للدفع" : "Continue to Payment"}</button>
+                  <button
+                    onClick={() => {
+                      if (validateStep2()) setStep(3);
+                    }}
+                    className="mt-6 px-8 py-3 bg-[#B57EDC] text-[#4B1C71] font-semibold rounded-xl hover:bg-[#A66DCC] transition-colors"
+                  >
+                    {lang === "ar" ? "متابعة للدفع" : "Continue to Payment"}
+                  </button>
                 </div>
               )}
             </div>
 
             {/* Step 3: Payment */}
-            <div className={`bg-white rounded-2xl border ${step === 3 ? 'border-[#B57EDC] shadow-md' : 'border-[#E7D8F1]'}`}>
-              <div className={`p-6 ${step >= 3 ? 'cursor-pointer' : 'opacity-50'}`}>
-                <h2 className={`text-lg font-semibold flex items-center gap-3 ${step === 3 ? 'text-[#4B1C71]' : 'text-[#8D7A97]'}`}>
-                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === 3 ? 'bg-[#4B1C71] text-white' : 'bg-[#E7D8F1] text-[#6F6178]'}`}>
+            <div
+              className={`bg-white rounded-2xl border ${step === 3 ? "border-[#B57EDC] shadow-md" : "border-[#E7D8F1]"}`}
+            >
+              <div
+                className={`p-6 ${step >= 3 ? "cursor-pointer" : "opacity-50"}`}
+              >
+                <h2
+                  className={`text-lg font-semibold flex items-center gap-3 ${step === 3 ? "text-[#4B1C71]" : "text-[#8D7A97]"}`}
+                >
+                  <span
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === 3 ? "bg-[#4B1C71] text-white" : "bg-[#E7D8F1] text-[#6F6178]"}`}
+                  >
                     3
                   </span>
                   {t.paymentMethod}
                 </h2>
               </div>
-              
+
               {step === 3 && (
                 <div className="p-6 pt-0 border-t border-[#E7D8F1] animate-in slide-in-from-top-4">
                   <div className="space-y-3 mt-6">
-                    {paymentMethods?.map((method) => (
-                      <label key={method.id} className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors ${formData.paymentMethod === method.method ? "border-[#B57EDC] bg-[#B57EDC]/5" : "border-[#E7D8F1] hover:border-[#B57EDC]/50"}`}>
-                        <input type="radio" name="paymentMethod" value={method.method} checked={formData.paymentMethod === method.method} onChange={handleChange} className="w-4 h-4 accent-[#B57EDC]" />
-                        <span className="text-[#4B1C71]">{getPaymentIcon(method.method)}</span>
+                    {paymentMethods?.map(method => (
+                      <label
+                        key={method.id}
+                        className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors ${formData.paymentMethod === method.method ? "border-[#B57EDC] bg-[#B57EDC]/5" : "border-[#E7D8F1] hover:border-[#B57EDC]/50"}`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={method.method}
+                          checked={formData.paymentMethod === method.method}
+                          onChange={handleChange}
+                          className="w-4 h-4 accent-[#B57EDC]"
+                        />
+                        <span className="text-[#4B1C71]">
+                          {getPaymentIcon(method.method)}
+                        </span>
                         <div>
-                          <p className="font-medium text-[#4B1C71]">{lang === "ar" && method.displayNameAr ? method.displayNameAr : method.displayName}</p>
-                          {method.instructions && <p className="text-xs text-[#8D7A97] mt-0.5">{lang === "ar" && method.instructionsAr ? method.instructionsAr : method.instructions}</p>}
+                          <p className="font-medium text-[#4B1C71]">
+                            {lang === "ar" && method.displayNameAr
+                              ? method.displayNameAr
+                              : method.displayName}
+                          </p>
+                          {method.instructions && (
+                            <p className="text-xs text-[#8D7A97] mt-0.5">
+                              {lang === "ar" && method.instructionsAr
+                                ? method.instructionsAr
+                                : method.instructions}
+                            </p>
+                          )}
                         </div>
                       </label>
                     ))}
                   </div>
-                  <button onClick={handleSubmit} disabled={isSubmitting} className="mt-8 w-full py-4 bg-[#B57EDC] text-[#4B1C71] font-semibold text-lg rounded-xl hover:bg-[#A66DCC] transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#B57EDC]/30">
-                    {isSubmitting && <Loader2 className="w-5 h-5 animate-spin" />}
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="mt-8 w-full py-4 bg-[#B57EDC] text-[#4B1C71] font-semibold text-lg rounded-xl hover:bg-[#A66DCC] transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#B57EDC]/30"
+                  >
+                    {isSubmitting && (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    )}
                     {t.placeOrder}
                   </button>
                 </div>
               )}
             </div>
-            
           </div>
 
           {/* Sticky Summary */}
           <div className="lg:w-[400px]">
             <div className="bg-white rounded-2xl p-6 border border-[#E7D8F1] sticky top-24 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-              <h2 className="text-lg font-semibold text-[#4B1C71] mb-6">{t.orderSummary}</h2>
+              <h2 className="text-lg font-semibold text-[#4B1C71] mb-6">
+                {t.orderSummary}
+              </h2>
               <div className="space-y-3 mb-6 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                {items.map((item) => (
+                {items.map(item => (
                   <div key={item.productId} className="flex gap-3">
                     <div className="relative">
-                      <img src={item.image || "/products/hero-product.jpg"} className="w-16 h-16 rounded-lg border border-[#E7D8F1] object-contain p-1" />
-                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#4B1C71] text-white rounded-full flex items-center justify-center text-[10px] font-bold">{item.quantity}</span>
+                      <img
+                        src={item.image || "/products/hero-product.jpg"}
+                        className="w-16 h-16 rounded-lg border border-[#E7D8F1] object-contain p-1"
+                      />
+                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#4B1C71] text-white rounded-full flex items-center justify-center text-[10px] font-bold">
+                        {item.quantity}
+                      </span>
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <p className="text-sm font-semibold text-[#4B1C71] truncate">{lang === 'ar' && item.nameAr ? item.nameAr : item.name}</p>
+                      <p className="text-sm font-semibold text-[#4B1C71] truncate">
+                        {lang === "ar" && item.nameAr ? item.nameAr : item.name}
+                      </p>
                       <p className="text-xs text-[#8D7A97]">{item.scent}</p>
-                      <p className="text-sm font-bold text-[#4B1C71] mt-1">{(parseFloat(item.salePrice || item.price) * item.quantity).toFixed(0)} {t.currency}</p>
+                      <p className="text-sm font-bold text-[#4B1C71] mt-1">
+                        {(
+                          parseFloat(item.salePrice || item.price) *
+                          item.quantity
+                        ).toFixed(0)}{" "}
+                        {t.currency}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -373,22 +652,49 @@ export default function Checkout() {
 
               {/* Coupon */}
               <div className="mb-6 border-y border-[#E7D8F1] py-4">
-                <label className="block text-sm font-medium text-[#4B1C71] mb-2">{lang === "ar" ? "كود الخصم" : "Coupon Code"}</label>
+                <label className="block text-sm font-medium text-[#4B1C71] mb-2">
+                  {lang === "ar" ? "كود الخصم" : "Coupon Code"}
+                </label>
                 {appliedCoupon ? (
                   <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center gap-2 text-green-700 text-sm font-medium">
                       <Tag className="w-3 h-3" />
                       <span>{appliedCoupon.code}</span>
                     </div>
-                    <button type="button" onClick={handleRemoveCoupon} className="p-1 text-green-600 hover:bg-green-100 rounded-full">
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="p-1 text-green-600 hover:bg-green-100 rounded-full"
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   </div>
                 ) : (
                   <div className="flex gap-2">
-                    <input type="text" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder={lang === "ar" ? "أدخل كود الخصم" : "Enter code"} className="flex-1 px-3 py-2 rounded-lg border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 uppercase text-sm" />
-                    <button type="button" onClick={handleApplyCoupon} disabled={validateCoupon.isPending || !couponCode.trim()} className="px-4 py-2 bg-[#FCF8FF] text-[#4B1C71] border border-[#E7D8F1] font-semibold text-sm rounded-lg hover:bg-[#F7ECFF] disabled:opacity-50">
-                      {validateCoupon.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (lang === "ar" ? "تطبيق" : "Apply")}
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={e =>
+                        setCouponCode(e.target.value.toUpperCase())
+                      }
+                      placeholder={
+                        lang === "ar" ? "أدخل كود الخصم" : "Enter code"
+                      }
+                      className="flex-1 px-3 py-2 rounded-lg border border-[#E7D8F1] focus:ring-2 focus:ring-[#B57EDC]/30 uppercase text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={validateCoupon.isPending || !couponCode.trim()}
+                      className="px-4 py-2 bg-[#FCF8FF] text-[#4B1C71] border border-[#E7D8F1] font-semibold text-sm rounded-lg hover:bg-[#F7ECFF] disabled:opacity-50"
+                    >
+                      {validateCoupon.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : lang === "ar" ? (
+                        "تطبيق"
+                      ) : (
+                        "Apply"
+                      )}
                     </button>
                   </div>
                 )}
@@ -397,34 +703,53 @@ export default function Checkout() {
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-[#6F6178]">{t.subtotal}</span>
-                  <span className="font-medium">{(subtotal).toFixed(0)} {t.currency}</span>
+                  <span className="font-medium">
+                    {subtotal.toFixed(0)} {t.currency}
+                  </span>
                 </div>
                 {volumeDiscount > 0 && (
                   <div className="flex justify-between text-sm text-[#D71920]">
-                    <span className="font-medium">{lang === 'ar' ? 'خصم باقة التوفير' : 'Volume Discount'}</span>
-                    <span>-{volumeDiscount.toFixed(0)} {t.currency}</span>
+                    <span className="font-medium">
+                      {lang === "ar" ? "خصم باقة التوفير" : "Volume Discount"}
+                    </span>
+                    <span>
+                      -{volumeDiscount.toFixed(0)} {t.currency}
+                    </span>
                   </div>
                 )}
                 {appliedCoupon && (
                   <div className="flex justify-between text-sm text-green-600">
-                    <span className="font-medium">{lang === "ar" ? "خصم الكوبون" : "Coupon Discount"}</span>
-                    <span>-{appliedCoupon.discountAmount.toFixed(0)} {t.currency}</span>
+                    <span className="font-medium">
+                      {lang === "ar" ? "خصم الكوبون" : "Coupon Discount"}
+                    </span>
+                    <span>
+                      -{appliedCoupon.discountAmount.toFixed(0)} {t.currency}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-[#6F6178]">{t.shipping}</span>
-                  <span>{effectiveShipping === 0 ? <span className="text-green-500 font-medium">{t.freeShipping}</span> : `${effectiveShipping.toFixed(0)} ${t.currency}`}</span>
+                  <span>
+                    {effectiveShipping === 0 ? (
+                      <span className="text-green-500 font-medium">
+                        {t.freeShipping}
+                      </span>
+                    ) : (
+                      `${effectiveShipping.toFixed(0)} ${t.currency}`
+                    )}
+                  </span>
                 </div>
               </div>
               <div className="border-t border-[#E7D8F1] pt-4 mt-4">
                 <div className="flex justify-between text-xl font-bold text-[#4B1C71]">
                   <span>{t.total}</span>
-                  <span>{total.toFixed(0)} {t.currency}</span>
+                  <span>
+                    {total.toFixed(0)} {t.currency}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>

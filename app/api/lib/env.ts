@@ -14,7 +14,8 @@ function optionalNonEmpty(name: string): string | undefined {
 }
 
 function requiredJwtSecret(): string {
-  const value = optionalNonEmpty("JWT_SECRET") ?? optionalNonEmpty("APP_SECRET");
+  const value =
+    optionalNonEmpty("JWT_SECRET") ?? optionalNonEmpty("APP_SECRET");
   if (!value && process.env.NODE_ENV === "production") {
     throw new Error("Missing required environment variable: JWT_SECRET");
   }
@@ -25,7 +26,7 @@ function databaseUrl(): string {
   const value = required("DATABASE_URL").trim();
   if (!value || value.startsWith("#") || !value.includes("://")) {
     throw new Error(
-      "DATABASE_URL must be set to a valid MySQL connection URL, for example mysql://user:password@host:3306/database",
+      "DATABASE_URL must be set to a valid MySQL connection URL, for example mysql://user:password@host:3306/database"
     );
   }
   return value;
@@ -35,13 +36,27 @@ export const env = {
   // Primary JWT secret (new, preferred)
   jwtSecret: requiredJwtSecret(),
 
+  // Paymob HMAC Secret
+  paymobHmacSecret: (() => {
+    const val = process.env.PAYMOB_HMAC_SECRET?.trim();
+    if (!val && process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Missing required environment variable: PAYMOB_HMAC_SECRET"
+      );
+    }
+    return val ?? "local-dev-hmac-secret";
+  })(),
+
   // Legacy compat — used in kimi/session.ts via appSecret fallback
   appId: process.env.APP_ID ?? "",
   appSecret:
     optionalNonEmpty("APP_SECRET") ??
-    (process.env.NODE_ENV === "production" ? required("APP_SECRET") : "local-dev-secret"),
+    (process.env.NODE_ENV === "production"
+      ? required("APP_SECRET")
+      : "local-dev-secret"),
 
   isProduction: process.env.NODE_ENV === "production",
+  trustProxy: process.env.TRUST_PROXY === "true",
   databaseUrl: databaseUrl(),
 
   // Kimi OAuth (optional — only needed if using OAuth login)

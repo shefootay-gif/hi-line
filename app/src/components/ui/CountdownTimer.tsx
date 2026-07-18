@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { Timer } from 'lucide-react';
 
+function calculateTimeLeft(target: string | Date) {
+  const difference = new Date(target).getTime() - Date.now();
+  if (difference <= 0) return null;
+
+  return {
+    hours: Math.floor(difference / (1000 * 60 * 60)),
+    minutes: Math.floor((difference / 1000 / 60) % 60),
+    seconds: Math.floor((difference / 1000) % 60),
+  };
+}
+
 export default function CountdownTimer({ targetDate }: { targetDate: string | Date }) {
   const { lang, isRTL } = useLanguage();
   const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft(targetDate));
@@ -12,17 +23,6 @@ export default function CountdownTimer({ targetDate }: { targetDate: string | Da
     }, 1000);
     return () => clearInterval(timer);
   }, [targetDate]);
-
-  function calculateTimeLeft(target: string | Date) {
-    const difference = new Date(target).getTime() - new Date().getTime();
-    if (difference <= 0) return null;
-    
-    return {
-      hours: Math.floor((difference / (1000 * 60 * 60))),
-      minutes: Math.floor((difference / 1000 / 60) % 60),
-      seconds: Math.floor((difference / 1000) % 60)
-    };
-  }
 
   if (!timeLeft) return null;
 

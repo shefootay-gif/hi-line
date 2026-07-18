@@ -4,6 +4,7 @@ import { trpc } from "@/providers/trpc";
 import { useLanguage } from "@/hooks/useLanguage";
 import toast, { Toaster } from "react-hot-toast";
 import { Eye, EyeOff, LogIn, UserPlus, ArrowLeft, Shield } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 
 export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
   const { lang, isRTL } = useLanguage();
@@ -56,7 +57,11 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
   });
 
   return (
-    <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F3E8FF] to-[#FCF8FF] px-4 ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
+    <main className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F3E8FF] to-[#FCF8FF] px-4 ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
+      <Helmet>
+        <title>{isAdmin ? "Hi Line Admin Login" : "Hi Line Account Login"}</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <Toaster position="top-center" />
       <div className="w-full max-w-md">
         {/* Card */}
@@ -80,23 +85,27 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
                 onSubmit={(e) => { e.preventDefault(); adminLogin.mutate({ username: adminUser, password: adminPw }); }}
               >
                 <div>
-                  <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "اسم المستخدم" : "Username"}</label>
+                  <label htmlFor="admin-username" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "اسم المستخدم" : "Username"}</label>
                   <input
+                    id="admin-username"
+                    autoComplete="username"
                     value={adminUser}
                     onChange={(e) => setAdminUser(e.target.value)}
                     className="w-full px-4 py-3 rounded-2xl border border-[#E7D8F1] text-sm focus:outline-none focus:border-[#B57EDC] focus:ring-2 focus:ring-[#B57EDC]/20 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "كلمة المرور" : "Password"}</label>
+                  <label htmlFor="admin-password" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "كلمة المرور" : "Password"}</label>
                   <div className="relative">
                     <input
+                      id="admin-password"
+                      autoComplete="current-password"
                       type={showPw ? "text" : "password"}
                       value={adminPw}
                       onChange={(e) => setAdminPw(e.target.value)}
                       className="w-full px-4 py-3 rounded-2xl border border-[#E7D8F1] text-sm focus:outline-none focus:border-[#B57EDC] focus:ring-2 focus:ring-[#B57EDC]/20 transition-colors pr-12"
                     />
-                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]">
+                    <button type="button" aria-label={showPw ? "Hide password" : "Show password"} onClick={() => setShowPw(!showPw)} className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-[#9CA3AF]">
                       {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -137,8 +146,10 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
                     onSubmit={(e) => { e.preventDefault(); userLogin.mutate({ email, password }); }}
                   >
                     <div>
-                      <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "البريد الإلكتروني" : "Email"}</label>
+                      <label htmlFor="login-email" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "البريد الإلكتروني" : "Email"}</label>
                       <input
+                        id="login-email"
+                        autoComplete="email"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -147,15 +158,17 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "كلمة المرور" : "Password"}</label>
+                      <label htmlFor="login-password" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "كلمة المرور" : "Password"}</label>
                       <div className="relative">
                         <input
+                          id="login-password"
+                          autoComplete="current-password"
                           type={showPw ? "text" : "password"}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           className="w-full px-4 py-3 rounded-2xl border border-[#E7D8F1] text-sm focus:outline-none focus:border-[#B57EDC] focus:ring-2 focus:ring-[#B57EDC]/20 transition-colors pr-12"
                         />
-                        <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]">
+                        <button type="button" aria-label={showPw ? "Hide password" : "Show password"} onClick={() => setShowPw(!showPw)} className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-[#9CA3AF]">
                           {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
@@ -178,8 +191,10 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
                     onSubmit={(e) => { e.preventDefault(); register.mutate({ name: regName, email: regEmail, password: regPw }); }}
                   >
                     <div>
-                      <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "الاسم الكامل" : "Full Name"}</label>
+                      <label htmlFor="register-name" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "الاسم الكامل" : "Full Name"}</label>
                       <input
+                        id="register-name"
+                        autoComplete="name"
                         value={regName}
                         onChange={(e) => setRegName(e.target.value)}
                         placeholder={ar ? "محمد أحمد" : "John Doe"}
@@ -187,8 +202,10 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "البريد الإلكتروني" : "Email"}</label>
+                      <label htmlFor="register-email" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "البريد الإلكتروني" : "Email"}</label>
                       <input
+                        id="register-email"
+                        autoComplete="email"
                         type="email"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
@@ -197,15 +214,17 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "كلمة المرور (8 أحرف+)" : "Password (8+ chars)"}</label>
+                      <label htmlFor="register-password" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "كلمة المرور (8 أحرف+)" : "Password (8+ chars)"}</label>
                       <div className="relative">
                         <input
+                          id="register-password"
+                          autoComplete="new-password"
                           type={showPw ? "text" : "password"}
                           value={regPw}
                           onChange={(e) => setRegPw(e.target.value)}
                           className="w-full px-4 py-3 rounded-2xl border border-[#E7D8F1] text-sm focus:outline-none focus:border-[#B57EDC] focus:ring-2 focus:ring-[#B57EDC]/20 transition-colors pr-12"
                         />
-                        <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]">
+                        <button type="button" aria-label={showPw ? "Hide password" : "Show password"} onClick={() => setShowPw(!showPw)} className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-[#9CA3AF]">
                           {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
@@ -230,6 +249,6 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

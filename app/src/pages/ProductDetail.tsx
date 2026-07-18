@@ -4,7 +4,7 @@ import { findCatalogProductBySlug } from "@/lib/hiLineCatalog";
 import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
 import { useParams, Link } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ChevronRight,
   Minus,
@@ -23,6 +23,9 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import CountdownTimer from "@/components/ui/CountdownTimer";
+import { Helmet } from "react-helmet-async";
+import { productStructuredData } from "@/lib/productSeo";
+import { pathForLocale } from "@/lib/localeRouting";
 
 function listValue<T>(value: T[] | string | null | undefined): T[] {
   if (Array.isArray(value)) return value;
@@ -48,6 +51,27 @@ const scentBenefitsAr = [
   "تطبيق سلس",
 ];
 
+type RecentlyViewedProduct = {
+  id: number;
+  nameEn: string;
+  nameAr: string | null;
+  slug: string;
+  price: string;
+  images: string[] | string | null;
+  scentColor: string | null;
+};
+
+function isRecentlyViewedProduct(value: unknown): value is RecentlyViewedProduct {
+  if (!value || typeof value !== "object") return false;
+  const product = value as Record<string, unknown>;
+  return (
+    typeof product.id === "number" &&
+    typeof product.nameEn === "string" &&
+    typeof product.slug === "string" &&
+    typeof product.price === "string"
+  );
+}
+
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { lang, isRTL } = useLanguage();
@@ -69,9 +93,10 @@ export default function ProductDetail() {
   const addReview = trpc.store.addReview.useMutation();
   
   const catalogProduct = findCatalogProductBySlug(slug);
-  const product = apiProduct
-    ? catalogProduct
-      ? {
+  const product = useMemo(() => {
+    return apiProduct
+      ? catalogProduct
+        ? {
           ...apiProduct,
           ...catalogProduct,
           id: apiProduct.id,
@@ -82,10 +107,10 @@ export default function ProductDetail() {
           ingredientsAr: apiProduct.ingredientsAr,
           usageInstructions: apiProduct.usageInstructions,
           usageInstructionsAr: apiProduct.usageInstructionsAr,
-        }
-      : apiProduct
-    : catalogProduct
-      ? {
+          }
+        : apiProduct
+      : catalogProduct
+        ? {
           ...catalogProduct,
           descriptionAr: catalogProduct.shortDescriptionAr,
           benefits: [],
@@ -94,9 +119,12 @@ export default function ProductDetail() {
           ingredientsAr: null,
           usageInstructions: null,
           usageInstructionsAr: null,
+          flashSalePrice: null,
+          flashSaleEndsAt: null,
           relatedProductsList: [],
-        }
-      : null;
+          }
+        : null;
+  }, [apiProduct, catalogProduct]);
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -105,7 +133,7 @@ export default function ProductDetail() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [showStickyCart, setShowStickyCart] = useState(false);
-  const [recentlyViewed, setRecentlyViewed] = useState<any[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedProduct[]>([]);
 
   // Scroll listener for Sticky Cart
   useEffect(() => {
@@ -123,8 +151,16 @@ export default function ProductDetail() {
   // Recently Viewed Tracking
   useEffect(() => {
     if (product) {
-      const currentViewed = JSON.parse(localStorage.getItem("recentlyViewed") || "[]");
-      const filtered = currentViewed.filter((p: any) => p.id !== product.id);
+      let currentViewed: RecentlyViewedProduct[] = [];
+      try {
+        const parsed: unknown = JSON.parse(localStorage.getItem("recentlyViewed") || "[]");
+        currentViewed = Array.isArray(parsed)
+          ? parsed.filter(isRecentlyViewedProduct)
+          : [];
+      } catch {
+        localStorage.removeItem("recentlyViewed");
+      }
+      const filtered = currentViewed.filter(recent => recent.id !== product.id);
       // save lightweight product version
       const lightweight = {
         id: product.id,
@@ -139,13 +175,13 @@ export default function ProductDetail() {
       localStorage.setItem("recentlyViewed", JSON.stringify(newViewed));
       setRecentlyViewed(filtered.slice(0, 4));
     }
-  }, [product?.id]);
+  }, [product]);
 
   const isWishlisted = wishlist?.some(w => w.product.id === product?.id) ?? false;
 
   const handleToggleWishlist = async () => {
     if (!user) {
-      toast.error(lang === "ar" ? "ط¸ظ¹ط·آ¬ط·آ¨ ط·ع¾ط·آ³ط·آ¬ط¸ظ¹ط¸â€‍ ط·آ§ط¸â€‍ط·آ¯ط·آ®ط¸ث†ط¸â€‍ ط·آ£ط¸ث†ط¸â€‍ط·آ§ط¸â€¹" : "Please login first");
+      toast.error(lang === "ar" ? "يرجى تسجيل الدخول أولاً" : "Please login first");
       return;
     }
     if (!product) return;
@@ -153,12 +189,12 @@ export default function ProductDetail() {
       const res = await toggleWishlist.mutateAsync({ productId: product.id });
       refetchWishlist();
       if (res.added) {
-        toast.success(lang === "ar" ? "ط·ع¾ط¸â€¦ط·ع¾ ط·آ§ط¸â€‍ط·آ¥ط·آ¶ط·آ§ط¸ظ¾ط·آ© ط¸â€‍ط¸â€‍ط¸â€¦ط¸ظ¾ط·آ¶ط¸â€‍ط·آ©" : "Added to wishlist");
+        toast.success(lang === "ar" ? "تمت الإضافة إلى المفضلة" : "Added to wishlist");
       } else {
-        toast.success(lang === "ar" ? "ط·ع¾ط¸â€¦ط·ع¾ ط·آ§ط¸â€‍ط·آ¥ط·آ²ط·آ§ط¸â€‍ط·آ© ط¸â€¦ط¸â€  ط·آ§ط¸â€‍ط¸â€¦ط¸ظ¾ط·آ¶ط¸â€‍ط·آ©" : "Removed from wishlist");
+        toast.success(lang === "ar" ? "تمت الإزالة من المفضلة" : "Removed from wishlist");
       }
     } catch {
-      toast.error(lang === "ar" ? "ط·آ­ط·آ¯ط·آ« ط·آ®ط·آ·ط·آ£" : "An error occurred");
+      toast.error(lang === "ar" ? "حدث خطأ" : "An error occurred");
     }
   };
 
@@ -184,7 +220,7 @@ export default function ProductDetail() {
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      toast.error(lang === "ar" ? "ط¸ظ¹ط·آ¬ط·آ¨ ط·ع¾ط·آ³ط·آ¬ط¸ظ¹ط¸â€‍ ط·آ§ط¸â€‍ط·آ¯ط·آ®ط¸ث†ط¸â€‍ ط·آ£ط¸ث†ط¸â€‍ط·آ§ط¸â€¹" : "Please login first");
+      toast.error(lang === "ar" ? "يرجى تسجيل الدخول أولاً" : "Please login first");
       return;
     }
     if (!product) return;
@@ -198,9 +234,9 @@ export default function ProductDetail() {
       setReviewComment("");
       setReviewRating(5);
       setReviewImages([]);
-      toast.success(lang === "ar" ? "ط·ع¾ط¸â€¦ ط·آ¥ط·آ±ط·آ³ط·آ§ط¸â€‍ ط·ع¾ط¸â€ڑط¸ظ¹ط¸ظ¹ط¸â€¦ط¸ئ’ ط·آ¨ط¸â€ ط·آ¬ط·آ§ط·آ­ ط¸ث†ط·آ³ط¸ث†ط¸ظ¾ ط¸ظ¹ط·آ¸ط¸â€،ط·آ± ط·آ¨ط·آ¹ط·آ¯ ط·آ§ط¸â€‍ط¸â€¦ط·آ±ط·آ§ط·آ¬ط·آ¹ط·آ©" : "Review submitted successfully and will appear after approval");
+      toast.success(lang === "ar" ? "تم إرسال تقييمك بنجاح وسيظهر بعد المراجعة" : "Review submitted successfully and will appear after approval");
     } catch {
-      toast.error(lang === "ar" ? "ط·آ­ط·آ¯ط·آ« ط·آ®ط·آ·ط·آ£ ط·آ£ط·آ«ط¸â€ ط·آ§ط·طŒ ط·آ¥ط·آ±ط·آ³ط·آ§ط¸â€‍ ط·آ§ط¸â€‍ط·ع¾ط¸â€ڑط¸ظ¹ط¸ظ¹ط¸â€¦" : "Error submitting review");
+      toast.error(lang === "ar" ? "حدث خطأ أثناء إرسال التقييم" : "Error submitting review");
     }
   };
 
@@ -220,7 +256,7 @@ export default function ProductDetail() {
       });
     }
     setAdded(true);
-    toast.success(lang === "ar" ? "ط·ع¾ط¸â€¦ط·ع¾ ط·آ§ط¸â€‍ط·آ¥ط·آ¶ط·آ§ط¸ظ¾ط·آ© ط·آ¥ط¸â€‍ط¸â€° ط·آ§ط¸â€‍ط·آ³ط¸â€‍ط·آ©!" : "Added to cart!");
+    toast.success(lang === "ar" ? "تمت الإضافة إلى السلة!" : "Added to cart!");
     setTimeout(() => setAdded(false), 1500);
   };
 
@@ -230,7 +266,7 @@ export default function ProductDetail() {
       lang === "ar" && product.nameAr ? product.nameAr : product.nameEn;
     const message =
       lang === "ar"
-        ? `ط¸â€¦ط·آ±ط·آ­ط·آ¨ط¸â€¹ط·آ§ط·إ’ ط·آ£ط·آ±ط¸ظ¹ط·آ¯ ط·آ·ط¸â€‍ط·آ¨:\nط·آ§ط¸â€‍ط¸â€¦ط¸â€ ط·ع¾ط·آ¬: ${productName}\nط·آ§ط¸â€‍ط¸ئ’ط¸â€¦ط¸ظ¹ط·آ©: ${quantity}\nط·آ§ط¸â€‍ط·آ§ط·آ³ط¸â€¦: \nط·آ±ط¸â€ڑط¸â€¦ ط·آ§ط¸â€‍ط¸â€،ط·آ§ط·ع¾ط¸ظ¾: \nط·آ§ط¸â€‍ط·آ¹ط¸â€ ط¸ث†ط·آ§ط¸â€ : `
+        ? `مرحباً، أريد طلب:\nالمنتج: ${productName}\nالكمية: ${quantity}\nالاسم: \nرقم الهاتف: \nالعنوان: `
         : `Hello! I want to order:\nProduct: ${productName}\nQuantity: ${quantity}\nName: \nPhone: \nAddress: `;
     window.open(
       `https://wa.me/201223863092?text=${encodeURIComponent(message)}`,
@@ -268,7 +304,7 @@ export default function ProductDetail() {
           {lang === "ar" ? "المنتج غير موجود" : "Product not found"}
         </p>
         <Link
-          to="/shop"
+          to={pathForLocale("/shop", lang)}
           className="px-6 py-2.5 beauty-button font-semibold rounded-lg"
         >
           {t.back}
@@ -281,20 +317,43 @@ export default function ProductDetail() {
   const benefits = listValue<string>(product.benefits);
   const benefitsAr = listValue<string>(product.benefitsAr);
   const productStock = (product as { stock?: number }).stock ?? 1;
+  const productName = lang === "ar" && product.nameAr ? product.nameAr : product.nameEn;
+  const productDescription =
+    lang === "ar" && product.shortDescriptionAr
+      ? product.shortDescriptionAr
+      : product.shortDescriptionEn || product.descriptionEn || productName;
+  const canonicalUrl = `${window.location.origin}${pathForLocale(window.location.pathname, lang)}`;
+  const structuredData = productStructuredData({
+    id: product.id,
+    name: productName,
+    description: productDescription,
+    imagePath: images[0] || "/products/hero-product.jpg",
+    price: product.flashSalePrice || product.salePrice || product.price,
+    stock: productStock,
+    url: canonicalUrl,
+    origin: window.location.origin,
+    brand: (product as { brand?: string }).brand || "Hi Line",
+  });
 
   return (
     <div className={isRTL ? "font-[Cairo]" : "font-[Inter]"}>
+      <Helmet>
+        <title>{`${productName} | Hi Line Pro Care`}</title>
+        <meta name="description" content={productDescription} />
+        <link rel="canonical" href={canonicalUrl} />
+        <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
+      </Helmet>
       <Toaster position="top-center" />
 
       {/* Breadcrumb */}
       <div className="pt-24 pb-4 bg-white/70 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex items-center gap-2 text-sm text-[#6F6178]">
-            <Link to="/" className="hover:text-[#B57EDC]">
-              {lang === "ar" ? "ط·آ§ط¸â€‍ط·آ±ط·آ¦ط¸ظ¹ط·آ³ط¸ظ¹ط·آ©" : "Home"}
+            <Link to={pathForLocale("/", lang)} className="hover:text-[#B57EDC]">
+              {lang === "ar" ? "الرئيسية" : "Home"}
             </Link>
             <ChevronRight className="w-3 h-3" />
-            <Link to="/shop" className="hover:text-[#B57EDC]">
+            <Link to={pathForLocale("/shop", lang)} className="hover:text-[#B57EDC]">
               {t.shop}
             </Link>
             <ChevronRight className="w-3 h-3" />
@@ -423,10 +482,10 @@ export default function ProductDetail() {
                   {added ? (
                     <>
                       <Check className="w-5 h-5 animate-in zoom-in" />
-                      {lang === "ar" ? "ط·ع¾ط¸â€¦ط·ع¾ ط·آ§ط¸â€‍ط·آ¥ط·آ¶ط·آ§ط¸ظ¾ط·آ©" : "Added"}
+                      {lang === "ar" ? "تمت الإضافة" : "Added"}
                     </>
                   ) : (
-                    lang === "ar" ? "ط·آ£ط·آ¶ط¸ظ¾ ط·آ¥ط¸â€‍ط¸â€° ط·آ§ط¸â€‍ط·آ³ط¸â€‍ط·آ©" : "Add to Cart"
+                    lang === "ar" ? "أضف إلى السلة" : "Add to Cart"
                   )}
                 </button>
 
@@ -437,7 +496,7 @@ export default function ProductDetail() {
                       ? "border-[#B57EDC] bg-[#F7ECFF] text-[#B57EDC] shadow-sm"
                       : "border-[#E7D8F1] bg-white text-[#8D7A97] hover:border-[#B57EDC] hover:text-[#B57EDC]"
                   }`}
-                  title={lang === "ar" ? "ط·آ§ط¸â€‍ط¸â€¦ط¸ظ¾ط·آ¶ط¸â€‍ط·آ©" : "Wishlist"}
+                  title={lang === "ar" ? "المفضلة" : "Wishlist"}
                 >
                   <Heart className={`w-6 h-6 ${isWishlisted ? "fill-[#B57EDC]" : ""}`} />
                 </button>
@@ -458,7 +517,7 @@ export default function ProductDetail() {
             {/* Share */}
             <div className="flex items-center gap-4">
               <span className="text-sm text-[#6F6178]">
-                {lang === "ar" ? "ط¸â€¦ط·آ´ط·آ§ط·آ±ط¸ئ’ط·آ©:" : "Share:"}
+                {lang === "ar" ? "مشاركة:" : "Share:"}
               </span>
               <button
                 onClick={shareOnFacebook}
@@ -734,7 +793,7 @@ export default function ProductDetail() {
                 return (
                   <Link
                     key={related.id}
-                    to={`/shop/${related.slug}`}
+                    to={pathForLocale(`/shop/${related.slug}`, lang)}
                     className="group beauty-card rounded-2xl overflow-hidden"
                   >
                     <div
@@ -779,7 +838,7 @@ export default function ProductDetail() {
               return (
                 <Link
                   key={recent.id}
-                  to={`/shop/${recent.slug}`}
+                  to={pathForLocale(`/shop/${recent.slug}`, lang)}
                   className="group beauty-card rounded-2xl overflow-hidden min-w-[240px] snap-start"
                 >
                   <div

@@ -162,8 +162,8 @@ export default function DataAnalytics() {
   const funnelQuery = trpc.admin.getFunnelAnalytics.useQuery(undefined, { retry: false });
 
   const summary = (summaryQuery.data ?? {}) as Summary;
-  const trend = (trendQuery.data ?? []) as TrendPoint[];
-  const topProducts = (productsQuery.data ?? []) as TopProduct[];
+  const trend = useMemo(() => (trendQuery.data ?? []) as TrendPoint[], [trendQuery.data]);
+  const topProducts = useMemo(() => (productsQuery.data ?? []) as TopProduct[], [productsQuery.data]);
   const customers = (customersQuery.data ?? {}) as CustomerAnalytics;
   const inventory = (inventoryQuery.data ?? {}) as InventoryAnalytics;
   const media = (mediaQuery.data ?? {}) as MediaAnalytics;

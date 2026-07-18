@@ -6,6 +6,8 @@ import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
+import { Helmet } from "react-helmet-async";
+import { pathForLocale, pathWithoutLocale } from "@/lib/localeRouting";
 import {
   ShoppingCart,
   Globe,
@@ -80,16 +82,79 @@ export default function MainLayout() {
   const facebookUrl = settings?.facebook_url || "https://www.facebook.com/profile.php?id=61587944979845";
   const instagramUrl = settings?.instagram_url || "#";
   const whatsappText = encodeURIComponent("Hello! I'm interested in ordering Hi Line Pro Care products.");
+  const seoByPath: Record<string, { title: string; description: string }> = {
+    "/": {
+      title: "Hi Line Pro Care | Daily Personal Care",
+      description: "Shop Hi Line Pro Care personal-care essentials and signature scents with convenient delivery across Egypt.",
+    },
+    "/shop": {
+      title: "Shop Hi Line Pro Care Products",
+      description: "Browse Hi Line Pro Care roll-ons and daily personal-care products in signature scents.",
+    },
+    "/about": {
+      title: "About Hi Line Pro Care",
+      description: "Discover the Hi Line Pro Care story and our approach to dependable everyday personal care.",
+    },
+    "/contact": {
+      title: "Contact Hi Line Pro Care",
+      description: "Contact Hi Line Pro Care for product, order, and delivery support.",
+    },
+    "/faq": {
+      title: "Hi Line Pro Care FAQs",
+      description: "Find answers about Hi Line Pro Care products, ordering, payment, and delivery.",
+    },
+  };
+  const storefrontPath = pathWithoutLocale(location.pathname);
+  const seo = seoByPath[storefrontPath] ?? {
+    title: "Hi Line Pro Care",
+    description: "Shop Hi Line Pro Care personal-care essentials and signature scents.",
+  };
+  const privatePath = ["/cart", "/checkout", "/account", "/order-confirmation"].some(
+    path => storefrontPath.startsWith(path),
+  );
+  const canonicalUrl = `${window.location.origin}${location.pathname}`;
+  const arabicUrl = `${window.location.origin}${pathForLocale(location.pathname, "ar")}`;
+  const englishUrl = `${window.location.origin}${pathForLocale(location.pathname, "en")}`;
 
   return (
     <div className={`min-h-screen flex flex-col beauty-shell ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
-
-
+      <Helmet>
+        <html lang={lang} dir={isRTL ? "rtl" : "ltr"} />
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <link rel="canonical" href={canonicalUrl} />
+        <link rel="alternate" hrefLang="ar" href={arabicUrl} />
+        <link rel="alternate" hrefLang="en" href={englishUrl} />
+        <link rel="alternate" hrefLang="x-default" href={englishUrl} />
+        {privatePath && <meta name="robots" content="noindex, nofollow" />}
+        {storefrontPath === "/" && (
+          <script type="application/ld+json">
+            {JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: storeName,
+              url: window.location.origin,
+              logo: new URL(logoUrl, window.location.origin).href,
+              contactPoint: {
+                "@type": "ContactPoint",
+                telephone: displayPhone,
+                contactType: "customer service",
+              },
+            })}
+          </script>
+        )}
+      </Helmet>
+      <a
+        href="#main-content"
+        className="sr-only z-[100] rounded-md bg-white px-4 py-2 text-[#4B1C71] focus:not-sr-only focus:fixed focus:start-4 focus:top-4"
+      >
+        {lang === "ar" ? "تخطي إلى المحتوى" : "Skip to main content"}
+      </a>
       {/* Promo Bar */}
       <div className="bg-[#4B1C71] text-white py-2.5 px-4 text-xs sm:text-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 text-center">
           <span className="font-semibold">{announcement}</span>
-          <Link to="/shop" className="hidden sm:inline-flex rounded-full bg-white/12 px-3 py-1 font-semibold hover:bg-white/20">
+          <Link to={pathForLocale("/shop", lang)} className="hidden sm:inline-flex rounded-full bg-white/12 px-3 py-1 font-semibold hover:bg-white/20">
             Roll On
           </Link>
         </div>
@@ -104,7 +169,7 @@ export default function MainLayout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-[72px]">
             {/* Logo */}
-            <Link to="/" className="flex items-center shrink-0" onClick={scrollToTop}>
+            <Link to={pathForLocale("/", lang)} className="flex items-center shrink-0" onClick={scrollToTop}>
               <img
                 src={logoUrl}
                 alt={storeName}
@@ -117,9 +182,9 @@ export default function MainLayout() {
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
-                  to={link.href}
+                  to={pathForLocale(link.href, lang)}
                   className={`text-sm font-medium transition-colors duration-200 hover:text-[#B57EDC] ${
-                    location.pathname === link.href
+                    storefrontPath === link.href
                       ? "text-[#B57EDC]"
                       : "text-[#4B1C71]"
                   }`}
@@ -143,7 +208,8 @@ export default function MainLayout() {
               {/* Mobile Language */}
               <button
                 onClick={toggleLanguage}
-                className="sm:hidden flex items-center justify-center w-8 h-8 rounded-full beauty-pill"
+                aria-label={lang === "en" ? "Switch to Arabic" : "التبديل إلى الإنجليزية"}
+                className="sm:hidden flex items-center justify-center w-11 h-11 rounded-full beauty-pill"
               >
                 <Globe className="w-4 h-4" />
               </button>
@@ -151,7 +217,10 @@ export default function MainLayout() {
               {/* Cart */}
               <Sheet open={cartOpen} onOpenChange={setCartOpen}>
                 <SheetTrigger asChild>
-                  <button className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-[#F7ECFF] transition-colors">
+                  <button
+                    aria-label={t.yourCart}
+                    className="relative flex items-center justify-center w-11 h-11 rounded-full hover:bg-[#F7ECFF] transition-colors"
+                  >
                     <ShoppingCart className="w-5 h-5 text-[#4B1C71]" />
                     {cartItemCount > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[#B57EDC] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
@@ -174,7 +243,7 @@ export default function MainLayout() {
                         <button
                           onClick={() => {
                             setCartOpen(false);
-                            navigate("/shop");
+                            navigate(pathForLocale("/shop", lang));
                           }}
                           className="px-6 py-2.5 beauty-button font-semibold rounded-lg"
                         >
@@ -270,7 +339,7 @@ export default function MainLayout() {
                           <button
                             onClick={() => {
                               setCartOpen(false);
-                              navigate("/checkout");
+                              navigate(pathForLocale("/checkout", lang));
                             }}
                             className="w-full py-3 beauty-button font-semibold rounded-xl"
                           >
@@ -300,7 +369,7 @@ export default function MainLayout() {
                 </Link>
               ) : (
                 <Link
-                  to="/login"
+                  to={pathForLocale("/login", lang)}
                   className="sm:hidden flex items-center justify-center w-9 h-9 rounded-full hover:bg-[#F7ECFF] transition-colors"
                   title={lang === "ar" ? "تسجيل الدخول" : "Login"}
                 >
@@ -327,7 +396,7 @@ export default function MainLayout() {
                 </div>
               ) : (
                 <Link
-                  to="/login"
+                  to={pathForLocale("/login", lang)}
                   className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full beauty-pill text-sm font-medium hover:bg-[#F1E1FF] transition-colors"
                 >
                   {t.login}
@@ -348,6 +417,12 @@ export default function MainLayout() {
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label={
+                  mobileMenuOpen
+                    ? lang === "ar" ? "إغلاق القائمة" : "Close menu"
+                    : lang === "ar" ? "فتح القائمة" : "Open menu"
+                }
+                aria-expanded={mobileMenuOpen}
                 className="md:hidden flex items-center justify-center w-9 h-9 rounded-full hover:bg-[#F7ECFF] transition-colors"
               >
                 {mobileMenuOpen ? (
@@ -401,7 +476,7 @@ export default function MainLayout() {
                 </>
               ) : (
                 <Link
-                  to="/login"
+                  to={pathForLocale("/login", lang)}
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center justify-between py-2 text-sm font-medium text-[#4B1C71]"
                 >
@@ -424,7 +499,7 @@ export default function MainLayout() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main id="main-content" className="flex-1" tabIndex={-1}>
         <Outlet />
       </main>
 
@@ -474,7 +549,7 @@ export default function MainLayout() {
                 {navLinks.map((link) => (
                   <li key={link.href}>
                     <Link
-                      to={link.href}
+                      to={pathForLocale(link.href, lang)}
                       className="text-sm text-white/70 hover:text-white transition-colors"
                     >
                       {link.label}
@@ -499,7 +574,7 @@ export default function MainLayout() {
                 ].map((scent) => (
                   <li key={scent}>
                     <Link
-                      to={`/shop`}
+                      to={pathForLocale("/shop", lang)}
                       className="text-sm text-white/70 hover:text-white transition-colors"
                     >
                       Hi Line - {scent}

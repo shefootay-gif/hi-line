@@ -11,6 +11,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function Contact() {
   const { lang, isRTL } = useLanguage();
@@ -54,8 +55,8 @@ export default function Contact() {
       });
       setSent(true);
       toast.success(t.messageSent);
-    } catch (err: any) {
-      toast.error(err.message || (lang === "ar" ? "حدث خطأ أثناء الإرسال" : "Error sending message"));
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, lang === "ar" ? "حدث خطأ أثناء الإرسال" : "Error sending message"));
     }
   };
 

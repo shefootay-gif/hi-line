@@ -13,6 +13,9 @@ app/.edge-profile/
 local-dev.log
 local-dev.err.log
 mysql-local/
+/backups/
+testsprite_tests/tmp/
+app/testsprite_tests/tmp/
 .env
 .env.local
 .env.production
@@ -23,3 +26,5 @@ build/
 app/.chrome-profile/**
 /package-lock.json
 /scripts/
+
+testsprite_tests\tmp\config.json

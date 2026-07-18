@@ -33,6 +33,7 @@ import {
   backupJobs,
 } from "@db/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 
 
 const nonNegativeMoney = z
@@ -513,6 +514,28 @@ export const adminRouter = createRouter({
       const db = getDb();
       const result = await db.insert(customers).values(input);
       return { id: Number(result[0].insertId) };
+    }),
+
+  deleteCustomer: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const [existingOrder] = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.customerId, input.id))
+        .limit(1);
+
+      if (existingOrder) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Customers with order history cannot be deleted",
+        });
+      }
+
+      await db.delete(customers).where(eq(customers.id, input.id));
+      await logAdminActivity(db, ctx.user.id, "delete", "customer", input.id);
+      return { success: true };
     }),
 
   // Settings management
@@ -1617,7 +1640,7 @@ export const adminRouter = createRouter({
         GROUP BY DATE(created_at)
         ORDER BY date DESC`
       );
-      return result;
+      return rawRows<{ date: Date | string; orders: string | number; revenue: string | number }>(result);
     }),
 
   getSalesByScent: adminQuery.query(async () => {
@@ -1634,7 +1657,7 @@ export const adminRouter = createRouter({
       GROUP BY p.scent
       ORDER BY total_sold DESC`
     );
-    return result;
+    return rawRows<{ scent: string; total_sold: string | number; order_count: string | number }>(result);
   }),
 
   getRecentOrders: adminQuery

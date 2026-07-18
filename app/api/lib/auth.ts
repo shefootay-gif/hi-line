@@ -3,29 +3,10 @@ import { Session } from "@contracts/constants";
 import { Errors } from "@contracts/errors";
 import { env } from "./env";
 import { verifySessionToken } from "./session";
+import type { SafeUser } from "@db/schema";
 import { findUserById, findUserByUnionId } from "../queries/users";
 
-export async function authenticateRequest(headers: Headers) {
-  const authHeader = headers.get("authorization");
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const bearerToken = authHeader.substring(7).trim();
-    if (bearerToken === "admin123") {
-      const now = new Date();
-      return {
-        id: 0,
-        unionId: `local-admin:${env.localAdminUsername}`,
-        name: "Hi Line Admin",
-        email: "admin@hiline.local",
-        avatar: null,
-        role: "admin",
-        passwordHash: null,
-        createdAt: now,
-        updatedAt: now,
-        lastSignInAt: now,
-      } as const;
-    }
-  }
-
+export async function authenticateRequest(headers: Headers): Promise<SafeUser> {
   const cookies = cookie.parse(headers.get("cookie") || "");
   const token = cookies[Session.cookieName];
   if (!token) {
@@ -46,15 +27,20 @@ export async function authenticateRequest(headers: Headers) {
       email: "admin@hiline.local",
       avatar: null,
       role: "admin",
-      passwordHash: null,
+      phone: null,
+      gender: null,
+      birthday: null,
+      nationality: null,
       createdAt: now,
       updatedAt: now,
       lastSignInAt: now,
-    } as const;
+    } satisfies SafeUser;
   }
 
   if (!claim.unionId.startsWith("local:")) {
-    throw Errors.forbidden("Unsupported authentication provider. Please re-login.");
+    throw Errors.forbidden(
+      "Unsupported authentication provider. Please re-login."
+    );
   }
 
   let user = await findUserByUnionId(claim.unionId);
@@ -69,5 +55,7 @@ export async function authenticateRequest(headers: Headers) {
     throw Errors.forbidden("User not found. Please re-login.");
   }
 
-  return user;
+  const safeUser = { ...user };
+  delete (safeUser as { passwordHash?: string }).passwordHash;
+  return safeUser;
 }

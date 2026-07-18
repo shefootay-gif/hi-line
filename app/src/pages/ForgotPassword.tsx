@@ -3,7 +3,10 @@ import { trpc } from "@/providers/trpc";
 import { Link } from "react-router";
 import { Mail, ArrowRight, CheckCircle, ArrowLeft } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { getErrorMessage } from "@/lib/errors";
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
+import { pathForLocale } from "@/lib/localeRouting";
 
 export default function ForgotPassword() {
   const { lang, isRTL } = useLanguage();
@@ -20,13 +23,17 @@ export default function ForgotPassword() {
     try {
       await forgotPassword.mutateAsync({ email });
       setSent(true);
-    } catch (err: any) {
-      toast.error(err.message || (lang === "ar" ? "حدث خطأ" : "An error occurred"));
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, lang === "ar" ? "حدث خطأ" : "An error occurred"));
     }
   };
 
   return (
     <div className={`min-h-screen bg-[#FCF8FF] flex items-center justify-center pt-20 px-4 ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
+      <Helmet>
+        <title>Hi Line Password Recovery</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <Toaster position="top-center" />
       <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(75,28,113,0.04)] border border-[#E7D8F1]">
         <div className="text-center mb-8">
@@ -60,7 +67,7 @@ export default function ForgotPassword() {
               </p>
             </div>
             <Link
-              to="/login"
+              to={pathForLocale("/login", lang)}
               className="inline-flex items-center gap-2 text-sm font-semibold text-[#4B1C71] hover:text-[#B57EDC] transition-colors"
             >
               {isRTL ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
@@ -98,7 +105,7 @@ export default function ForgotPassword() {
             
             <div className="text-center mt-6">
               <Link
-                to="/login"
+                to={pathForLocale("/login", lang)}
                 className="inline-flex items-center gap-2 text-sm font-semibold text-[#6F6178] hover:text-[#4B1C71] transition-colors"
               >
                 {isRTL ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}

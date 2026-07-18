@@ -1,73 +1,140 @@
-import { Routes, Route, Navigate } from "react-router";
+import {
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useLocation,
+  useParams,
+} from "react-router";
+import { lazy, Suspense } from "react";
 import { LanguageProvider } from "./hooks/useLanguage";
 import { TRPCProvider } from "./providers/trpc";
 import MainLayout from "./layouts/MainLayout";
 import Home from "./pages/Home";
-import Shop from "./pages/Shop";
-import ProductDetail from "./pages/ProductDetail";
-import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
-import OrderConfirmation from "./pages/OrderConfirmation";
-import TrackOrder from "./pages/TrackOrder";
-import About from "./pages/About";
-import Contact from "./pages/Contact";
-import FAQ from "./pages/FAQ";
-import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Account from "./pages/Account";
-import AdminLayout from "./layouts/AdminLayout";
-import AdminDashboard from "./pages/admin/Dashboard";
-import AdminProducts from "./pages/admin/Products";
-import AdminCategories from "./pages/admin/Categories";
-import AdminOrders from "./pages/admin/Orders";
-import AdminCustomers from "./pages/admin/Customers";
-import AdminSettings from "./pages/admin/Settings";
-import AdminCoupons from "./pages/admin/Coupons";
-import MediaBuyer from "./pages/admin/MediaBuyer";
-import Dropshipping from "./pages/admin/Dropshipping";
-import ActivityLogs from "./pages/admin/ActivityLogs";
-import InventoryMovements from "./pages/admin/InventoryMovements";
-import DataAnalytics from "./pages/admin/DataAnalytics";
-import FulfillmentCenter from "./pages/admin/FulfillmentCenter";
-import Notifications from "./pages/admin/Notifications";
-import MediaLibrary from "./pages/admin/MediaLibrary";
-import SeoTools from "./pages/admin/SeoTools";
-import AdminUsers from "./pages/admin/AdminUsers";
-import ExportBackup from "./pages/admin/ExportBackup";
 import NotFound from "./pages/NotFound";
 
 import { HelmetProvider } from "react-helmet-async";
+import {
+  pathForLocale,
+  type StorefrontLocale,
+} from "./lib/localeRouting";
+
+const Shop = lazy(() => import("./pages/Shop"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const Cart = lazy(() => import("./pages/Cart"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
+const TrackOrder = lazy(() => import("./pages/TrackOrder"));
+const About = lazy(() => import("./pages/About"));
+const Contact = lazy(() => import("./pages/Contact"));
+const FAQ = lazy(() => import("./pages/FAQ"));
+const Login = lazy(() => import("./pages/Login"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Account = lazy(() => import("./pages/Account"));
+const AdminLayout = lazy(() => import("./layouts/AdminLayout"));
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const AdminProducts = lazy(() => import("./pages/admin/Products"));
+const AdminCategories = lazy(() => import("./pages/admin/Categories"));
+const AdminOrders = lazy(() => import("./pages/admin/Orders"));
+const AdminCustomers = lazy(() => import("./pages/admin/Customers"));
+const AdminSettings = lazy(() => import("./pages/admin/Settings"));
+const AdminCoupons = lazy(() => import("./pages/admin/Coupons"));
+const MediaBuyer = lazy(() => import("./pages/admin/MediaBuyer"));
+const Dropshipping = lazy(() => import("./pages/admin/Dropshipping"));
+const ActivityLogs = lazy(() => import("./pages/admin/ActivityLogs"));
+const InventoryMovements = lazy(() => import("./pages/admin/InventoryMovements"));
+const DataAnalytics = lazy(() => import("./pages/admin/DataAnalytics"));
+const FulfillmentCenter = lazy(() => import("./pages/admin/FulfillmentCenter"));
+const Notifications = lazy(() => import("./pages/admin/Notifications"));
+const MediaLibrary = lazy(() => import("./pages/admin/MediaLibrary"));
+const SeoTools = lazy(() => import("./pages/admin/SeoTools"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const ExportBackup = lazy(() => import("./pages/admin/ExportBackup"));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center" role="status">
+      <span className="h-8 w-8 animate-spin rounded-full border-2 border-[#B57EDC] border-t-transparent" />
+      <span className="sr-only">Loading</span>
+    </div>
+  );
+}
+
+function LocaleBoundary() {
+  const { locale } = useParams<{ locale: string }>();
+  return locale === "ar" || locale === "en" ? <Outlet /> : <NotFound />;
+}
+
+function LegacyStorefrontRedirect() {
+  const location = useLocation();
+  const savedLocale = localStorage.getItem("hilang");
+  const locale: StorefrontLocale = savedLocale === "ar" ? "ar" : "en";
+  return (
+    <Navigate
+      to={{
+        pathname: pathForLocale(location.pathname, locale),
+        search: location.search,
+        hash: location.hash,
+      }}
+      replace
+    />
+  );
+}
 
 export default function App() {
   return (
     <HelmetProvider>
       <TRPCProvider>
         <LanguageProvider>
-        <Routes>
-          {/* Public Routes */}
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/shop/category/:category" element={<Shop />} />
-            <Route path="/shop/:slug" element={<ProductDetail />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/checkout" element={<Checkout />} />
-            <Route path="/order-confirmation" element={<OrderConfirmation />} />
-            <Route path="/track-order" element={<TrackOrder />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/my-orders" element={<Navigate to="/account?tab=orders" replace />} />
-            <Route path="/wishlist" element={<Navigate to="/account?tab=wishlist" replace />} />
-            <Route path="/returns" element={<Navigate to="/account?tab=returns" replace />} />
-            <Route path="/account" element={<Account />} />
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+          <Route path="/:locale" element={<LocaleBoundary />}>
+            <Route element={<MainLayout />}>
+              <Route index element={<Home />} />
+              <Route path="shop" element={<Shop />} />
+              <Route path="shop/category/:category" element={<Shop />} />
+              <Route path="shop/:slug" element={<ProductDetail />} />
+              <Route path="cart" element={<Cart />} />
+              <Route path="checkout" element={<Checkout />} />
+              <Route path="order-confirmation" element={<OrderConfirmation />} />
+              <Route path="track-order" element={<TrackOrder />} />
+              <Route path="about" element={<About />} />
+              <Route path="contact" element={<Contact />} />
+              <Route path="faq" element={<FAQ />} />
+              <Route path="my-orders" element={<Navigate to="../account?tab=orders" replace />} />
+              <Route path="wishlist" element={<Navigate to="../account?tab=wishlist" replace />} />
+              <Route path="returns" element={<Navigate to="../account?tab=returns" replace />} />
+              <Route path="account" element={<Account />} />
+            </Route>
+            <Route path="login" element={<Login />} />
+            <Route path="forgot-password" element={<ForgotPassword />} />
+            <Route path="reset-password" element={<ResetPassword />} />
           </Route>
 
-          {/* Auth */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
+          {[
+            "/",
+            "/shop",
+            "/shop/category/:category",
+            "/shop/:slug",
+            "/cart",
+            "/checkout",
+            "/order-confirmation",
+            "/track-order",
+            "/about",
+            "/contact",
+            "/faq",
+            "/my-orders",
+            "/wishlist",
+            "/returns",
+            "/account",
+            "/login",
+            "/forgot-password",
+            "/reset-password",
+          ].map(path => (
+            <Route key={path} path={path} element={<LegacyStorefrontRedirect />} />
+          ))}
+
           <Route path="/admin/login" element={<Login mode="admin" />} />
 
           {/* Admin Routes */}
@@ -94,7 +161,8 @@ export default function App() {
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </LanguageProvider>
     </TRPCProvider>
     </HelmetProvider>

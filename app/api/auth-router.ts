@@ -115,7 +115,8 @@ export const authRouter = createRouter({
         }),
       );
       // Return safe user data (omit passwordHash)
-      const { passwordHash: _pw, ...safeUser } = user;
+      const { passwordHash, ...safeUser } = user;
+      void passwordHash;
       return { user: safeUser };
     }),
 

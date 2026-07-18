@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router";
+import {
+  localeFromPath,
+  pathForLocale,
+  type StorefrontLocale,
+} from "@/lib/localeRouting";
 
-type Language = "en" | "ar";
+type Language = StorefrontLocale;
 
 interface LanguageContextType {
   lang: Language;
@@ -17,6 +23,8 @@ const LanguageContext = createContext<LanguageContextType>({
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [lang, setLang] = useState<Language>(() => {
     if (typeof window !== "undefined") {
       return (localStorage.getItem("hilang") as Language) || "en";
@@ -27,18 +35,40 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const isRTL = lang === "ar";
 
   useEffect(() => {
+    const pathLocale = localeFromPath(location.pathname);
+    if (pathLocale && pathLocale !== lang) setLang(pathLocale);
+  }, [lang, location.pathname]);
+
+  useEffect(() => {
     localStorage.setItem("hilang", lang);
     document.documentElement.dir = isRTL ? "rtl" : "ltr";
     document.documentElement.lang = lang;
   }, [lang, isRTL]);
 
   const toggleLanguage = useCallback(() => {
-    setLang((prev) => (prev === "en" ? "ar" : "en"));
-  }, []);
+    const nextLanguage = lang === "en" ? "ar" : "en";
+    setLang(nextLanguage);
+    navigate(
+      {
+        pathname: pathForLocale(location.pathname, nextLanguage),
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true }
+    );
+  }, [lang, location.hash, location.pathname, location.search, navigate]);
 
   const setLanguage = useCallback((newLang: Language) => {
     setLang(newLang);
-  }, []);
+    navigate(
+      {
+        pathname: pathForLocale(location.pathname, newLang),
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true }
+    );
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   return (
     <LanguageContext.Provider value={{ lang, isRTL, toggleLanguage, setLanguage }}>

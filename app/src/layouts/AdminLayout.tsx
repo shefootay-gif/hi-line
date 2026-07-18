@@ -2,6 +2,7 @@ import { Outlet, Link, Navigate, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -65,6 +66,10 @@ export default function AdminLayout() {
   }
 
   return (
+    <>
+      <Helmet>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
 <div
   dir={isRTL ? "rtl" : "ltr"}
   className={`min-h-screen w-full overflow-x-hidden bg-[#F7ECFF] ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}
@@ -157,5 +162,6 @@ export default function AdminLayout() {
         />
       )}
     </div>
+    </>
   );
 }
