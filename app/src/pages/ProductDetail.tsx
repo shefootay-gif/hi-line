@@ -26,16 +26,11 @@ import CountdownTimer from "@/components/ui/CountdownTimer";
 import { Helmet } from "react-helmet-async";
 import { productStructuredData } from "@/lib/productSeo";
 import { pathForLocale } from "@/lib/localeRouting";
-
-function listValue<T>(value: T[] | string | null | undefined): T[] {
-  if (Array.isArray(value)) return value;
-  if (!value) return [];
-  try {
-    return JSON.parse(value);
-  } catch {
-    return [];
-  }
-}
+import {
+  isRecentlyViewedProduct,
+  listValue,
+  type RecentlyViewedProduct,
+} from "@/lib/product-values";
 
 const scentBenefits = [
   "48h Protection",
@@ -50,27 +45,6 @@ const scentBenefitsAr = [
   "تركيبة لبنانية",
   "تطبيق سلس",
 ];
-
-type RecentlyViewedProduct = {
-  id: number;
-  nameEn: string;
-  nameAr: string | null;
-  slug: string;
-  price: string;
-  images: string[] | string | null;
-  scentColor: string | null;
-};
-
-function isRecentlyViewedProduct(value: unknown): value is RecentlyViewedProduct {
-  if (!value || typeof value !== "object") return false;
-  const product = value as Record<string, unknown>;
-  return (
-    typeof product.id === "number" &&
-    typeof product.nameEn === "string" &&
-    typeof product.slug === "string" &&
-    typeof product.price === "string"
-  );
-}
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
