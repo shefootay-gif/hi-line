@@ -13,12 +13,7 @@ The platform offers a seamless shopping experience for customers and a robust, f
 ### 🛍️ For Customers (Storefront)
 - **Dynamic Catalog:** Browse products dynamically fetched from the database with real-time stock availability and custom Arabic translation support.
 - **Cart & Checkout:** Advanced shopping cart system with automatic calculation of totals, discounts, and shipping fees.
-- **Payment Options:** Support for multiple payment methods including:
-  - Cash on Delivery (COD) / الدفع عند الاستلام
-  - Vodafone Cash / فودافون كاش (displays transfer details and instructs the customer to send their transfer receipt via a WhatsApp link)
-  - InstaPay / إنستاباي (displays the store handle and instructs the customer to transfer and share the receipt via a WhatsApp link)
-  - Bank Transfer / تحويل بنكي
-  - Paymob credit/debit card online checkout implementation (coded, requires credentials/webhook setup)
+- **Payment:** Cash on Delivery (COD) is the only active checkout method. The historical Vodafone Cash, InstaPay, bank transfer, and Paymob definitions remain disabled for compatibility.
 - **Order Tracking & Notifications:** Customers can track their orders and contact support via WhatsApp using dynamic short links.
 - **RTL & LTR Support:** Full localization and RTL layout specifically tailored for Arabic users.
 
@@ -73,14 +68,6 @@ LOCAL_ADMIN_USERNAME=admin
 LOCAL_ADMIN_PASSWORD=secure-admin-password-here
 # Optional: Union ID for admin promotion on first login
 OWNER_UNION_ID=
-
-# ── Paymob Integration ─────────────────────────────────────────
-# Paymob credentials (required for credit card checkout)
-PAYMOB_API_KEY=your-paymob-api-key
-PAYMOB_INTEGRATION_ID=your-integration-id
-PAYMOB_IFRAME_ID=your-iframe-id
-# HMAC Secret for authenticating incoming transaction webhooks (required in production)
-PAYMOB_HMAC_SECRET=your-paymob-hmac-webhook-secret
 
 # Transactional password-reset email (Resend)
 RESEND_API_KEY=your-resend-api-key
@@ -160,7 +147,7 @@ The repository includes `railway.json` with the production build, database migra
 ---
 
 ## 🏗️ Project Structure
-- `api/` - Backend Hono and tRPC router, rate-limiting middleware, webhooks, and integrations (Paymob, WhatsApp).
+- `api/` - Backend Hono and tRPC router, rate-limiting middleware, and integrations such as WhatsApp.
 - `db/` - Drizzle ORM schema, SQL migrations, and database maintenance scripts.
 - `src/pages/` - React storefront pages (Home, Shop, Cart, Checkout, OrderConfirmation).
 - `src/pages/admin/` - Admin Dashboard pages and views (Orders, Products, Analytics, Settings).

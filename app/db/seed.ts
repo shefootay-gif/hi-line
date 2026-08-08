@@ -1,4 +1,5 @@
 import { getDb } from "../api/queries/connection";
+import { inArray, sql } from "drizzle-orm";
 import {
   products,
   categories,
@@ -446,24 +447,24 @@ async function seed() {
       },
       {
         method: "vodafone_cash",
-        isEnabled: true,
+        isEnabled: false,
         displayName: "Vodafone Cash",
         displayNameAr: "فودافون كاش",
         accountNumber: "+201223863092",
         accountName: "Hi Line Pro Care",
-        instructions: "Please send payment to +20 122 386 3092 and upload the receipt",
-        instructionsAr: "يرجى إرسال المبلغ إلى +20 122 386 3092 ورفع الإيصال",
+        instructions: "Send the payment, then send the receipt via WhatsApp for seller approval",
+        instructionsAr: "حوّل المبلغ ثم أرسل الإيصال عبر واتساب لاعتماده من البائع",
         sortOrder: 2,
       },
       {
         method: "instapay",
-        isEnabled: true,
+        isEnabled: false,
         displayName: "InstaPay",
         displayNameAr: "إنستا باي",
         accountNumber: "hiline@instapay",
         accountName: "Hi Line Pro Care",
-        instructions: "Send payment to hiline@instapay and upload the receipt",
-        instructionsAr: "أرسل المبلغ إلى hiline@instapay ورفع الإيصال",
+        instructions: "Send the payment, then send the receipt via WhatsApp for seller approval",
+        instructionsAr: "حوّل المبلغ ثم أرسل الإيصال عبر واتساب لاعتماده من البائع",
         sortOrder: 3,
       },
       {
@@ -475,8 +476,13 @@ async function seed() {
       },
     ])
     .onDuplicateKeyUpdate({
-      set: { isEnabled: true },
+      set: { isEnabled: sql`VALUES(is_enabled)` },
     });
+
+  await db
+    .update(paymentSettings)
+    .set({ isEnabled: false })
+    .where(inArray(paymentSettings.method, ["bank_transfer", "paymob"]));
 
   console.log("Payment settings seeded");
 

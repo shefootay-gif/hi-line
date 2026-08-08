@@ -7,11 +7,11 @@ import {
 } from "./middleware";
 import { getDb } from "./queries/connection";
 import { getCached, setCached } from "./cache";
-import { initializePaymobPayment } from "./payment-service";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { sendWhatsAppMessage } from "./whatsapp-service";
 import { sendMetaCAPIEvent } from "./meta-capi";
+import { getAffectedRows } from "./lib/db-result";
 import {
   products,
   categories,
@@ -31,7 +31,6 @@ import {
   abandonedCarts,
   userAddresses,
   customers,
-  paymentTransactions,
 } from "@db/schema";
 import { eq, desc, and, or, like, sql, inArray, notInArray } from "drizzle-orm";
 
@@ -269,7 +268,16 @@ export const storeRouter = createRouter({
     return db
       .select()
       .from(paymentSettings)
-      .where(eq(paymentSettings.isEnabled, true))
+      .where(
+        and(
+          eq(paymentSettings.isEnabled, true),
+          inArray(paymentSettings.method, [
+            "cash_on_delivery",
+            "vodafone_cash",
+            "instapay",
+          ])
+        )
+      )
       .orderBy(paymentSettings.sortOrder);
   }),
 
@@ -330,6 +338,31 @@ export const storeRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      if (input.paymentMethod !== "cash_on_delivery") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only cash on delivery is currently available.",
+        });
+      }
+
+      const [enabledPaymentMethod] = await db
+        .select()
+        .from(paymentSettings)
+        .where(
+          and(
+            eq(paymentSettings.method, input.paymentMethod),
+            eq(paymentSettings.isEnabled, true)
+          )
+        )
+        .limit(1);
+
+      if (!enabledPaymentMethod) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Selected payment method is not available.",
+        });
+      }
+
       const currentFingerprint = calculateOrderFingerprint(input);
 
       // End-to-end public order creation idempotency pre-check
@@ -360,50 +393,18 @@ export const storeRouter = createRouter({
             });
           }
 
-          // Fetch the paymob transaction if method is paymob
-          let paymobUrl: string | null = null;
-          if (existingOrder.paymentMethod === "paymob") {
-            const [transaction] = await db
-              .select()
-              .from(paymentTransactions)
-              .where(
-                and(
-                  eq(paymentTransactions.orderId, existingOrder.id),
-                  eq(paymentTransactions.provider, "paymob")
-                )
-              )
-              .limit(1);
-            if (transaction) {
-              paymobUrl = transaction.checkoutUrl;
-            }
-            if (!paymobUrl) {
-              throw new TRPCError({
-                code: "CONFLICT",
-                message:
-                  "Payment initialization is still in progress. Please retry shortly.",
-              });
-            }
-          }
-
           return {
             orderId: existingOrder.id,
             orderNumber: existingOrder.orderNumber,
             total: existingOrder.total,
             discountAmount: existingOrder.discountAmount,
-            paymobUrl,
+            paymobUrl: null,
           };
         }
       }
 
       const { nanoid } = await import("nanoid");
       const orderNumber = `HL${Date.now().toString(36).toUpperCase()}${nanoid(4).toUpperCase()}`;
-
-      const getAffectedRows = (result: unknown) => {
-        const packet = Array.isArray(result) ? result[0] : result;
-        return Number(
-          (packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0
-        );
-      };
 
       let result;
       try {
@@ -691,160 +692,16 @@ export const storeRouter = createRouter({
               });
             }
 
-            // Fetch the paymob transaction if method is paymob
-            let paymobUrl: string | null = null;
-            if (existingOrder.paymentMethod === "paymob") {
-              const [transaction] = await db
-                .select()
-                .from(paymentTransactions)
-                .where(
-                  and(
-                    eq(paymentTransactions.orderId, existingOrder.id),
-                    eq(paymentTransactions.provider, "paymob")
-                  )
-                )
-                .limit(1);
-              if (transaction) {
-                paymobUrl = transaction.checkoutUrl;
-              }
-              if (!paymobUrl) {
-                throw new TRPCError({
-                  code: "CONFLICT",
-                  message:
-                    "Payment initialization is still in progress. Please retry shortly.",
-                });
-              }
-            }
-
             return {
               orderId: existingOrder.id,
               orderNumber: existingOrder.orderNumber,
               total: existingOrder.total,
               discountAmount: existingOrder.discountAmount,
-              paymobUrl,
+              paymobUrl: null,
             };
           }
         }
         throw err;
-      }
-
-      let paymobUrl: string | null = null;
-      if (result.input.paymentMethod === "paymob") {
-        let providerOrderId: string | null = null;
-        try {
-          const paymentSession = await initializePaymobPayment(
-            Math.round(result.totalNumber * 100),
-            result.orderNumber,
-            {
-              firstName:
-                result.input.customerName.split(" ")[0] ||
-                result.input.customerName,
-              lastName:
-                result.input.customerName.split(" ").slice(1).join(" ") ||
-                "Customer",
-              email: result.input.customerEmail || "customer@hilineprocare.com",
-              phoneNumber: result.input.customerPhone,
-              city: result.input.city || "Cairo",
-              country: "EG",
-              street: result.input.shippingAddress || "N/A",
-            }
-          );
-          paymobUrl = paymentSession.checkoutUrl;
-          providerOrderId = paymentSession.providerOrderId;
-        } catch (paymobErr) {
-          console.error("Paymob initialization exception:", paymobErr);
-          paymobUrl = null;
-        }
-
-        if (!paymobUrl) {
-          // If Paymob initialization fails, transition the order safely to failed/cancelled
-          // and restore inventory exactly once in a transaction (guarded by conditional transition status).
-          await db.transaction(async tx => {
-            const updateResult = await tx
-              .update(orders)
-              .set({
-                orderStatus: "cancelled",
-                paymentStatus: "failed",
-                notes: sql`CONCAT(COALESCE(${orders.notes}, ''), ' [System: Cancelled due to Paymob initialization failure]')`,
-              })
-              .where(
-                and(
-                  eq(orders.id, result.orderId),
-                  eq(orders.paymentStatus, "pending")
-                )
-              );
-
-            const affected = getAffectedRows(updateResult);
-
-            if (affected === 1) {
-              for (const item of result.input.items) {
-                await tx
-                  .update(products)
-                  .set({ stock: sql`${products.stock} + ${item.quantity}` })
-                  .where(eq(products.id, item.productId));
-
-                const [product] = await tx
-                  .select()
-                  .from(products)
-                  .where(eq(products.id, item.productId))
-                  .limit(1);
-
-                if (product) {
-                  const newStock = product.stock;
-                  const previousStock = newStock - item.quantity;
-
-                  await tx.insert(inventoryMovements).values({
-                    productId: item.productId,
-                    orderId: result.orderId,
-                    type: "cancel",
-                    quantity: item.quantity,
-                    previousStock,
-                    newStock,
-                    reason: "Paymob initialization failure - Stock restored",
-                    reference: result.orderNumber,
-                  });
-                }
-              }
-
-              if (result.appliedCouponId) {
-                await tx
-                  .update(coupons)
-                  .set({
-                    currentUsage: sql`GREATEST(${coupons.currentUsage} - 1, 0)`,
-                  })
-                  .where(eq(coupons.id, result.appliedCouponId));
-              }
-
-              await tx
-                .update(customers)
-                .set({
-                  totalOrders: sql`GREATEST(${customers.totalOrders} - 1, 0)`,
-                  totalSpent: sql`GREATEST(${customers.totalSpent} - ${result.total}, 0)`,
-                })
-                .where(eq(customers.phone, result.input.customerPhone));
-            }
-          });
-
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message:
-              "Payment initialization failed. Your order has been cancelled and stock released. Please try again.",
-          });
-        } else {
-          // Persist the Paymob order/transaction details needed for reconciliation
-          await db.insert(paymentTransactions).values({
-            orderId: result.orderId,
-            orderNumber: result.orderNumber,
-            provider: "paymob",
-            method: "paymob",
-            amount: result.total,
-            currency: "EGP",
-            status: "pending",
-            providerOrderId,
-            checkoutUrl: paymobUrl,
-            paidAt: null,
-          });
-        }
       }
 
       sendWhatsAppMessage(
@@ -853,8 +710,7 @@ export const storeRouter = createRouter({
       );
 
       // Send to Meta CAPI
-      if (result.input.paymentMethod !== "paymob")
-        sendMetaCAPIEvent(
+      sendMetaCAPIEvent(
           "Purchase",
           {
             value: result.totalNumber,
@@ -875,7 +731,7 @@ export const storeRouter = createRouter({
         orderNumber: result.orderNumber,
         total: result.total,
         discountAmount: result.discountAmount,
-        paymobUrl,
+        paymobUrl: null,
       };
     }),
 
@@ -988,13 +844,6 @@ export const storeRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       const db = getDb();
-      const getAffectedRows = (result: unknown) => {
-        const packet = Array.isArray(result) ? result[0] : result;
-        return Number(
-          (packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0
-        );
-      };
-
       await db.transaction(async tx => {
         const orderResult = await tx
           .select()
@@ -1068,7 +917,6 @@ export const storeRouter = createRouter({
       return { success: true };
     }),
 
-  // Reviews endpoints
   // Reviews endpoints
   addReview: authedQuery
     .input(

@@ -16,6 +16,7 @@ export default function OrderConfirmation() {
     { orderNumber: orderNumber || "", customerPhone: customerPhone || undefined },
     { enabled: !!orderNumber, retry: false }
   );
+  const { data: settings } = trpc.store.getSettings.useQuery();
 
   if (isLoading) {
     return (
@@ -48,6 +49,20 @@ export default function OrderConfirmation() {
         : `Hello! I want to track my order #${orderNumber}`;
     window.open(
       `https://wa.me/201223863092?text=${encodeURIComponent(message)}`,
+      "_blank"
+    );
+  };
+
+  const handleSendReceipt = () => {
+    const whatsappNumber = (
+      settings?.whatsapp_number || "+201223863092"
+    ).replace(/[^\d]/g, "");
+    const message =
+      lang === "ar"
+        ? `مرحبًا، أرفق إيصال التحويل لمراجعة الطلب رقم: ${orderNumber}`
+        : `Hello, I am attaching the transfer receipt for order #${orderNumber}`;
+    window.open(
+      `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`,
       "_blank"
     );
   };
@@ -105,6 +120,13 @@ export default function OrderConfirmation() {
             <div className="bg-white rounded-lg p-4 border border-[#FDE68A] text-center">
               <p className="text-xl font-bold text-[#D97706] tracking-widest">0122 386 3092</p>
             </div>
+            <button type="button" onClick={handleSendReceipt} className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 font-semibold text-white hover:bg-[#128C7E]">
+              <MessageCircle className="h-5 w-5" />
+              {lang === "ar" ? "إرسال الإيصال عبر واتساب" : "Send receipt via WhatsApp"}
+            </button>
+            <p className="mt-3 text-sm font-medium text-[#92400E]">
+              {lang === "ar" ? "سيظل الطلب قيد الانتظار حتى يراجع البائع الإيصال ويعتمد الدفع." : "The order remains pending until the seller reviews the receipt and approves payment."}
+            </p>
           </div>
         )}
 
@@ -121,6 +143,13 @@ export default function OrderConfirmation() {
             <div className="bg-white rounded-lg p-4 border border-[#BBF7D0] text-center">
               <p className="text-xl font-bold text-[#166534] tracking-widest">hiline@instapay</p>
             </div>
+            <button type="button" onClick={handleSendReceipt} className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 font-semibold text-white hover:bg-[#128C7E]">
+              <MessageCircle className="h-5 w-5" />
+              {lang === "ar" ? "إرسال الإيصال عبر واتساب" : "Send receipt via WhatsApp"}
+            </button>
+            <p className="mt-3 text-sm font-medium text-[#166534]">
+              {lang === "ar" ? "سيظل الطلب قيد الانتظار حتى يراجع البائع الإيصال ويعتمد الدفع." : "The order remains pending until the seller reviews the receipt and approves payment."}
+            </p>
           </div>
         )}
 

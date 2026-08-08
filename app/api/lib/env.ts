@@ -38,16 +38,11 @@ export const env = {
   // Primary JWT secret (new, preferred)
   jwtSecret: requiredJwtSecret(),
 
-  // Paymob HMAC Secret
-  paymobHmacSecret: (() => {
-    const val = process.env.PAYMOB_HMAC_SECRET?.trim();
-    if (!val && isProduction) {
-      throw new Error(
-        "Missing required environment variable: PAYMOB_HMAC_SECRET"
-      );
-    }
-    return val ?? "local-dev-hmac-secret";
-  })(),
+  // Paymob is intentionally disabled. The test environment keeps the callback
+  // reachable only so its legacy signature/reconciliation tests remain useful.
+  paymobEnabled: process.env.NODE_ENV === "test",
+  paymobHmacSecret:
+    optionalNonEmpty("PAYMOB_HMAC_SECRET") ?? "local-dev-hmac-secret",
 
   // Legacy compat — used in kimi/session.ts via appSecret fallback
   appId: process.env.APP_ID ?? "",

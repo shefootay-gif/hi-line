@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { appRouter } from "./router";
-import { initializePaymobPayment } from "./payment-service";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-
-vi.mock("./payment-service", () => ({
-  initializePaymobPayment: vi.fn(),
-}));
 
 interface MockProduct {
   id: number;
@@ -44,6 +39,11 @@ interface MockOrder {
   appliedCouponId?: number | null;
   shippingAddress?: string;
   items?: { productId: number; quantity: number }[];
+}
+
+interface MockPaymentSetting {
+  method: string;
+  isEnabled: boolean;
 }
 
 const getTableName = (schemaTable: unknown): string => {
@@ -120,6 +120,12 @@ class MockDbInstance {
   ];
   inventoryMovements: unknown[] = [];
   paymentTransactions: unknown[] = [];
+  paymentSettings: MockPaymentSetting[] = [
+    { method: "cash_on_delivery", isEnabled: true },
+    { method: "vodafone_cash", isEnabled: true },
+    { method: "instapay", isEnabled: true },
+    { method: "bank_transfer", isEnabled: false },
+  ];
   customers: unknown[] = [];
   shippingSettings: unknown[] = [];
   storeSettings: unknown[] = [];
@@ -137,6 +143,7 @@ class MockDbInstance {
           if (tableName === "store_settings") return this.storeSettings;
           if (tableName === "payment_transactions")
             return this.paymentTransactions;
+          if (tableName === "payment_settings") return this.paymentSettings;
           return [];
         };
 
@@ -240,17 +247,12 @@ describe("tRPC store.createOrder behaviors", () => {
 
     const key = "a3b8fa3a-2394-4d80-87a3-864bbd985a1a";
 
-    vi.mocked(initializePaymobPayment).mockResolvedValueOnce({
-      checkoutUrl: "https://checkout.paymob.com/123",
-      providerOrderId: "paymob-order-123",
-    });
-
     const result1 = await caller.store.createOrder({
       idempotencyKey: key,
       customerName: "John Doe",
       customerPhone: "01234567890",
       shippingAddress: "Cairo",
-      paymentMethod: "paymob",
+      paymentMethod: "cash_on_delivery",
       items: [{ productId: 1, quantity: 2 }],
     });
 
@@ -264,7 +266,7 @@ describe("tRPC store.createOrder behaviors", () => {
         requestFingerprint: mockDbInstance.orders[0].requestFingerprint,
         customerName: "John Doe",
         customerPhone: "01234567890",
-        paymentMethod: "paymob",
+        paymentMethod: "cash_on_delivery",
         total: "100.00",
         discountAmount: "0.00",
       },
@@ -275,7 +277,7 @@ describe("tRPC store.createOrder behaviors", () => {
       customerName: "John Doe",
       customerPhone: "01234567890",
       shippingAddress: "Cairo",
-      paymentMethod: "paymob",
+      paymentMethod: "cash_on_delivery",
       items: [{ productId: 1, quantity: 2 }],
     });
 
@@ -299,7 +301,7 @@ describe("tRPC store.createOrder behaviors", () => {
         requestFingerprint: "some-fingerprint",
         customerName: "John Doe",
         customerPhone: "01234567890",
-        paymentMethod: "paymob",
+        paymentMethod: "cash_on_delivery",
         total: "100.00",
         discountAmount: "0.00",
       },
@@ -311,7 +313,7 @@ describe("tRPC store.createOrder behaviors", () => {
         customerName: "Different Name",
         customerPhone: "01234567890",
         shippingAddress: "Cairo",
-        paymentMethod: "paymob",
+        paymentMethod: "cash_on_delivery",
         items: [{ productId: 1, quantity: 2 }],
       })
     ).rejects.toThrow(TRPCError);
@@ -371,36 +373,28 @@ describe("tRPC store.createOrder behaviors", () => {
     expect(result.orderId).toBe(555);
   });
 
-  it("should cancel order and restore stock exactly once on Paymob initialization failure", async () => {
+  it("rejects payment methods outside the supported manual methods", async () => {
+    mockDbInstance.paymentSettings = [
+      { method: "cash_on_delivery", isEnabled: true },
+      { method: "bank_transfer", isEnabled: false },
+    ];
     const caller = appRouter.createCaller({
       req: new Request("https://localhost/api/trpc"),
       resHeaders: new Headers(),
     });
 
-    const key = "d12a8069-4e78-43d9-95e2-763db026ee68";
-
-    vi.mocked(initializePaymobPayment).mockRejectedValueOnce(
-      new Error("Paymob unavailable")
-    );
-
-    mockDbInstance.products = [
-      { id: 1, stock: 10, isActive: true, nameEn: "Product 1", price: "50.00" },
-    ];
-
     await expect(
       caller.store.createOrder({
-        idempotencyKey: key,
+        idempotencyKey: "e8b96a40-924c-4ef3-8bfb-0f851dfb84a9",
         customerName: "John Doe",
         customerPhone: "01234567890",
         shippingAddress: "Cairo",
-        paymentMethod: "paymob",
-        items: [{ productId: 1, quantity: 2 }],
-      })
-    ).rejects.toThrow();
+        paymentMethod: "paymob" as never,
+        items: [{ productId: 1, quantity: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
-    expect(mockDbInstance.orders[0].paymentStatus).toBe("failed");
-    expect(mockDbInstance.orders[0].orderStatus).toBe("cancelled");
-    expect(mockDbInstance.products[0].stock).toBe(12);
+    expect(mockDbInstance.orders).toHaveLength(0);
   });
 });
 

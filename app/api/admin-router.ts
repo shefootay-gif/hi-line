@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { clearCachePrefix } from "./cache";
@@ -33,9 +34,6 @@ import {
   backupJobs,
 } from "@db/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
-
-
 const nonNegativeMoney = z
   .string()
   .trim()
@@ -408,6 +406,20 @@ export const adminRouter = createRouter({
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
       const orderRes = await db.select().from(orders).where(eq(orders.id, input.id)).limit(1);
+      const order = orderRes[0];
+      const isManualTransfer =
+        order?.paymentMethod === "vodafone_cash" ||
+        order?.paymentMethod === "instapay";
+      const startsFulfillment = ["processing", "shipped", "delivered"].includes(
+        input.status
+      );
+
+      if (isManualTransfer && startsFulfillment && order.paymentStatus !== "paid") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Approve the payment receipt before processing this order.",
+        });
+      }
       
       await db
         .update(orders)

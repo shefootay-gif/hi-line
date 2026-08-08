@@ -19,6 +19,7 @@ import { eq, and, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { sendMetaCAPIEvent } from "./meta-capi";
 import { buildSitemap } from "./lib/sitemap";
+import { getAffectedRows } from "./lib/db-result";
 
 process.on("uncaughtException", err => {
   console.error("CRITICAL UNCAUGHT EXCEPTION:", err);
@@ -77,6 +78,10 @@ app.use("/api/trpc/*", async c => {
   });
 });
 app.post("/api/payments/paymob/callback", async c => {
+  if (!env.paymobEnabled) {
+    return c.json({ error: "Not Found" }, 404);
+  }
+
   try {
     const hmac = c.req.query("hmac");
     if (!hmac) {
@@ -243,13 +248,6 @@ app.post("/api/payments/paymob/callback", async c => {
       isRefunded: obj.is_refunded,
       isVoided: obj.is_voided,
       paymentMethodSubType: obj.source_data?.sub_type || "",
-    };
-
-    const getAffectedRows = (result: unknown) => {
-      const packet = Array.isArray(result) ? result[0] : result;
-      return Number(
-        (packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0
-      );
     };
 
     let orderTransitionApplied = false;

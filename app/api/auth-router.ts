@@ -1,10 +1,9 @@
-import * as cookie from "cookie";
 import crypto from "crypto";
 import { z } from "zod";
 import { and, eq, gt } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { Session } from "@contracts/constants";
-import { getSessionCookieOptions } from "./lib/cookies";
+import { serializeSessionCookie } from "./lib/cookies";
+import { getAffectedRows } from "./lib/db-result";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
 import { env } from "./lib/env";
 import { signSessionToken } from "./lib/session";
@@ -19,12 +18,6 @@ const passwordResetResponse = {
   success: true,
   message: "If an account with that email exists, a reset link has been sent.",
 } as const;
-
-function getAffectedRows(result: unknown): number {
-  if (!Array.isArray(result)) return 0;
-  const packet = result[0];
-  return (packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0;
-}
 
 export const authRouter = createRouter({
   me: authedQuery.query((opts) => opts.ctx.user),
@@ -76,16 +69,9 @@ export const authRouter = createRouter({
         unionId,
         clientId: "local-admin",
       });
-      const opts = getSessionCookieOptions(ctx.req.headers);
       ctx.resHeaders.append(
         "set-cookie",
-        cookie.serialize(Session.cookieName, token, {
-          httpOnly: opts.httpOnly,
-          path: opts.path,
-          sameSite: opts.sameSite?.toLowerCase() as "lax" | "none",
-          secure: opts.secure,
-          maxAge: Session.maxAgeMs / 1000,
-        }),
+        serializeSessionCookie(ctx.req.headers, token),
       );
 
       return { success: true };
@@ -119,16 +105,9 @@ export const authRouter = createRouter({
       }
       // Issue session token
       const token = await signSessionToken({ unionId: user.unionId, clientId: "local" });
-      const cookieOpts = getSessionCookieOptions(ctx.req.headers);
       ctx.resHeaders.append(
         "set-cookie",
-        cookie.serialize(Session.cookieName, token, {
-          httpOnly: cookieOpts.httpOnly,
-          path: cookieOpts.path,
-          sameSite: cookieOpts.sameSite?.toLowerCase() as "lax" | "none",
-          secure: cookieOpts.secure,
-          maxAge: 30 * 24 * 60 * 60,
-        }),
+        serializeSessionCookie(ctx.req.headers, token, 30 * 24 * 60 * 60),
       );
       // Return safe user data (omit passwordHash)
       const { passwordHash, ...safeUser } = user;
@@ -175,16 +154,9 @@ export const authRouter = createRouter({
     }),
 
   logout: authedQuery.mutation(async ({ ctx }) => {
-    const opts = getSessionCookieOptions(ctx.req.headers);
     ctx.resHeaders.append(
       "set-cookie",
-      cookie.serialize(Session.cookieName, "", {
-        httpOnly: opts.httpOnly,
-        path: opts.path,
-        sameSite: opts.sameSite?.toLowerCase() as "lax" | "none",
-        secure: opts.secure,
-        maxAge: 0,
-      }),
+      serializeSessionCookie(ctx.req.headers, "", 0),
     );
     return { success: true };
   }),

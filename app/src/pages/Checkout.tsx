@@ -213,16 +213,12 @@ export default function Checkout() {
       });
 
       clearCart();
-      if (result.paymobUrl) {
-        window.location.href = result.paymobUrl;
-      } else {
-        navigate(
-          `/order-confirmation?order=${result.orderNumber}&phone=${encodeURIComponent(formData.phone)}`,
-          {
-            state: { total: result.total },
-          }
-        );
-      }
+      navigate(
+        `/order-confirmation?order=${result.orderNumber}&phone=${encodeURIComponent(formData.phone)}`,
+        {
+          state: { total: result.total },
+        }
+      );
     } catch (err) {
       const error = err as { message?: string; data?: { code?: string } };
       if (error.data?.code === "PRECONDITION_FAILED") {
