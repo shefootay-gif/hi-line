@@ -48,4 +48,31 @@ describe("rateLimiter", () => {
     expect(responseAfterReset.status).toBe(200);
     expect(responseAfterReset.headers.get("X-RateLimit-Remaining")).toBe("0");
   });
+
+  it("applies the stricter authentication limit to forgot-password requests", async () => {
+    const app = new Hono();
+    app.use("*", rateLimiter({ limit: 300, windowMs: 60_000 }));
+    app.post("/api/trpc/auth.forgotPassword", c => c.json({ ok: true }));
+    const requestEnv = { remoteAddress: "forgot-password-client" };
+
+    for (let request = 0; request < 10; request += 1) {
+      expect(
+        (
+          await app.request(
+            "/api/trpc/auth.forgotPassword",
+            { method: "POST" },
+            requestEnv,
+          )
+        ).status,
+      ).toBe(200);
+    }
+
+    const blockedResponse = await app.request(
+      "/api/trpc/auth.forgotPassword",
+      { method: "POST" },
+      requestEnv,
+    );
+    expect(blockedResponse.status).toBe(429);
+    expect(blockedResponse.headers.get("X-RateLimit-Limit")).toBe("10");
+  });
 });

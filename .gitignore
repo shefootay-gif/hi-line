@@ -17,6 +17,8 @@ mysql-local/
 .env
 .env.local
 .env.production
+**/decrypted_cookies.json
+**/*decrypted*cookie*.json
 node_modules/
 dist/
 build/

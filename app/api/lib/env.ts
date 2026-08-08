@@ -1,8 +1,10 @@
 import "dotenv/config";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 function required(name: string): string {
   const value = process.env[name];
-  if (!value && process.env.NODE_ENV === "production") {
+  if (!value && isProduction) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value ?? "";
@@ -16,7 +18,7 @@ function optionalNonEmpty(name: string): string | undefined {
 function requiredJwtSecret(): string {
   const value =
     optionalNonEmpty("JWT_SECRET") ?? optionalNonEmpty("APP_SECRET");
-  if (!value && process.env.NODE_ENV === "production") {
+  if (!value && isProduction) {
     throw new Error("Missing required environment variable: JWT_SECRET");
   }
   return value ?? "local-dev-secret-change-in-production";
@@ -39,7 +41,7 @@ export const env = {
   // Paymob HMAC Secret
   paymobHmacSecret: (() => {
     const val = process.env.PAYMOB_HMAC_SECRET?.trim();
-    if (!val && process.env.NODE_ENV === "production") {
+    if (!val && isProduction) {
       throw new Error(
         "Missing required environment variable: PAYMOB_HMAC_SECRET"
       );
@@ -51,11 +53,11 @@ export const env = {
   appId: process.env.APP_ID ?? "",
   appSecret:
     optionalNonEmpty("APP_SECRET") ??
-    (process.env.NODE_ENV === "production"
+    (isProduction
       ? required("APP_SECRET")
       : "local-dev-secret"),
 
-  isProduction: process.env.NODE_ENV === "production",
+  isProduction,
   trustProxy: process.env.TRUST_PROXY === "true",
   databaseUrl: databaseUrl(),
 
@@ -70,5 +72,18 @@ export const env = {
     (process.env.NODE_ENV === "production" ? "" : "admin"),
   localAdminPassword:
     process.env.LOCAL_ADMIN_PASSWORD ??
-    (process.env.NODE_ENV === "production" ? "" : "admin-dev-password"),
+    (isProduction ? "" : "admin-dev-password"),
+
+  // Transactional email used by the password-reset flow.
+  resendApiKey:
+    optionalNonEmpty("RESEND_API_KEY") ??
+    (isProduction ? required("RESEND_API_KEY") : ""),
+  passwordResetFromEmail:
+    optionalNonEmpty("PASSWORD_RESET_FROM_EMAIL") ??
+    (isProduction ? required("PASSWORD_RESET_FROM_EMAIL") : ""),
+  passwordResetBaseUrl:
+    optionalNonEmpty("PASSWORD_RESET_BASE_URL") ??
+    (isProduction
+      ? required("PASSWORD_RESET_BASE_URL")
+      : "http://localhost:3000"),
 };

@@ -14,9 +14,10 @@ function getClientIp(
   remoteAddress: string | undefined,
   forwardedFor: string | undefined,
 ): string {
-  if (remoteAddress) return remoteAddress;
-  if (!env.trustProxy || !forwardedFor) return "unknown";
-  return forwardedFor.split(",")[0]?.trim() || "unknown";
+  if (env.trustProxy && forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || "unknown";
+  }
+  return remoteAddress || "unknown";
 }
 
 export const rateLimiter = (options = { limit: 200, windowMs: 60000 }): MiddlewareHandler => {
@@ -33,6 +34,7 @@ export const rateLimiter = (options = { limit: 200, windowMs: 60000 }): Middlewa
       url.includes("createOrder") || 
       url.includes("Login") || 
       url.includes("register") || 
+      url.includes("forgotPassword") ||
       url.includes("resetPassword");
       
     const limit = isSensitive ? 10 : options.limit;

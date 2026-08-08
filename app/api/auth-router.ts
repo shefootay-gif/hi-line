@@ -1,6 +1,7 @@
 import * as cookie from "cookie";
+import crypto from "crypto";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { Session } from "@contracts/constants";
 import { getSessionCookieOptions } from "./lib/cookies";
@@ -9,6 +10,21 @@ import { env } from "./lib/env";
 import { signSessionToken } from "./lib/session";
 import { getDb } from "./queries/connection";
 import { users, passwordResetTokens } from "@db/schema";
+import {
+  hashPasswordResetToken,
+  sendPasswordResetEmail,
+} from "./email-service";
+
+const passwordResetResponse = {
+  success: true,
+  message: "If an account with that email exists, a reset link has been sent.",
+} as const;
+
+function getAffectedRows(result: unknown): number {
+  if (!Array.isArray(result)) return 0;
+  const packet = result[0];
+  return (packet as { affectedRows?: number } | undefined)?.affectedRows ?? 0;
+}
 
 export const authRouter = createRouter({
   me: authedQuery.query((opts) => opts.ctx.user),
@@ -182,26 +198,41 @@ export const authRouter = createRouter({
       const user = rows[0];
       if (!user) {
         // Return success even if not found to prevent email enumeration
-        return { success: true, message: "If an account with that email exists, a reset link has been sent." };
+        return passwordResetResponse;
       }
-      
-      const { nanoid } = await import("nanoid");
-      const token = nanoid(32);
+
+      const token = crypto.randomBytes(32).toString("base64url");
+      const tokenHash = hashPasswordResetToken(token);
       const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
-      
+
+      // A new request invalidates any earlier reset links for this account.
+      await db
+        .update(passwordResetTokens)
+        .set({ used: true })
+        .where(eq(passwordResetTokens.userId, user.id));
+
       await db.insert(passwordResetTokens).values({
         userId: user.id,
-        token,
+        token: tokenHash,
         expiresAt,
       });
-      
-      // TODO: send this token through an email provider.
-      // Never print password reset links in production logs.
-      if (!env.isProduction) {
-        console.log(`[PASSWORD RESET] Link: /reset-password?token=${token}`);
+
+      try {
+        await sendPasswordResetEmail({
+          to: email,
+          name: user.name,
+          token,
+        });
+      } catch (error) {
+        // Do not reveal whether an account exists, but invalidate an undelivered link.
+        await db
+          .update(passwordResetTokens)
+          .set({ used: true })
+          .where(eq(passwordResetTokens.token, tokenHash));
+        console.error("Password reset email delivery failed:", error);
       }
-      
-      return { success: true, message: "If an account with that email exists, a reset link has been sent." };
+
+      return passwordResetResponse;
     }),
 
   resetPassword: publicQuery
@@ -211,22 +242,52 @@ export const authRouter = createRouter({
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      const rows = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.token, input.token)).limit(1);
+      const tokenHash = hashPasswordResetToken(input.token);
+      const rows = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.token, tokenHash))
+        .limit(1);
       const resetReq = rows[0];
-      
+
       if (!resetReq || resetReq.used || resetReq.expiresAt < new Date()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired reset token." });
       }
-      
+
       const { default: bcrypt } = await import("bcryptjs");
       const passwordHash = await bcrypt.hash(input.password, 12);
-      
-      // Update password
-      await db.update(users).set({ passwordHash }).where(eq(users.id, resetReq.userId));
-      
-      // Mark token as used
-      await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, resetReq.id));
-      
+
+      await db.transaction(async tx => {
+        // Claim the token atomically so concurrent requests cannot reuse it.
+        const claimResult = await tx
+          .update(passwordResetTokens)
+          .set({ used: true })
+          .where(
+            and(
+              eq(passwordResetTokens.id, resetReq.id),
+              eq(passwordResetTokens.used, false),
+              gt(passwordResetTokens.expiresAt, new Date()),
+            ),
+          );
+
+        if (getAffectedRows(claimResult) !== 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid or expired reset token.",
+          });
+        }
+
+        await tx
+          .update(users)
+          .set({ passwordHash })
+          .where(eq(users.id, resetReq.userId));
+
+        await tx
+          .update(passwordResetTokens)
+          .set({ used: true })
+          .where(eq(passwordResetTokens.userId, resetReq.userId));
+      });
+
       return { success: true, message: "Password has been reset successfully. Please login." };
     }),
 });

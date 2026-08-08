@@ -82,6 +82,11 @@ PAYMOB_IFRAME_ID=your-iframe-id
 # HMAC Secret for authenticating incoming transaction webhooks (required in production)
 PAYMOB_HMAC_SECRET=your-paymob-hmac-webhook-secret
 
+# Transactional password-reset email (Resend)
+RESEND_API_KEY=your-resend-api-key
+PASSWORD_RESET_FROM_EMAIL=Hi Line Pro Care <no-reply@yourdomain.com>
+PASSWORD_RESET_BASE_URL=https://yourdomain.com
+
 # ── WhatsApp Notifications (Optional) ──────────────────────────
 # Meta WhatsApp Cloud API credentials
 WHATSAPP_API_URL=https://graph.facebook.com/v17.0
@@ -147,6 +152,10 @@ To bundle the project and start the application in production mode:
    npm run start
    ```
 This sets `NODE_ENV=production` and runs the compiled bundle `dist/boot.js` listening on port `3000` (or the port defined in the `PORT` environment variable).
+
+### Railway deployment
+
+The repository includes `railway.json` with the production build, database migration, start command, restart policy, and `/api/health/ready` health check. In Railway, set the service root directory to `app`, attach a MySQL service over private networking, and configure the production environment variables above before the first deployment.
 
 ---
 
