@@ -10,7 +10,7 @@ export type SeoProduct = {
   salePrice: string | null;
   stock: number;
   sku: string | null;
-  images: string[] | null;
+  images: string[] | string | null;
 };
 
 const pageCopy = {
@@ -54,6 +54,22 @@ const escapeHtml = (value: string) =>
 const jsonLd = (value: unknown) =>
   JSON.stringify(value).replace(/</g, "\\u003c");
 
+const imageList = (value: SeoProduct["images"] | undefined): string[] => {
+  if (Array.isArray(value)) {
+    return value.filter((image): image is string => typeof image === "string" && image.trim().length > 0);
+  }
+  if (typeof value !== "string" || !value.trim()) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((image): image is string => typeof image === "string" && image.trim().length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+};
+
 const localeDetails = (pathname: string) => {
   const match = pathname.match(/^\/(ar|en)(\/.*)?$/);
   const locale = match?.[1] === "ar" ? "ar" : "en";
@@ -87,7 +103,10 @@ export const injectSeoDocument = (
   const alternateAr = new URL(`/ar${alternateRoute}`, origin).href;
   const alternateEn = new URL(`/en${alternateRoute}`, origin).href;
   const logo = new URL("/brand/logo.jpg", origin).href;
-  const imageUrls = product?.images?.map(image => new URL(image, origin).href) ?? [logo];
+  const images = imageList(product?.images);
+  const imageUrls = images.length > 0
+    ? images.map(image => new URL(image, origin).href)
+    : [logo];
   const structuredData = product
     ? {
         "@context": "https://schema.org",

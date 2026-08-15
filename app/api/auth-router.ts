@@ -4,11 +4,11 @@ import { and, eq, gt } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { serializeSessionCookie } from "./lib/cookies";
 import { getAffectedRows } from "./lib/db-result";
-import { createRouter, authedQuery, publicQuery } from "./middleware";
+import { createRouter, adminQuery, authedQuery, publicQuery } from "./middleware";
 import { env } from "./lib/env";
 import { signSessionToken } from "./lib/session";
 import { getDb } from "./queries/connection";
-import { users, passwordResetTokens } from "@db/schema";
+import { adminActivityLogs, users, passwordResetTokens } from "@db/schema";
 import {
   hashPasswordResetToken,
   sendPasswordResetEmail,
@@ -18,6 +18,42 @@ const passwordResetResponse = {
   success: true,
   message: "If an account with that email exists, a reset link has been sent.",
 } as const;
+
+const localAdminUnionId = () => `local-admin:${env.localAdminUsername}`;
+
+const safePasswordEqual = (candidate: string, expected: string) => {
+  const candidateBuffer = Buffer.from(candidate);
+  const expectedBuffer = Buffer.from(expected);
+  return candidateBuffer.length === expectedBuffer.length
+    && crypto.timingSafeEqual(candidateBuffer, expectedBuffer);
+};
+
+const getLocalAdminPasswordHash = async () => {
+  const [row] = await getDb()
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.unionId, localAdminUnionId()))
+    .limit(1);
+  return row?.passwordHash ?? null;
+};
+
+const verifyLocalAdminPassword = async (password: string) => {
+  const passwordHash = await getLocalAdminPasswordHash();
+  if (passwordHash) {
+    const { default: bcrypt } = await import("bcryptjs");
+    return bcrypt.compare(password, passwordHash);
+  }
+  return Boolean(env.localAdminPassword)
+    && safePasswordEqual(password, env.localAdminPassword);
+};
+
+const strongAdminPassword = z.string()
+  .min(12, "Password must be at least 12 characters.")
+  .max(100, "Password is too long.")
+  .regex(/[A-Z]/, "Password must contain an uppercase letter.")
+  .regex(/[a-z]/, "Password must contain a lowercase letter.")
+  .regex(/[0-9]/, "Password must contain a number.")
+  .regex(/[^A-Za-z0-9]/, "Password must contain a special character.");
 
 export const authRouter = createRouter({
   me: authedQuery.query((opts) => opts.ctx.user),
@@ -53,18 +89,18 @@ export const authRouter = createRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      if (!env.localAdminUsername || !env.localAdminPassword) {
+      if (!env.localAdminUsername) {
         throw new Error("Local admin login is not configured.");
       }
 
       if (
         input.username.trim() !== env.localAdminUsername ||
-        input.password !== env.localAdminPassword
+        !(await verifyLocalAdminPassword(input.password))
       ) {
         throw new Error("Invalid username or password.");
       }
 
-      const unionId = `local-admin:${env.localAdminUsername}`;
+      const unionId = localAdminUnionId();
       const token = await signSessionToken({
         unionId,
         clientId: "local-admin",
@@ -73,6 +109,49 @@ export const authRouter = createRouter({
         "set-cookie",
         serializeSessionCookie(ctx.req.headers, token),
       );
+
+      return { success: true };
+    }),
+
+  changeLocalAdminPassword: adminQuery
+    .input(z.object({
+      currentPassword: z.string().min(1).max(100),
+      newPassword: strongAdminPassword,
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.unionId !== localAdminUnionId()) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This account cannot change the primary admin password." });
+      }
+      if (!(await verifyLocalAdminPassword(input.currentPassword))) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Current password is incorrect." });
+      }
+      if (safePasswordEqual(input.currentPassword, input.newPassword)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The new password must be different." });
+      }
+
+      const { default: bcrypt } = await import("bcryptjs");
+      const passwordHash = await bcrypt.hash(input.newPassword, 12);
+      const db = getDb();
+      const updateResult = await db
+        .update(users)
+        .set({ passwordHash })
+        .where(eq(users.unionId, localAdminUnionId()));
+
+      if (getAffectedRows(updateResult) === 0) {
+        await db.insert(users).values({
+          unionId: localAdminUnionId(),
+          name: "Hi Line Admin",
+          email: "admin@hiline.local",
+          role: "admin",
+          passwordHash,
+        });
+      }
+
+      await db.insert(adminActivityLogs).values({
+        adminUserId: ctx.user.id || null,
+        action: "change_admin_password",
+        entityType: "security",
+      });
 
       return { success: true };
     }),

@@ -1,5 +1,5 @@
 import {
-  CreditCard, Facebook, Globe, Instagram, Mail, MapPin, Palette,
+  CreditCard, Facebook, Globe, Instagram, LockKeyhole, Mail, MapPin, Palette,
   Phone, Send, Store, Truck, Twitter, Youtube,
 } from "lucide-react";
 
@@ -9,6 +9,7 @@ export const settingsTabs = [
   { key: "appearance", labelEn: "Appearance", labelAr: "المظهر", icon: Palette },
   { key: "shipping", labelEn: "Shipping", labelAr: "الشحن", icon: Truck },
   { key: "payment", labelEn: "Payment", labelAr: "الدفع", icon: CreditCard },
+  { key: "security", labelEn: "Security", labelAr: "الأمان", icon: LockKeyhole },
   { key: "seo", labelEn: "SEO", labelAr: "تحسين البحث", icon: Globe },
 ];
 

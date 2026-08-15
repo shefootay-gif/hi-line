@@ -35,6 +35,25 @@ describe("injectSeoDocument", () => {
     expect(html).toContain("Fresh daily protection.");
   });
 
+  it("accepts product images returned by MariaDB as a JSON string", () => {
+    const html = injectSeoDocument(template, "https://bellorypharma.com", "/ar/shop/rose", {
+      slug: "rose",
+      nameEn: "Rose Roll-On",
+      nameAr: "رول أون روز",
+      descriptionEn: null,
+      descriptionAr: "انتعاش يومي.",
+      shortDescriptionEn: null,
+      shortDescriptionAr: null,
+      price: "120.00",
+      salePrice: null,
+      stock: 3,
+      sku: "ROSE-1",
+      images: '["/products/rose.webp"]',
+    });
+
+    expect(html).toContain("https://bellorypharma.com/products/rose.webp");
+  });
+
   it("marks unknown SPA routes as noindex", () => {
     const html = injectSeoDocument(template, "https://bellorypharma.com", "/en/not-real");
     expect(html).toContain('content="noindex, nofollow"');

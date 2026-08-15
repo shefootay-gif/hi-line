@@ -17,6 +17,7 @@ import {
   Megaphone,
   Settings2,
   Eye,
+  LockKeyhole,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { colorPresets, settingsTabs, socialPlatforms } from "./settings-config";
@@ -326,6 +327,52 @@ function Section({
       </div>
       <div className="p-6">{children}</div>
     </div>
+  );
+}
+
+function AdminPasswordForm({ ar }: { ar: boolean }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const changePassword = trpc.auth.changeLocalAdminPassword.useMutation({
+    onSuccess: () => {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success(ar ? "تم تغيير كلمة مرور الأدمن" : "Admin password changed");
+    },
+    onError: error => toast.error(error.message),
+  });
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error(ar ? "كلمتا المرور الجديدتان غير متطابقتين" : "New passwords do not match");
+      return;
+    }
+    changePassword.mutate({ currentPassword, newPassword });
+  };
+
+  const inputClass = "w-full rounded-xl border border-[#EDE5F7] px-4 py-2.5 text-sm focus:border-[#7C3AED] focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/10";
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-[#1A0533]">{ar ? "كلمة المرور الحالية" : "Current password"}</label>
+        <input className={inputClass} type="password" autoComplete="current-password" required value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-[#1A0533]">{ar ? "كلمة المرور الجديدة" : "New password"}</label>
+        <input className={inputClass} type="password" autoComplete="new-password" minLength={12} maxLength={100} required value={newPassword} onChange={event => setNewPassword(event.target.value)} />
+        <p className="mt-1.5 text-xs text-[#6F6178]">{ar ? "12 حرفًا على الأقل، وتحتوي على حرف كبير وصغير ورقم ورمز." : "At least 12 characters with uppercase, lowercase, number, and symbol."}</p>
+      </div>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-[#1A0533]">{ar ? "تأكيد كلمة المرور الجديدة" : "Confirm new password"}</label>
+        <input className={inputClass} type="password" autoComplete="new-password" minLength={12} maxLength={100} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} />
+      </div>
+      <button type="submit" disabled={changePassword.isPending} className="rounded-xl bg-[#7C3AED] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#6D28D9] disabled:opacity-50">
+        {changePassword.isPending ? (ar ? "جارٍ الحفظ..." : "Saving...") : (ar ? "تغيير كلمة المرور" : "Change password")}
+      </button>
+    </form>
   );
 }
 
@@ -793,6 +840,19 @@ export default function AdminSettings() {
       )}
 
       {/* ══ SEO TAB ══════════════════════════════════════════════════════ */}
+      {activeTab === "security" && (
+        <div className="max-w-3xl">
+          <Section
+            title={ar ? "كلمة مرور الأدمن" : "Admin Password"}
+            subtitle={ar ? "غيّر كلمة المرور الأساسية المستخدمة للدخول إلى لوحة التحكم" : "Change the primary password used to access the dashboard"}
+            icon={LockKeyhole}
+            color="#DC2626"
+          >
+            <AdminPasswordForm ar={ar} />
+          </Section>
+        </div>
+      )}
+
       {activeTab === "seo" && (
         <div className="max-w-3xl">
           <Section title={ar ? "تحسين محركات البحث (SEO)" : "Search Engine Optimization"} subtitle={ar ? "يساعد موقعك على الظهور في Google" : "Helps your site rank on Google"} icon={Globe} color="#0EA5E9">

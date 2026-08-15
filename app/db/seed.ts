@@ -360,7 +360,7 @@ export async function seed() {
         questionEn: "What payment methods do you accept?",
         questionAr: "ما هي طرق الدفع المتاحة؟",
         answerEn:
-          "We accept Cash on Delivery, Vodafone Cash, InstaPay, and Bank Transfer.",
+          "Cash on Delivery is currently the only available payment method.",
         answerAr:
           "نقبل الدفع عند الاستلام، فودافون كاش، إنستا باي، والتحويل البنكي.",
         category: "ordering",
