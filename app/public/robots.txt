@@ -25,4 +25,50 @@ Disallow: /en/login
 Disallow: /en/order-confirmation
 Disallow: /en/reset-password
 
-# The production server adds the canonical host dynamically at /sitemap.xml.
+# OpenAI search crawler. This is separate from GPTBot training controls.
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /ar/account
+Disallow: /ar/cart
+Disallow: /ar/checkout
+Disallow: /en/account
+Disallow: /en/cart
+Disallow: /en/checkout
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+
+User-agent: Perplexity-User
+Allow: /
+
+# Google Search supplies the public index used by Gemini grounding.
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /ar/account
+Disallow: /ar/cart
+Disallow: /ar/checkout
+Disallow: /en/account
+Disallow: /en/cart
+Disallow: /en/checkout
+
+# Allows use for Gemini model improvement and grounding with Google Search.
+User-agent: Google-Extended
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+
+Sitemap: https://bellorypharma.com/sitemap.xml

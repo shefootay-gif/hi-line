@@ -4,9 +4,16 @@ import { seed } from "../db/seed";
 
 const seedMarker = path.resolve(import.meta.dirname, "../.seed-complete");
 
-if (!fs.existsSync(seedMarker)) {
-  await seed();
-  fs.writeFileSync(seedMarker, new Date().toISOString(), "utf8");
+async function bootstrap() {
+  if (!fs.existsSync(seedMarker)) {
+    await seed();
+    fs.writeFileSync(seedMarker, new Date().toISOString(), "utf8");
+  }
+
+  await import("./boot");
 }
 
-await import("./boot");
+void bootstrap().catch(error => {
+  console.error("Application bootstrap failed", error);
+  process.exitCode = 1;
+});

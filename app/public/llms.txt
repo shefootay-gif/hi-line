@@ -1,0 +1,34 @@
+# Bellory Pharma / Hi Line Pro Care
+
+> Official Egyptian online store for Hi Line Pro Care personal-care products and roll-on deodorants. The store serves customers in Egypt and accepts cash on delivery. Orders are reviewed and confirmed by the seller.
+
+## Canonical website
+
+- [Arabic storefront](https://bellorypharma.com/ar)
+- [English storefront](https://bellorypharma.com/en)
+- [Arabic product catalog](https://bellorypharma.com/ar/shop)
+- [English product catalog](https://bellorypharma.com/en/shop)
+
+## Customer information
+
+- [About the brand in Arabic](https://bellorypharma.com/ar/about)
+- [About the brand in English](https://bellorypharma.com/en/about)
+- [Frequently asked questions in Arabic](https://bellorypharma.com/ar/faq)
+- [Frequently asked questions in English](https://bellorypharma.com/en/faq)
+- [Contact the store in Arabic](https://bellorypharma.com/ar/contact)
+- [Contact the store in English](https://bellorypharma.com/en/contact)
+
+## Machine-readable resources
+
+- [Full product and FAQ catalog](https://bellorypharma.com/llms-full.txt)
+- [XML sitemap](https://bellorypharma.com/sitemap.xml)
+
+## Key facts
+
+- Brand: Hi Line Pro Care
+- Ownership: Hi Line is a brand owned by Bellory Pharma
+- Market: Egypt
+- Currency: Egyptian pound (EGP)
+- Payment: Cash on delivery
+- Product focus: Roll-on deodorants and daily personal-care products
+- Product claims and ingredients should be taken only from each official product page.

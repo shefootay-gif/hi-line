@@ -82,34 +82,28 @@ export default function MainLayout() {
   const facebookUrl = settings?.facebook_url || "https://www.facebook.com/profile.php?id=61587944979845";
   const instagramUrl = settings?.instagram_url || "#";
   const whatsappText = encodeURIComponent("Hello! I'm interested in ordering Hi Line Pro Care products.");
-  const seoByPath: Record<string, { title: string; description: string }> = {
-    "/": {
-      title: "Hi Line Pro Care | Daily Personal Care",
-      description: "Shop Hi Line Pro Care personal-care essentials and signature scents with convenient delivery across Egypt.",
+  const seoByPath: Record<"ar" | "en", Record<string, { title: string; description: string }>> = {
+    ar: {
+      "/": { title: "هاي لاين برو كير | عناية يومية وانتعاش يدوم", description: "تسوق منتجات هاي لاين برو كير للعناية اليومية مع التوصيل داخل مصر والدفع عند الاستلام." },
+      "/shop": { title: "منتجات هاي لاين برو كير", description: "اكتشف مجموعة هاي لاين برو كير رول أون بروائح متنوعة وأسعار محدثة." },
+      "/about": { title: "عن هاي لاين برو كير", description: "تعرف على علامة هاي لاين برو كير ومنتجات العناية الشخصية." },
+      "/contact": { title: "تواصل مع هاي لاين برو كير", description: "تواصل معنا للاستفسار عن المنتجات والطلبات والتوصيل." },
+      "/faq": { title: "الأسئلة الشائعة | هاي لاين برو كير", description: "إجابات عن منتجات هاي لاين والطلب والدفع عند الاستلام والتوصيل." },
     },
-    "/shop": {
-      title: "Shop Hi Line Pro Care Products",
-      description: "Browse Hi Line Pro Care roll-ons and daily personal-care products in signature scents.",
-    },
-    "/about": {
-      title: "About Hi Line Pro Care",
-      description: "Discover the Hi Line Pro Care story and our approach to dependable everyday personal care.",
-    },
-    "/contact": {
-      title: "Contact Hi Line Pro Care",
-      description: "Contact Hi Line Pro Care for product, order, and delivery support.",
-    },
-    "/faq": {
-      title: "Hi Line Pro Care FAQs",
-      description: "Find answers about Hi Line Pro Care products, ordering, payment, and delivery.",
+    en: {
+      "/": { title: "Hi Line Pro Care | Daily Personal Care", description: "Shop Hi Line Pro Care personal-care essentials and signature scents with convenient delivery across Egypt." },
+      "/shop": { title: "Shop Hi Line Pro Care Products", description: "Browse Hi Line Pro Care roll-ons and daily personal-care products in signature scents." },
+      "/about": { title: "About Hi Line Pro Care", description: "Discover the Hi Line Pro Care story and our approach to dependable everyday personal care." },
+      "/contact": { title: "Contact Hi Line Pro Care", description: "Contact Hi Line Pro Care for product, order, and delivery support." },
+      "/faq": { title: "Hi Line Pro Care FAQs", description: "Find answers about Hi Line Pro Care products, ordering, payment, and delivery." },
     },
   };
   const storefrontPath = pathWithoutLocale(location.pathname);
-  const seo = seoByPath[storefrontPath] ?? {
-    title: "Hi Line Pro Care",
-    description: "Shop Hi Line Pro Care personal-care essentials and signature scents.",
+  const seo = seoByPath[lang][storefrontPath] ?? {
+    title: lang === "ar" ? "هاي لاين برو كير" : "Hi Line Pro Care",
+    description: lang === "ar" ? "متجر هاي لاين برو كير الرسمي في مصر." : "Shop Hi Line Pro Care personal-care essentials and signature scents.",
   };
-  const privatePath = ["/cart", "/checkout", "/account", "/order-confirmation"].some(
+  const privatePath = ["/cart", "/checkout", "/account", "/order-confirmation", "/track-order"].some(
     path => storefrontPath.startsWith(path),
   );
   const canonicalUrl = `${window.location.origin}${location.pathname}`;
@@ -132,9 +126,16 @@ export default function MainLayout() {
             {JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
-              name: storeName,
+              "@id": `${window.location.origin}/#organization`,
+              name: "Bellory Pharma",
+              alternateName: storeName,
               url: window.location.origin,
               logo: new URL(logoUrl, window.location.origin).href,
+              brand: {
+                "@type": "Brand",
+                "@id": `${window.location.origin}/#brand`,
+                name: "Hi Line Pro Care",
+              },
               contactPoint: {
                 "@type": "ContactPoint",
                 telephone: displayPhone,
@@ -514,6 +515,11 @@ export default function MainLayout() {
                 alt={storeName}
                 className="h-16 w-auto object-contain bg-white rounded-lg p-2 mb-6"
               />
+              <p className="mb-5 max-w-xs text-sm leading-relaxed text-white/70">
+                {lang === "ar"
+                  ? "Hi Line علامة تجارية مملوكة لشركة Bellory Pharma."
+                  : "Hi Line is a brand owned by Bellory Pharma."}
+              </p>
               <div className="flex items-center gap-3">
                 <a
                   href={facebookUrl}
@@ -607,7 +613,7 @@ export default function MainLayout() {
         <div className="border-t border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-sm text-white/50">
-              &copy; {new Date().getFullYear()} {storeName}. {t.allRightsReserved}
+              &copy; {new Date().getFullYear()} Bellory Pharma. {t.allRightsReserved}
             </p>
             <p className="flex items-center gap-1 text-sm text-white/50">
               {t.madeWithCare} <Heart className="w-3.5 h-3.5 text-red-400" />

@@ -16,7 +16,15 @@ describe("buildSitemap", () => {
       "<loc>https://hiline.example/ar/shop/rose%20%26%20oud</loc>"
     );
     expect(sitemap).toContain("<lastmod>2026-07-18T00:00:00.000Z</lastmod>");
+    expect(sitemap).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+    expect(sitemap).toContain(
+      'hreflang="ar" href="https://hiline.example/ar/shop/rose%20%26%20oud"'
+    );
+    expect(sitemap).toContain(
+      'hreflang="x-default" href="https://hiline.example/en/shop/rose%20%26%20oud"'
+    );
     expect(sitemap).not.toContain("/admin");
     expect(sitemap).not.toContain("/checkout");
+    expect(sitemap).not.toContain("/track-order");
   });
 });

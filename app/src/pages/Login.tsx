@@ -59,7 +59,7 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
   return (
     <main className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F3E8FF] to-[#FCF8FF] px-4 ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
       <Helmet>
-        <title>{isAdmin ? "Hi Line Admin Login" : "Hi Line Account Login"}</title>
+        <title>{isAdmin ? "Hi Line Admin Login" : ar ? "تسجيل الدخول | هاي لاين برو كير" : "Hi Line Account Login"}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <Toaster position="top-center" />
@@ -172,6 +172,14 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
                           {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
+                    </div>
+                    <div className={`flex ${isRTL ? "justify-start" : "justify-end"}`}>
+                      <Link
+                        to={ar ? "/ar/forgot-password" : "/en/forgot-password"}
+                        className="text-sm font-medium text-[#6F2C91] hover:text-[#4B1C71] hover:underline"
+                      >
+                        {ar ? "نسيت كلمة المرور؟" : "Forgot password?"}
+                      </Link>
                     </div>
                     <button
                       type="submit"

@@ -19,6 +19,7 @@ export const productStructuredData = (product: ProductSeoInput) => ({
   sku: String(product.id),
   brand: {
     "@type": "Brand",
+    "@id": `${product.origin}/#brand`,
     name: product.brand,
   },
   offers: {

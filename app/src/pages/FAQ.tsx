@@ -3,6 +3,7 @@ import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { useState } from "react";
 import { ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 
 const categories = [
   { key: "all", labelEn: "All", labelAr: "الكل" },
@@ -23,9 +24,30 @@ export default function FAQ() {
     faqs?.filter(
       (faq) => activeCategory === "all" || faq.category === activeCategory
     ) || [];
+  const structuredData = faqs?.length
+    ? {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: faqs.map(faq => ({
+          "@type": "Question",
+          name: lang === "ar" ? faq.questionAr : faq.questionEn,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: lang === "ar" ? faq.answerAr : faq.answerEn,
+          },
+        })),
+      }
+    : null;
 
   return (
     <div className={isRTL ? "font-[Cairo]" : "font-[Inter]"}>
+      {structuredData && (
+        <Helmet>
+          <script type="application/ld+json">
+            {JSON.stringify(structuredData)}
+          </script>
+        </Helmet>
+      )}
       {/* Header */}
       <div
         className="pt-32 pb-20"

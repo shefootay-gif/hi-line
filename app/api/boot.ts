@@ -11,14 +11,16 @@ import {
   orders,
   paymentTransactions,
   products,
+  faqs,
   orderItems,
   coupons,
   inventoryMovements,
 } from "../db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { sendMetaCAPIEvent } from "./meta-capi";
 import { buildSitemap } from "./lib/sitemap";
+import { buildAiCatalog } from "./lib/ai-catalog";
 import { getAffectedRows } from "./lib/db-result";
 
 process.on("uncaughtException", err => {
@@ -29,6 +31,9 @@ process.on("unhandledRejection", reason => {
 });
 
 const app = new Hono<{ Bindings: HttpBindings }>();
+const publicOrigin = env.isProduction
+  ? "https://bellorypharma.com"
+  : undefined;
 
 app.use("*", async (c, next) => {
   await next();
@@ -53,11 +58,56 @@ app.get("/sitemap.xml", async c => {
     .select({ slug: products.slug, updatedAt: products.updatedAt })
     .from(products)
     .where(eq(products.isActive, true));
-  const sitemap = buildSitemap(new URL(c.req.url).origin, activeProducts);
+  const sitemap = buildSitemap(
+    publicOrigin ?? new URL(c.req.url).origin,
+    activeProducts,
+  );
 
   return c.body(sitemap, 200, {
     "Content-Type": "application/xml; charset=utf-8",
     "Cache-Control": "public, max-age=3600",
+  });
+});
+app.get("/llms-full.txt", async c => {
+  const db = getDb();
+  const [activeProducts, activeFaqs] = await Promise.all([
+    db
+      .select({
+        slug: products.slug,
+        nameEn: products.nameEn,
+        nameAr: products.nameAr,
+        descriptionEn: products.descriptionEn,
+        descriptionAr: products.descriptionAr,
+        shortDescriptionEn: products.shortDescriptionEn,
+        shortDescriptionAr: products.shortDescriptionAr,
+        price: products.price,
+        salePrice: products.salePrice,
+        stock: products.stock,
+      })
+      .from(products)
+      .where(eq(products.isActive, true))
+      .orderBy(asc(products.nameEn)),
+    db
+      .select({
+        questionEn: faqs.questionEn,
+        questionAr: faqs.questionAr,
+        answerEn: faqs.answerEn,
+        answerAr: faqs.answerAr,
+      })
+      .from(faqs)
+      .where(eq(faqs.isActive, true))
+      .orderBy(asc(faqs.sortOrder)),
+  ]);
+  const catalog = buildAiCatalog(
+    publicOrigin ?? new URL(c.req.url).origin,
+    activeProducts,
+    activeFaqs,
+  );
+
+  return c.body(catalog, 200, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "public, max-age=3600",
+    "X-Robots-Tag": "index, follow",
   });
 });
 app.use("/api/*", rateLimiter({ limit: 300, windowMs: 60000 }));
