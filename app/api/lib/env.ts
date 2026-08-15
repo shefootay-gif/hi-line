@@ -70,15 +70,12 @@ export const env = {
     (isProduction ? "" : "admin-dev-password"),
 
   // Transactional email used by the password-reset flow.
-  resendApiKey:
-    optionalNonEmpty("RESEND_API_KEY") ??
-    (isProduction ? required("RESEND_API_KEY") : ""),
+  // These remain optional so a store can launch before a mail provider is
+  // connected. The reset endpoint invalidates undelivered links safely.
+  resendApiKey: optionalNonEmpty("RESEND_API_KEY") ?? "",
   passwordResetFromEmail:
-    optionalNonEmpty("PASSWORD_RESET_FROM_EMAIL") ??
-    (isProduction ? required("PASSWORD_RESET_FROM_EMAIL") : ""),
+    optionalNonEmpty("PASSWORD_RESET_FROM_EMAIL") ?? "",
   passwordResetBaseUrl:
     optionalNonEmpty("PASSWORD_RESET_BASE_URL") ??
-    (isProduction
-      ? required("PASSWORD_RESET_BASE_URL")
-      : "http://localhost:3000"),
+    "http://localhost:3000",
 };

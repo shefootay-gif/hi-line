@@ -9,7 +9,7 @@ import {
   shippingSettings,
 } from "./schema";
 
-async function seed() {
+export async function seed() {
   const db = getDb();
 
   console.log("Seeding database...");
@@ -527,5 +527,10 @@ async function seed() {
   console.log("Database seeding complete!");
 }
 
-seed().catch(console.error);
+if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+  seed().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
 
