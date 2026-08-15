@@ -12,6 +12,11 @@ import crypto from "crypto";
 import { sendWhatsAppMessage } from "./whatsapp-service";
 import { sendMetaCAPIEvent } from "./meta-capi";
 import { getAffectedRows } from "./lib/db-result";
+import { reverseOrderEffects } from "./lib/order-effects";
+import {
+  calculateOrderPricing,
+  calculateVolumeDiscount,
+} from "@contracts/order-pricing";
 import {
   products,
   categories,
@@ -480,7 +485,11 @@ export const storeRouter = createRouter({
             if (subtotal >= threshold) shippingFee = 0;
           }
 
-          let discountAmount = 0;
+          const totalItems = input.items.reduce(
+            (sum, item) => sum + item.quantity,
+            0
+          );
+          let couponDiscountAmount = 0;
           let appliedCouponId: number | null = null;
           const normalizedCouponCode = input.couponCode?.trim().toUpperCase();
 
@@ -502,7 +511,7 @@ export const storeRouter = createRouter({
 
               if (isValid) {
                 const val = parseFloat(coupon.discountValue);
-                discountAmount =
+                couponDiscountAmount =
                   coupon.discountType === "percentage"
                     ? (subtotal * val) / 100
                     : val;
@@ -511,8 +520,13 @@ export const storeRouter = createRouter({
             }
           }
 
-          if (discountAmount > subtotal) discountAmount = subtotal;
-          const total = subtotal - discountAmount + shippingFee;
+          const pricing = calculateOrderPricing({
+            subtotal,
+            itemCount: totalItems,
+            couponDiscount: couponDiscountAmount,
+            shippingFee,
+          });
+          const { discountAmount, total } = pricing;
 
           const orderResult = await tx.insert(orders).values({
             orderNumber,
@@ -757,13 +771,20 @@ export const storeRouter = createRouter({
     }),
 
   validateCoupon: publicQuery
-    .input(z.object({ code: z.string(), subtotal: z.number() }))
+    .input(
+      z.object({
+        code: z.string(),
+        subtotal: z.number().nonnegative(),
+        itemCount: z.number().int().nonnegative().optional().default(0),
+      })
+    )
     .mutation(async ({ input }) => {
       const db = getDb();
+      const normalizedCouponCode = input.code.trim().toUpperCase();
       const [coupon] = await db
         .select()
         .from(coupons)
-        .where(eq(coupons.code, input.code))
+        .where(eq(coupons.code, normalizedCouponCode))
         .limit(1);
 
       if (!coupon) {
@@ -792,7 +813,17 @@ export const storeRouter = createRouter({
         discountAmount = val;
       }
 
-      if (discountAmount > input.subtotal) discountAmount = input.subtotal;
+      const volumeDiscount = calculateVolumeDiscount(
+        input.subtotal,
+        input.itemCount
+      );
+      const maximumCouponDiscount = Math.max(
+        0,
+        input.subtotal - volumeDiscount
+      );
+      if (discountAmount > maximumCouponDiscount) {
+        discountAmount = maximumCouponDiscount;
+      }
 
       return {
         valid: true,
@@ -806,7 +837,7 @@ export const storeRouter = createRouter({
     .input(
       z.object({
         orderNumber: z.string().trim().min(1),
-        customerPhone: z.string().trim().optional(),
+        customerPhone: z.string().trim().min(1),
       })
     )
     .query(async ({ input }) => {
@@ -820,10 +851,7 @@ export const storeRouter = createRouter({
       if (orderResult.length === 0) return null;
 
       const order = orderResult[0];
-      if (
-        input.customerPhone &&
-        order.customerPhone.trim() !== input.customerPhone.trim()
-      ) {
+      if (order.customerPhone.trim() !== input.customerPhone.trim()) {
         return null;
       }
 
@@ -875,43 +903,7 @@ export const storeRouter = createRouter({
           throw new Error("Cannot cancel order at this stage");
         }
 
-        const items = await tx
-          .select()
-          .from(orderItems)
-          .where(eq(orderItems.orderId, order.id));
-
-        for (const item of items) {
-          const [product] = await tx
-            .select({ stock: products.stock })
-            .from(products)
-            .where(eq(products.id, item.productId))
-            .limit(1);
-
-          await tx
-            .update(products)
-            .set({ stock: sql`${products.stock} + ${item.quantity}` })
-            .where(eq(products.id, item.productId));
-
-          await tx.insert(inventoryMovements).values({
-            productId: item.productId,
-            orderId: order.id,
-            type: "cancel",
-            quantity: item.quantity,
-            previousStock: product?.stock ?? null,
-            newStock: product ? product.stock + item.quantity : null,
-            reason: "Order cancellation stock return",
-            reference: order.orderNumber,
-          });
-        }
-
-        if (order.couponCode) {
-          await tx
-            .update(coupons)
-            .set({
-              currentUsage: sql`GREATEST(${coupons.currentUsage} - 1, 0)`,
-            })
-            .where(eq(coupons.code, order.couponCode));
-        }
+        await reverseOrderEffects(tx, order, "cancel");
       });
 
       return { success: true };

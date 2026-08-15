@@ -13,8 +13,8 @@ export default function OrderConfirmation() {
   const customerPhone = searchParams.get("phone") || "";
 
   const { data: order, isLoading } = trpc.store.getOrderByNumber.useQuery(
-    { orderNumber: orderNumber || "", customerPhone: customerPhone || undefined },
-    { enabled: !!orderNumber, retry: false }
+    { orderNumber: orderNumber || "", customerPhone },
+    { enabled: !!orderNumber && !!customerPhone, retry: false }
   );
   const { data: settings } = trpc.store.getSettings.useQuery();
 

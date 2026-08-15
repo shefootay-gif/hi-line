@@ -31,6 +31,7 @@ interface MockOrder {
   customerName: string;
   customerPhone: string;
   paymentMethod: string;
+  subtotal?: string;
   total?: string;
   discountAmount?: string;
   paymentStatus?: string;
@@ -129,6 +130,7 @@ class MockDbInstance {
   customers: unknown[] = [];
   shippingSettings: unknown[] = [];
   storeSettings: unknown[] = [];
+  updateTables: string[] = [];
 
   select() {
     return {
@@ -144,6 +146,7 @@ class MockDbInstance {
           if (tableName === "payment_transactions")
             return this.paymentTransactions;
           if (tableName === "payment_settings") return this.paymentSettings;
+          if (tableName === "order_items") return this.orderItems;
           return [];
         };
 
@@ -196,6 +199,7 @@ class MockDbInstance {
 
   update(schemaTable: unknown) {
     const tableName = getTableName(schemaTable);
+    this.updateTables.push(tableName);
     return {
       set: (val: Record<string, unknown>) => {
         return {
@@ -396,6 +400,69 @@ describe("tRPC store.createOrder behaviors", () => {
 
     expect(mockDbInstance.orders).toHaveLength(0);
   });
+
+  it("applies the same three-item volume discount stored on the order", async () => {
+    const caller = appRouter.createCaller({
+      req: new Request("https://localhost/api/trpc"),
+      resHeaders: new Headers(),
+    });
+
+    const result = await caller.store.createOrder({
+      idempotencyKey: "f393943d-c18c-4a5a-ac9f-d6280fbd5192",
+      customerName: "John Doe",
+      customerPhone: "01234567890",
+      shippingAddress: "Cairo",
+      paymentMethod: "cash_on_delivery",
+      items: [{ productId: 1, quantity: 3 }],
+    });
+
+    expect(result.discountAmount).toBe("22.50");
+    expect(result.total).toBe("127.50");
+    expect(mockDbInstance.orders[0].subtotal).toBe("150.00");
+    expect(mockDbInstance.orders[0].discountAmount).toBe("22.50");
+  });
+});
+
+describe("tRPC store order privacy and cancellation", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockDbInstance = new MockDbInstance();
+    mockDbInstance.orders = [{
+      id: 1,
+      orderNumber: "HL1001",
+      customerName: "John Doe",
+      customerPhone: "01234567890",
+      paymentMethod: "cash_on_delivery",
+      total: "100.00",
+      orderStatus: "pending",
+    }];
+    mockDbInstance.customers = [{ id: 1, phone: "01234567890" }];
+  });
+
+  it("requires the customer phone before returning order details", async () => {
+    const caller = appRouter.createCaller({
+      req: new Request("https://localhost/api/trpc"),
+      resHeaders: new Headers(),
+    });
+
+    await expect(caller.store.getOrderByNumber({
+      orderNumber: "HL1001",
+    } as never)).rejects.toThrow();
+  });
+
+  it("reverses the customer's order counters when an order is cancelled", async () => {
+    const caller = appRouter.createCaller({
+      req: new Request("https://localhost/api/trpc"),
+      resHeaders: new Headers(),
+    });
+
+    await caller.store.cancelOrder({
+      orderNumber: "HL1001",
+      customerPhone: "01234567890",
+    });
+
+    expect(mockDbInstance.updateTables).toContain("customers");
+  });
 });
 
 describe("tRPC store.validateCoupon behaviors", () => {
@@ -418,6 +485,20 @@ describe("tRPC store.validateCoupon behaviors", () => {
 
     expect(result.valid).toBe(true);
     expect(result.discountAmount).toBe(50);
+  });
+
+  it("normalizes lowercase coupon codes", async () => {
+    const caller = appRouter.createCaller({
+      req: new Request("https://localhost/api/trpc"),
+      resHeaders: new Headers(),
+    });
+
+    const result = await caller.store.validateCoupon({
+      code: "save10",
+      subtotal: 50,
+    });
+
+    expect(result.valid).toBe(true);
   });
 
   it.each([

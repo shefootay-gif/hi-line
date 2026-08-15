@@ -8,8 +8,9 @@ import { ShoppingBag, Minus, Plus, Trash2, MessageCircle } from "lucide-react";
 export default function Cart() {
   const { lang, isRTL } = useLanguage();
   const t = useTranslations(lang);
-  const { items, getTotalPrice, getDiscountAmount, updateQuantity, removeItem } = useCart();
+  const { items, getSubtotal, getTotalPrice, getDiscountAmount, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
+  const subtotal = getSubtotal();
   const total = getTotalPrice();
   const discount = getDiscountAmount();
 
@@ -139,7 +140,7 @@ export default function Cart() {
                   <div className="flex justify-between text-sm">
                     <span className="text-[#6F6178]">{t.subtotal}</span>
                     <span className="font-medium">
-                      {(total + discount).toFixed(0)} {t.currency}
+                      {subtotal.toFixed(0)} {t.currency}
                     </span>
                   </div>
                   {discount > 0 && (

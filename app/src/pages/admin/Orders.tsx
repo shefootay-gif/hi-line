@@ -5,7 +5,6 @@ import { useState } from "react";
 import {
   Search,
   Eye,
-  Trash2,
   X,
   Loader2,
   MessageCircle,
@@ -103,14 +102,6 @@ export default function AdminOrders() {
       utils.admin.listOrders.invalidate();
       setUpdateStatusId(null);
       toast.success(lang === "ar" ? "تم التحديث" : "Updated");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const deleteOrder = trpc.admin.deleteOrder.useMutation({
-    onSuccess: () => {
-      utils.admin.listOrders.invalidate();
-      toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -253,16 +244,6 @@ export default function AdminOrders() {
                           className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#25D366]/10 text-[#25D366]"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(t.confirmDelete)) {
-                              deleteOrder.mutate({ id: order.id });
-                            }
-                          }}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-500"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>

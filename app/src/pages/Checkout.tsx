@@ -16,6 +16,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { calculateOrderPricing } from "@contracts/order-pricing";
 
 type PaymentMethod =
   | "cash_on_delivery"
@@ -47,9 +48,10 @@ export default function Checkout() {
   const { lang, isRTL } = useLanguage();
   const t = useTranslations(lang);
   const navigate = useNavigate();
-  const { items, getTotalPrice, getDiscountAmount, clearCart } = useCart();
+  const { items, getSubtotal, getTotalItems, clearCart } = useCart();
   const { data: paymentMethods } = trpc.store.getPaymentMethods.useQuery();
   const { data: governorates } = trpc.store.getShippingGovernorates.useQuery();
+  const { data: settings } = trpc.store.getSettings.useQuery();
   const createOrder = trpc.store.createOrder.useMutation();
   const validateCoupon = trpc.store.validateCoupon.useMutation();
   const { data: user } = trpc.auth.me.useQuery();
@@ -104,16 +106,27 @@ export default function Checkout() {
     appliedCoupon?.code,
   ]);
 
-  const subtotal = getTotalPrice();
-  const volumeDiscount = getDiscountAmount();
+  const subtotal = getSubtotal();
+  const itemCount = getTotalItems();
 
   const selectedGov = governorates?.find(
     g => g.governorate === formData.governorate
   );
   const shippingFee = selectedGov ? parseFloat(selectedGov.baseFee ?? "0") : 0;
-  const effectiveShipping = shippingFee;
-  const couponDiscount = appliedCoupon ? appliedCoupon.discountAmount : 0;
-  const total = subtotal - couponDiscount - volumeDiscount + effectiveShipping;
+  const freeShippingThreshold = Number.parseFloat(
+    settings?.free_shipping_threshold ?? "999999"
+  );
+  const effectiveShipping =
+    Number.isFinite(freeShippingThreshold) && subtotal >= freeShippingThreshold
+      ? 0
+      : shippingFee;
+  const pricing = calculateOrderPricing({
+    subtotal,
+    itemCount,
+    couponDiscount: appliedCoupon?.discountAmount,
+    shippingFee: effectiveShipping,
+  });
+  const { volumeDiscount, couponDiscount, total } = pricing;
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -129,6 +142,7 @@ export default function Checkout() {
       const result = await validateCoupon.mutateAsync({
         code: couponCode.trim(),
         subtotal: subtotal,
+        itemCount,
       });
       if (result.valid) {
         setAppliedCoupon({
@@ -719,7 +733,7 @@ export default function Checkout() {
                       {lang === "ar" ? "خصم الكوبون" : "Coupon Discount"}
                     </span>
                     <span>
-                      -{appliedCoupon.discountAmount.toFixed(0)} {t.currency}
+                      -{couponDiscount.toFixed(0)} {t.currency}
                     </span>
                   </div>
                 )}

@@ -94,5 +94,25 @@ describe('useCart', () => {
     });
     
     expect(useCart.getState().getTotalPrice()).toBe(250);
+    expect(useCart.getState().getSubtotal()).toBe(250);
+  });
+
+  it('keeps the subtotal separate from the three-item discount', () => {
+    useCart.getState().addItem({
+      productId: 1,
+      name: 'Item 1',
+      nameAr: null,
+      scent: 'Fresh',
+      scentColor: null,
+      price: '50.00',
+      salePrice: null,
+      image: null,
+      stock: 10
+    });
+    useCart.getState().updateQuantity(1, 3);
+
+    expect(useCart.getState().getSubtotal()).toBe(150);
+    expect(useCart.getState().getDiscountAmount()).toBe(22.5);
+    expect(useCart.getState().getTotalPrice()).toBe(127.5);
   });
 });

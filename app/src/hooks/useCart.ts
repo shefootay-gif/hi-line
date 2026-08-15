@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { calculateOrderPricing } from "@contracts/order-pricing";
 
 export interface CartItem {
   productId: number;
@@ -21,6 +22,7 @@ interface CartState {
   updateQuantity: (productId: number, quantity: number) => void;
   clearCart: () => void;
   getTotalItems: () => number;
+  getSubtotal: () => number;
   getTotalPrice: () => number;
   getDiscountAmount: () => number;
 }
@@ -129,22 +131,23 @@ export const useCart = create<CartState>()(
           0
         );
       },
-      getTotalPrice: () => {
-        const totalItems = get().getTotalItems();
-        const baseTotal = normalizeCartItems(get().items).reduce((sum, item) => {
+      getSubtotal: () => {
+        return normalizeCartItems(get().items).reduce((sum, item) => {
           const price = item.salePrice ? parseMoney(item.salePrice) : parseMoney(item.price);
           return sum + price * item.quantity;
         }, 0);
-        return totalItems >= 3 ? baseTotal * 0.85 : baseTotal;
+      },
+      getTotalPrice: () => {
+        return calculateOrderPricing({
+          subtotal: get().getSubtotal(),
+          itemCount: get().getTotalItems(),
+        }).total;
       },
       getDiscountAmount: () => {
-        const totalItems = get().getTotalItems();
-        if (totalItems < 3) return 0;
-        const baseTotal = normalizeCartItems(get().items).reduce((sum, item) => {
-          const price = item.salePrice ? parseMoney(item.salePrice) : parseMoney(item.price);
-          return sum + price * item.quantity;
-        }, 0);
-        return baseTotal * 0.15;
+        return calculateOrderPricing({
+          subtotal: get().getSubtotal(),
+          itemCount: get().getTotalItems(),
+        }).volumeDiscount;
       },
     }),
     {

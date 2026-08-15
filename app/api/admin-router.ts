@@ -45,6 +45,11 @@ import {
   toNumber,
   validateCampaignMetrics,
 } from "./lib/admin-utils";
+import { getAffectedRows } from "./lib/db-result";
+import {
+  restoreOrderInventory,
+  reverseOrderEffects,
+} from "./lib/order-effects";
 
 type AdminDb = ReturnType<typeof getDb>;
 
@@ -289,61 +294,89 @@ export const adminRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const orderRes = await db.select().from(orders).where(eq(orders.id, input.id)).limit(1);
-      const order = orderRes[0];
-      const isManualTransfer =
-        order?.paymentMethod === "vodafone_cash" ||
-        order?.paymentMethod === "instapay";
-      const startsFulfillment = ["processing", "shipped", "delivered"].includes(
-        input.status
-      );
+      const result = await db.transaction(async tx => {
+        const [order] = await tx
+          .select()
+          .from(orders)
+          .where(eq(orders.id, input.id))
+          .limit(1);
+        if (!order) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+        }
 
-      if (isManualTransfer && startsFulfillment && order.paymentStatus !== "paid") {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Approve the payment receipt before processing this order.",
-        });
-      }
-      
-      await db
-        .update(orders)
-        .set({ orderStatus: input.status })
-        .where(eq(orders.id, input.id));
+        const currentStatus = order.orderStatus ?? "pending";
+        const terminalStatuses = ["cancelled", "refunded"] as const;
+        if (terminalStatuses.includes(currentStatus as (typeof terminalStatuses)[number])) {
+          if (currentStatus === input.status) return { order, changed: false };
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Cancelled or refunded orders cannot be reopened.",
+          });
+        }
 
-      // Get the existing shipment for this order
-      const [existingShipment] = await db
-        .select()
-        .from(shipments)
-        .where(eq(shipments.orderId, input.id))
-        .limit(1);
+        const isManualTransfer =
+          order.paymentMethod === "vodafone_cash" ||
+          order.paymentMethod === "instapay";
+        const startsFulfillment = ["processing", "shipped", "delivered"].includes(
+          input.status
+        );
+        if (isManualTransfer && startsFulfillment && order.paymentStatus !== "paid") {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Approve the payment receipt before processing this order.",
+          });
+        }
+        if (currentStatus === input.status) return { order, changed: false };
 
-      let shipmentStatus: "pending" | "ready" | "shipped" | "out_for_delivery" | "delivered" | "failed" | "returned" = "pending";
-      if (input.status === "processing") shipmentStatus = "ready";
-      else if (input.status === "shipped") shipmentStatus = "shipped";
-      else if (input.status === "delivered") shipmentStatus = "delivered";
-      else if (input.status === "cancelled") shipmentStatus = "returned";
-      else if (input.status === "refunded") shipmentStatus = "returned";
+        const statusUpdate = await tx
+          .update(orders)
+          .set({ orderStatus: input.status })
+          .where(and(eq(orders.id, input.id), eq(orders.orderStatus, currentStatus)));
+        if (getAffectedRows(statusUpdate) !== 1) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Order status changed. Refresh and try again.",
+          });
+        }
 
-      if (existingShipment) {
-        await db
-          .update(shipments)
-          .set({
+        if (input.status === "cancelled" || input.status === "refunded") {
+          await reverseOrderEffects(
+            tx,
+            order,
+            input.status === "refunded" ? "return" : "cancel"
+          );
+        }
+
+        const [existingShipment] = await tx
+          .select()
+          .from(shipments)
+          .where(eq(shipments.orderId, input.id))
+          .limit(1);
+        let shipmentStatus: "pending" | "ready" | "shipped" | "delivered" | "returned" = "pending";
+        if (input.status === "processing") shipmentStatus = "ready";
+        else if (input.status === "shipped") shipmentStatus = "shipped";
+        else if (input.status === "delivered") shipmentStatus = "delivered";
+        else if (input.status === "cancelled" || input.status === "refunded") shipmentStatus = "returned";
+
+        if (existingShipment) {
+          await tx.update(shipments).set({
             status: shipmentStatus,
             shippedAt: input.status === "shipped" ? new Date() : existingShipment.shippedAt,
             deliveredAt: input.status === "delivered" ? new Date() : existingShipment.deliveredAt,
-          })
-          .where(eq(shipments.id, existingShipment.id));
-      } else {
-        await db.insert(shipments).values({
-          orderId: input.id,
-          status: shipmentStatus,
-          shippedAt: input.status === "shipped" ? new Date() : null,
-          deliveredAt: input.status === "delivered" ? new Date() : null,
-        });
-      }
-        
-      if (orderRes[0]) {
-        sendWhatsAppMessage(orderRes[0].customerPhone, `Hi ${orderRes[0].customerName}, your order #${orderRes[0].orderNumber} status has been updated to: ${input.status}.`);
+          }).where(eq(shipments.id, existingShipment.id));
+        } else {
+          await tx.insert(shipments).values({
+            orderId: input.id,
+            status: shipmentStatus,
+            shippedAt: input.status === "shipped" ? new Date() : null,
+            deliveredAt: input.status === "delivered" ? new Date() : null,
+          });
+        }
+        return { order, changed: true };
+      });
+
+      if (result.changed) {
+        sendWhatsAppMessage(result.order.customerPhone, `Hi ${result.order.customerName}, your order #${result.order.orderNumber} status has been updated to: ${input.status}.`);
       }
       
       await logAdminActivity(db, ctx.user.id, "update_status", "order", input.id, { status: input.status });
@@ -359,23 +392,64 @@ export const adminRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      await db
-        .update(orders)
-        .set({ paymentStatus: input.status })
-        .where(eq(orders.id, input.id));
+      await db.transaction(async tx => {
+        const [order] = await tx
+          .select()
+          .from(orders)
+          .where(eq(orders.id, input.id))
+          .limit(1);
+        if (!order) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+        }
+
+        const currentOrderStatus = order.orderStatus ?? "pending";
+        if (input.status === "refunded") {
+          if (currentOrderStatus !== "cancelled" && currentOrderStatus !== "refunded") {
+            const updateResult = await tx
+              .update(orders)
+              .set({ paymentStatus: "refunded", orderStatus: "refunded" })
+              .where(
+                and(
+                  eq(orders.id, input.id),
+                  eq(orders.orderStatus, currentOrderStatus)
+                )
+              );
+            if (getAffectedRows(updateResult) !== 1) {
+              throw new TRPCError({
+                code: "CONFLICT",
+                message: "Order status changed. Refresh and try again.",
+              });
+            }
+            await reverseOrderEffects(tx, order, "return");
+            await tx
+              .update(shipments)
+              .set({ status: "returned" })
+              .where(eq(shipments.orderId, order.id));
+            return;
+          }
+        } else if (currentOrderStatus === "cancelled" || currentOrderStatus === "refunded") {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Payment status cannot be changed on a closed order.",
+          });
+        }
+
+        await tx
+          .update(orders)
+          .set({ paymentStatus: input.status })
+          .where(eq(orders.id, input.id));
+      });
       await logAdminActivity(db, ctx.user.id, "update_payment", "order", input.id, { status: input.status });
       return { success: true };
     }),
 
   deleteOrder: adminQuery
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
-      const db = getDb();
-      // Delete order items first
-      await db.delete(orderItems).where(eq(orderItems.orderId, input.id));
-      // Delete order
-      await db.delete(orders).where(eq(orders.id, input.id));
-      return { success: true };
+    .mutation(async () => {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Orders are retained for inventory and accounting history. Cancel the order instead.",
+      });
     }),
 
   // Customers management
@@ -1426,7 +1500,57 @@ export const adminRouter = createRouter({
     .input(z.object({ id: z.number(), status: z.enum(["pending", "approved", "rejected", "received", "refunded", "closed"]), refundAmount: z.string().optional(), restockItems: z.boolean().default(false), adminNotes: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb(); const { id, ...data } = input;
-      await db.update(returnRequests).set(data).where(eq(returnRequests.id, id));
+      await db.transaction(async tx => {
+        const [returnRequest] = await tx
+          .select()
+          .from(returnRequests)
+          .where(eq(returnRequests.id, id))
+          .limit(1);
+        if (!returnRequest) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Return request not found",
+          });
+        }
+
+        const shouldRestock = input.restockItems && !returnRequest.restockItems;
+        if (shouldRestock) {
+          const [order] = await tx
+            .select()
+            .from(orders)
+            .where(eq(orders.id, returnRequest.orderId ?? 0))
+            .limit(1);
+          if (!order) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "The linked order is required before items can be restocked.",
+            });
+          }
+
+          const updateResult = await tx
+            .update(returnRequests)
+            .set(data)
+            .where(
+              and(
+                eq(returnRequests.id, id),
+                eq(returnRequests.restockItems, false)
+              )
+            );
+          if (getAffectedRows(updateResult) !== 1) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Return request changed. Refresh and try again.",
+            });
+          }
+          await restoreOrderInventory(tx, order, "return");
+          return;
+        }
+
+        await tx
+          .update(returnRequests)
+          .set(data)
+          .where(eq(returnRequests.id, id));
+      });
       await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "update_return_status", entityType: "return_request", entityId: id, details: data });
       return { success: true };
     }),
