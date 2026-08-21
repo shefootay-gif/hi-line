@@ -1,3 +1,5 @@
+import { SINGLE_ROLL_ON_SALE_PRODUCTS_WITH_PRICE } from "@contracts/sale-products";
+
 export type CatalogProduct = {
   id: number;
   brand: "Hi Line";
@@ -114,6 +116,25 @@ export const rollOnProducts: CatalogProduct[] = [
     descriptionEn: "Hi Line Roll On whiting deodorant with 48-hour freshness.",
     images: ["/products/hi-line-fragrance-free.webp"],
   },
+  ...SINGLE_ROLL_ON_SALE_PRODUCTS_WITH_PRICE.map((product, index) => ({
+    id: 6 + index,
+    brand: "Hi Line" as const,
+    section: "Roll On" as const,
+    category: "Roll On",
+    nameEn: `Hi Line Deodorant Roll On - ${product.scent} - Single Piece (30% Sale)`,
+    nameAr: `هاي لاين رول أون مزيل عرق - ${product.scentAr} - قطعة واحدة (خصم 30%)`,
+    scent: product.scent,
+    scentColor: product.scentColor,
+    slug: product.slug,
+    price: product.price,
+    salePrice: product.salePrice,
+    originalPrice: product.price,
+    discountLabel: `${product.discountPercent}% OFF`,
+    shortDescriptionEn: `Single 60ml roll-on in ${product.scent}, now 30% off.`,
+    shortDescriptionAr: `قطعة واحدة رول أون 60 مل ${product.scentAr} بخصم 30%.`,
+    descriptionEn: `One Hi Line Deodorant Roll On with ${product.scent} and up to 48-hour freshness. This offer contains one piece.`,
+    images: [product.image],
+  })),
 ];
 
 export const catalogProducts = [...rollOnProducts];

@@ -1,5 +1,7 @@
 import { getDb } from "../api/queries/connection";
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
+import { PRIMARY_PRODUCT_CATEGORY } from "../contracts/product-category";
+import { SINGLE_ROLL_ON_SALE_PRODUCTS_WITH_PRICE } from "../contracts/sale-products";
 import {
   products,
   categories,
@@ -8,6 +10,63 @@ import {
   paymentSettings,
   shippingSettings,
 } from "./schema";
+
+function buildSingleRollOnSaleProductRows(categoryId: number) {
+  return SINGLE_ROLL_ON_SALE_PRODUCTS_WITH_PRICE.map(product => ({
+    nameEn: `Hi Line Deodorant Roll On - ${product.scent} - Single Piece (30% Sale)`,
+    nameAr: `هاي لاين رول أون مزيل عرق - ${product.scentAr} - قطعة واحدة (خصم 30%)`,
+    slug: product.slug,
+    descriptionEn: `One Hi Line Deodorant Roll On with ${product.scent} and up to 48-hour freshness. This offer contains one 60ml piece.`,
+    descriptionAr: `قطعة واحدة من هاي لاين رول أون مزيل العرق ${product.scentAr} بحجم 60 مل، مع انتعاش يصل إلى 48 ساعة.`,
+    shortDescriptionEn: `Single 60ml roll-on in ${product.scent}, now 30% off.`,
+    shortDescriptionAr: `قطعة واحدة رول أون 60 مل ${product.scentAr} بخصم 30%.`,
+    price: product.price,
+    salePrice: product.salePrice,
+    stock: 100,
+    sku: product.sku,
+    scent: product.scent,
+    scentColor: product.scentColor,
+    categoryId,
+    images: [product.image],
+    benefits: [
+      "One 60ml piece",
+      "Up to 48 hours freshness",
+      "0% Aluminum formula",
+      "Lebanese Formula",
+    ],
+    benefitsAr: [
+      "قطعة واحدة بحجم 60 مل",
+      "انتعاش يصل إلى 48 ساعة",
+      "تركيبة خالية من الألمنيوم",
+      "تركيبة لبنانية",
+    ],
+    usageInstructions: "Apply to clean, dry underarms and allow to dry before dressing.",
+    usageInstructionsAr: "يُستخدم على إبطين نظيفين وجافين ويُترك حتى يجف قبل ارتداء الملابس.",
+    isActive: true,
+    isFeatured: true,
+    isBestSeller: false,
+    seoTitle: `Hi Line ${product.scent} Roll On Single Piece - 30% Sale`,
+    seoDescription: `Shop one 60ml Hi Line ${product.scent} Deodorant Roll On for EGP 199.50 instead of EGP 285.`,
+  }));
+}
+
+export async function seedSingleRollOnSaleProducts() {
+  const db = getDb();
+  const [category] = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(eq(categories.slug, PRIMARY_PRODUCT_CATEGORY.slug))
+    .limit(1);
+
+  if (!category) {
+    throw new Error(`Missing product category: ${PRIMARY_PRODUCT_CATEGORY.slug}`);
+  }
+
+  await db
+    .insert(products)
+    .values(buildSingleRollOnSaleProductRows(category.id))
+    .onDuplicateKeyUpdate({ set: { slug: sql`VALUES(slug)` } });
+}
 
 export async function seed() {
   const db = getDb();
@@ -313,6 +372,9 @@ export async function seed() {
     });
 
   console.log("Products seeded");
+
+  await seedSingleRollOnSaleProducts();
+  console.log("Single-piece sale products seeded");
 
   // Seed FAQs
   await db
