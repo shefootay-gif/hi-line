@@ -43,6 +43,16 @@ export function slugify(value: string) {
   );
 }
 
+export function nextAvailableSlug(value: string, existingSlugs: Iterable<string>) {
+  const base = slugify(value);
+  const existing = new Set(existingSlugs);
+  if (!existing.has(base)) return base;
+
+  let suffix = 2;
+  while (existing.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
 export function validateCampaignMetrics(input: {
   budget?: string;
   spend?: string;

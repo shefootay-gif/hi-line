@@ -4,6 +4,7 @@ import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
 import { rollOnProducts, type CatalogProduct } from "@/lib/hiLineCatalog";
+import { productImage } from "@/lib/product-media";
 import { Link } from "react-router";
 import { useNavigate } from "react-router";
 import {
@@ -102,7 +103,7 @@ export default function Home() {
         price: p.price,
         salePrice: p.salePrice,
         originalPrice: p.price,
-        images: Array.isArray(p.images) ? p.images as string[] : ["/products/hi-line-tropical-breeze.webp"],
+        images: [productImage(p.images)],
         discountLabel: p.salePrice ? `${Math.round((1 - parseFloat(p.salePrice) / parseFloat(p.price)) * 100)}% OFF` : "NEW",
         brand: "Hi Line" as const,
         section: "Roll On" as const,

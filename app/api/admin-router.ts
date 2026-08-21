@@ -41,6 +41,7 @@ import {
   rawRows,
   safeNumber,
   slugify,
+  nextAvailableSlug,
   toCsv,
   toNumber,
   validateCampaignMetrics,
@@ -107,7 +108,7 @@ export const adminRouter = createRouter({
       z.object({
         nameEn: z.string().min(1),
         nameAr: z.string().min(1),
-        slug: z.string().min(1),
+        slug: z.string().optional(),
         descriptionEn: z.string().optional(),
         descriptionAr: z.string().optional(),
         shortDescriptionEn: z.string().optional(),
@@ -135,8 +136,17 @@ export const adminRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      const baseSlug = slugify(input.nameEn || input.nameAr);
+      const matchingSlugs = await db
+        .select({ slug: products.slug })
+        .from(products)
+        .where(like(products.slug, `${baseSlug}%`));
+      const slug = nextAvailableSlug(input.nameEn || input.nameAr, matchingSlugs.map(row => row.slug));
+      const productData = { ...input };
+      delete productData.slug;
       const result = await db.insert(products).values({
-        ...input,
+        ...productData,
+        slug,
         images: input.images ?? null,
         benefits: input.benefits ?? null,
         benefitsAr: input.benefitsAr ?? null,
@@ -153,8 +163,8 @@ export const adminRouter = createRouter({
           reference: input.sku ?? null,
         });
       }
-      await logAdminActivity(db, ctx.user.id, "create", "product", id, { name: input.nameEn, sku: input.sku ?? null });
-      return { id };
+      await logAdminActivity(db, ctx.user.id, "create", "product", id, { name: input.nameEn, slug, sku: input.sku ?? null });
+      return { id, slug };
     }),
 
   updateProduct: adminQuery

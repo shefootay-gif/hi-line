@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { pathForLocale, pathWithoutLocale } from "@/lib/localeRouting";
+import { getActiveSocialLinks } from "@/lib/social-links";
 import {
   ShoppingCart,
   Globe,
@@ -15,8 +16,6 @@ import {
   X,
   Phone,
   MessageCircle,
-  Facebook,
-  Instagram,
   Heart,
   ChevronRight,
   Minus,
@@ -77,11 +76,11 @@ export default function MainLayout() {
     savedAnnouncement && !/free shipping|شحن مجاني|500/i.test(savedAnnouncement)
       ? savedAnnouncement
       : defaultAnnouncement;
-  const whatsappNumber = (settings?.whatsapp_number || "+201223863092").replace(/[^\d]/g, "");
+  const socialLinks = getActiveSocialLinks(settings);
+  const whatsappLink = socialLinks.find(link => link.key === "whatsapp_number");
   const displayPhone = settings?.phone_number || settings?.whatsapp_number || "+20 122 386 3092";
-  const facebookUrl = settings?.facebook_url || "https://www.facebook.com/profile.php?id=61587944979845";
-  const instagramUrl = settings?.instagram_url || "#";
   const whatsappText = encodeURIComponent("Hello! I'm interested in ordering Hi Line Pro Care products.");
+  const whatsappOrderUrl = whatsappLink ? `${whatsappLink.href}?text=${whatsappText}` : null;
   const seoByPath: Record<"ar" | "en", Record<string, { title: string; description: string }>> = {
     ar: {
       "/": { title: "هاي لاين برو كير | عناية يومية وانتعاش يدوم", description: "تسوق منتجات هاي لاين برو كير للعناية اليومية مع التوصيل داخل مصر والدفع عند الاستلام." },
@@ -405,8 +404,9 @@ export default function MainLayout() {
               )}
 
               {/* WhatsApp Quick Order */}
+              {whatsappOrderUrl && (
               <a
-                href={`https://wa.me/${whatsappNumber}?text=${whatsappText}`}
+                href={whatsappOrderUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#25D366] text-white text-sm font-medium hover:bg-[#128C7E] transition-colors shadow-[0_10px_24px_rgba(37,211,102,0.2)]"
@@ -414,6 +414,7 @@ export default function MainLayout() {
                 <MessageCircle className="w-4 h-4" />
                 {t.orderOnWhatsApp}
               </a>
+              )}
 
               {/* Mobile Menu Button */}
               <button
@@ -485,15 +486,15 @@ export default function MainLayout() {
                   <ChevronRight className="w-4 h-4" />
                 </Link>
               )}
-              <a
-                href={`https://wa.me/${whatsappNumber}?text=${whatsappText}`}
+              {whatsappOrderUrl && <a
+                href={whatsappOrderUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 py-3 mt-2 rounded-xl bg-[#25D366] text-white font-medium"
               >
                 <MessageCircle className="w-4 h-4" />
                 {t.orderOnWhatsApp}
-              </a>
+              </a>}
             </nav>
           </div>
         )}
@@ -521,28 +522,21 @@ export default function MainLayout() {
                   : "Hi Line is a brand owned by Bellory Pharma."}
               </p>
               <div className="flex items-center gap-3">
-                <a
-                  href={facebookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-[#B57EDC] hover:text-white transition-colors"
-                >
-                  <Facebook className="w-4 h-4" />
-                </a>
-                <a
-                  href={instagramUrl}
-                  className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-[#B57EDC] hover:text-white transition-colors"
-                >
-                  <Instagram className="w-4 h-4" />
-                </a>
-                <a
-                  href={`https://wa.me/${whatsappNumber}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-[#25D366] hover:text-white transition-colors"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                </a>
+                {socialLinks.map(link => {
+                  const SocialIcon = link.icon;
+                  return (
+                    <a
+                      key={link.key}
+                      href={link.href}
+                      target={link.kind === "email" ? undefined : "_blank"}
+                      rel={link.kind === "email" ? undefined : "noopener noreferrer"}
+                      aria-label={lang === "ar" ? link.labelAr : link.labelEn}
+                      className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-[#B57EDC] hover:text-white transition-colors"
+                    >
+                      <SocialIcon className="w-4 h-4" />
+                    </a>
+                  );
+                })}
               </div>
             </div>
 
@@ -623,8 +617,9 @@ export default function MainLayout() {
       </footer>
 
       {/* Floating WhatsApp Button */}
+      {whatsappOrderUrl && (
       <a
-        href={`https://wa.me/${whatsappNumber}?text=${whatsappText}`}
+        href={whatsappOrderUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 z-50 w-14 h-14 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
@@ -633,6 +628,7 @@ export default function MainLayout() {
         <MessageCircle className="w-7 h-7" />
         <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-20" />
       </a>
+      )}
     </div>
   );
 }

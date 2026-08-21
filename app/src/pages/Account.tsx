@@ -1,5 +1,6 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { pathForLocale } from "@/lib/localeRouting";
+import { productImage } from "@/lib/product-media";
 import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { useState, useEffect } from "react";
@@ -279,7 +280,7 @@ function WishlistTab({ ar, t }: { ar: boolean; t: Translations }) {
       scentColor: product.scentColor,
       price: product.salePrice ?? product.price,
       salePrice: product.salePrice,
-      image: Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : null,
+      image: productImage(product.images),
     });
     toast.success(ar ? "تمت الإضافة إلى السلة" : "Added to cart");
     setTimeout(() => setAddingId(null), 1000);
@@ -327,7 +328,7 @@ function WishlistTab({ ar, t }: { ar: boolean; t: Translations }) {
                 </button>
                 <Link to={pathForLocale(`/shop/${product.slug}`, lang)} className="block w-full h-full">
                   <img
-                    src={Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : ""}
+                    src={productImage(product.images)}
                     alt={product.nameEn}
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                   />

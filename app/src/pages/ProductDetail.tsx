@@ -26,6 +26,7 @@ import CountdownTimer from "@/components/ui/CountdownTimer";
 import { Helmet } from "react-helmet-async";
 import { productStructuredData } from "@/lib/productSeo";
 import { pathForLocale } from "@/lib/localeRouting";
+import { productImage } from "@/lib/product-media";
 import {
   isRecentlyViewedProduct,
   listValue,
@@ -287,7 +288,7 @@ export default function ProductDetail() {
     );
   }
 
-  const images = listValue<string>(product.images);
+  const primaryImage = productImage(product.images);
   const benefits = listValue<string>(product.benefits);
   const benefitsAr = listValue<string>(product.benefitsAr);
   const productStock = (product as { stock?: number }).stock ?? 1;
@@ -301,7 +302,7 @@ export default function ProductDetail() {
     id: product.id,
     name: productName,
     description: productDescription,
-    imagePath: images[0] || "/products/hero-product.jpg",
+    imagePath: primaryImage,
     price: product.flashSalePrice || product.salePrice || product.price,
     stock: productStock,
     url: canonicalUrl,
@@ -356,7 +357,7 @@ export default function ProductDetail() {
               }}
             >
               <img
-                src={images[0] || "/products/hero-product.jpg"}
+                src={primaryImage}
                 alt={
                   lang === "ar" && product.nameAr
                     ? product.nameAr
@@ -718,14 +719,14 @@ export default function ProductDetail() {
               <div className="flex-1 flex items-center justify-center gap-4 w-full">
                 {/* Current Product */}
                 <div className="flex-1 beauty-card p-4 rounded-xl text-center bg-white">
-                  <img src={images[0]} alt={product.nameEn} className="w-24 h-24 mx-auto object-contain mb-2" loading="lazy" />
+                  <img src={primaryImage} alt={product.nameEn} className="w-24 h-24 mx-auto object-contain mb-2" loading="lazy" />
                   <p className="text-sm font-semibold text-[#4B1C71] truncate">{lang === 'ar' && product.nameAr ? product.nameAr : product.nameEn}</p>
                   <p className="text-xs text-[#B57EDC]">{parseFloat(product.price).toFixed(0)} {t.currency}</p>
                 </div>
                 <Plus className="w-8 h-8 text-[#B57EDC] flex-shrink-0" />
                 {/* Recommended Product */}
                 <div className="flex-1 beauty-card p-4 rounded-xl text-center bg-white">
-                  <img src={listValue(product.relatedProductsList[0].images)[0]} alt={product.relatedProductsList[0].nameEn} className="w-24 h-24 mx-auto object-contain mb-2" loading="lazy" />
+                  <img src={productImage(product.relatedProductsList[0].images)} alt={product.relatedProductsList[0].nameEn} className="w-24 h-24 mx-auto object-contain mb-2" loading="lazy" />
                   <p className="text-sm font-semibold text-[#4B1C71] truncate">{lang === 'ar' && product.relatedProductsList[0].nameAr ? product.relatedProductsList[0].nameAr : product.relatedProductsList[0].nameEn}</p>
                   <p className="text-xs text-[#B57EDC]">{parseFloat(product.relatedProductsList[0].price).toFixed(0)} {t.currency}</p>
                 </div>
@@ -739,9 +740,9 @@ export default function ProductDetail() {
                 </p>
                 <button 
                   onClick={() => {
-                    addItem({ productId: product.id, name: product.nameEn, nameAr: product.nameAr, scent: product.scent, scentColor: product.scentColor, price: (parseFloat(product.price)*0.9).toFixed(2), salePrice: null, image: images[0], stock: productStock });
+                    addItem({ productId: product.id, name: product.nameEn, nameAr: product.nameAr, scent: product.scent, scentColor: product.scentColor, price: (parseFloat(product.price)*0.9).toFixed(2), salePrice: null, image: primaryImage, stock: productStock });
                     const rel = product.relatedProductsList[0];
-                    addItem({ productId: rel.id, name: rel.nameEn, nameAr: rel.nameAr, scent: rel.scent, scentColor: rel.scentColor, price: (parseFloat(rel.price)*0.9).toFixed(2), salePrice: null, image: listValue(rel.images)[0], stock: 10 });
+                    addItem({ productId: rel.id, name: rel.nameEn, nameAr: rel.nameAr, scent: rel.scent, scentColor: rel.scentColor, price: (parseFloat(rel.price)*0.9).toFixed(2), salePrice: null, image: productImage(rel.images), stock: 10 });
                     toast.success(lang === 'ar' ? 'تم إضافة العرض للسلة!' : 'Bundle added to cart!');
                   }}
                   className="w-full beauty-button py-3 rounded-xl font-bold text-white shadow-lg shadow-[#B57EDC]/30"

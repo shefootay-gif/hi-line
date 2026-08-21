@@ -10,6 +10,7 @@ import {
   X,
   Package,
   Loader2,
+  ImagePlus,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -128,15 +129,35 @@ export default function AdminProducts() {
   });
 
   const handleSave = () => {
-    if (!editing.nameEn || !editing.nameAr || !editing.slug || !editing.price || !editing.scent) {
+    if (!editing.nameEn || !editing.nameAr || (editing.id > 0 && !editing.slug) || !editing.price || !editing.scent) {
       toast.error(lang === "ar" ? "يرجى ملء الحقول المطلوبة" : "Please fill required fields");
       return;
     }
-    if (editing.id) {
-      updateProduct.mutate(editing);
-    } else {
-      createProduct.mutate(editing);
+    const payload = {
+      ...editing,
+      images: editing.images.map(image => image.trim()).filter(Boolean),
+    };
+    if (editing.id) updateProduct.mutate(payload);
+    else createProduct.mutate(payload);
+  };
+
+  const addImageFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error(lang === "ar" ? "اختر ملف صورة صالحًا" : "Choose a valid image file");
+      return;
     }
+    if (file.size > 3_000_000) {
+      toast.error(lang === "ar" ? "يجب ألا تتجاوز الصورة 3 ميجابايت" : "Image must be under 3 MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setEditing(current => ({ ...current, images: [...current.images, reader.result as string] }));
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const openEdit = (product: AdminProduct) => {
@@ -357,19 +378,22 @@ export default function AdminProducts() {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {editing.id > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-[#4B1C71] mb-1">
-                    {t.slug} *
+                    {t.slug}
                   </label>
                   <input
                     type="text"
                     value={editing.slug}
-                    onChange={(e) =>
-                      setEditing({ ...editing, slug: e.target.value })
-                    }
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] text-sm focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30"
+                    readOnly
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] bg-[#F8F4FC] text-sm text-[#6F6178]"
                   />
+                  <p className="mt-1 text-xs text-[#8D7A97]">
+                    {lang === "ar" ? "يُنشأ تلقائيًا عند إضافة المنتج ولا يتغير بتغيير الاسم." : "Created automatically and kept stable when the name changes."}
+                  </p>
                 </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.sku}
@@ -484,6 +508,68 @@ export default function AdminProducts() {
                     className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] text-sm focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30"
                   />
                 </div>
+              </div>
+              <div className="space-y-3 rounded-xl border border-[#E7D8F1] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-[#4B1C71]">
+                      {lang === "ar" ? "صور المنتج" : "Product images"}
+                    </label>
+                    <p className="text-xs text-[#8D7A97]">
+                      {lang === "ar" ? "كل صورة تُحفظ لهذا المنتج فقط." : "Each image is saved only for this product."}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(current => ({ ...current, images: [...current.images, ""] }))}
+                      className="rounded-lg border border-[#B57EDC] px-3 py-2 text-xs font-medium text-[#4B1C71]"
+                    >
+                      {lang === "ar" ? "إضافة رابط صورة" : "Add image URL"}
+                    </button>
+                    <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#F3E8FF] px-3 py-2 text-xs font-medium text-[#7C3AED]">
+                      <ImagePlus className="h-4 w-4" />
+                      {lang === "ar" ? "رفع صورة" : "Upload image"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={event => {
+                          addImageFile(event.target.files?.[0]);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+                {editing.images.map((image, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-[#F8F4FC]">
+                      {image && <img src={image} alt="" className="h-full w-full object-cover" />}
+                    </div>
+                    <input
+                      type="text"
+                      value={image}
+                      onChange={event => setEditing(current => ({
+                        ...current,
+                        images: current.images.map((item, itemIndex) => itemIndex === index ? event.target.value : item),
+                      }))}
+                      placeholder="https://..."
+                      className="min-w-0 flex-1 rounded-xl border border-[#E7D8F1] px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30"
+                    />
+                    <button
+                      type="button"
+                      aria-label={lang === "ar" ? "حذف الصورة" : "Remove image"}
+                      onClick={() => setEditing(current => ({
+                        ...current,
+                        images: current.images.filter((_, itemIndex) => itemIndex !== index),
+                      }))}
+                      className="rounded-lg p-2 text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#4B1C71] mb-1">

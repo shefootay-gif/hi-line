@@ -497,7 +497,7 @@ export default function AdminSettings() {
               <div>
                 <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "اللغة الافتراضية" : "Default Language"}</label>
                 <select
-                  defaultValue={g("default_language") || "ar"}
+                  defaultValue={g("default_language") || "en"}
                   onChange={(e) => save("default_language", e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-[#EDE5F7] text-sm focus:outline-none focus:border-[#7C3AED] bg-white"
                 >

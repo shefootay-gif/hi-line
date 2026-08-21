@@ -3,6 +3,7 @@ import {
   localeFromPath,
   pathForLocale,
   pathWithoutLocale,
+  preferredStorefrontLocale,
 } from "./localeRouting";
 
 describe("locale routing", () => {
@@ -25,5 +26,10 @@ describe("locale routing", () => {
   it("removes only a leading storefront locale", () => {
     expect(pathWithoutLocale("/ar/shop/item")).toBe("/shop/item");
     expect(pathWithoutLocale("/admin")).toBe("/admin");
+  });
+
+  it("defaults to English while preserving a valid saved preference", () => {
+    expect(preferredStorefrontLocale(null)).toBe("en");
+    expect(preferredStorefrontLocale("ar")).toBe("ar");
   });
 });

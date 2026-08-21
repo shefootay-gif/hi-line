@@ -4,6 +4,7 @@ import { useTranslations } from "@/lib/translations";
 import { Link, useSearchParams } from "react-router";
 import { CheckCircle, MessageCircle, Home, Loader2, MapPin } from "lucide-react";
 import { trpc } from "@/providers/trpc";
+import { getActiveSocialLinks } from "@/lib/social-links";
 
 export default function OrderConfirmation() {
   const { lang, isRTL } = useLanguage();
@@ -17,6 +18,7 @@ export default function OrderConfirmation() {
     { enabled: !!orderNumber && !!customerPhone, retry: false }
   );
   const { data: settings } = trpc.store.getSettings.useQuery();
+  const whatsappLink = getActiveSocialLinks(settings).find(link => link.key === "whatsapp_number");
 
   if (isLoading) {
     return (
@@ -43,26 +45,25 @@ export default function OrderConfirmation() {
   }
 
   const handleWhatsAppTrack = () => {
+    if (!whatsappLink) return;
     const message =
       lang === "ar"
         ? `مرحبًا، أريد متابعة طلبي رقم: ${orderNumber}`
         : `Hello! I want to track my order #${orderNumber}`;
     window.open(
-      `https://wa.me/201223863092?text=${encodeURIComponent(message)}`,
+      `${whatsappLink.href}?text=${encodeURIComponent(message)}`,
       "_blank"
     );
   };
 
   const handleSendReceipt = () => {
-    const whatsappNumber = (
-      settings?.whatsapp_number || "+201223863092"
-    ).replace(/[^\d]/g, "");
+    if (!whatsappLink) return;
     const message =
       lang === "ar"
         ? `مرحبًا، أرفق إيصال التحويل لمراجعة الطلب رقم: ${orderNumber}`
         : `Hello, I am attaching the transfer receipt for order #${orderNumber}`;
     window.open(
-      `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`,
+      `${whatsappLink.href}?text=${encodeURIComponent(message)}`,
       "_blank"
     );
   };
@@ -120,10 +121,10 @@ export default function OrderConfirmation() {
             <div className="bg-white rounded-lg p-4 border border-[#FDE68A] text-center">
               <p className="text-xl font-bold text-[#D97706] tracking-widest">0122 386 3092</p>
             </div>
-            <button type="button" onClick={handleSendReceipt} className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 font-semibold text-white hover:bg-[#128C7E]">
+            {whatsappLink && <button type="button" onClick={handleSendReceipt} className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 font-semibold text-white hover:bg-[#128C7E]">
               <MessageCircle className="h-5 w-5" />
               {lang === "ar" ? "إرسال الإيصال عبر واتساب" : "Send receipt via WhatsApp"}
-            </button>
+            </button>}
             <p className="mt-3 text-sm font-medium text-[#92400E]">
               {lang === "ar" ? "سيظل الطلب قيد الانتظار حتى يراجع البائع الإيصال ويعتمد الدفع." : "The order remains pending until the seller reviews the receipt and approves payment."}
             </p>
@@ -143,10 +144,10 @@ export default function OrderConfirmation() {
             <div className="bg-white rounded-lg p-4 border border-[#BBF7D0] text-center">
               <p className="text-xl font-bold text-[#166534] tracking-widest">hiline@instapay</p>
             </div>
-            <button type="button" onClick={handleSendReceipt} className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 font-semibold text-white hover:bg-[#128C7E]">
+            {whatsappLink && <button type="button" onClick={handleSendReceipt} className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 font-semibold text-white hover:bg-[#128C7E]">
               <MessageCircle className="h-5 w-5" />
               {lang === "ar" ? "إرسال الإيصال عبر واتساب" : "Send receipt via WhatsApp"}
-            </button>
+            </button>}
             <p className="mt-3 text-sm font-medium text-[#166534]">
               {lang === "ar" ? "سيظل الطلب قيد الانتظار حتى يراجع البائع الإيصال ويعتمد الدفع." : "The order remains pending until the seller reviews the receipt and approves payment."}
             </p>
@@ -160,13 +161,13 @@ export default function OrderConfirmation() {
           >
             {lang === "ar" ? "تتبع حالة الطلب هنا" : "Track Order Status"}
           </Link>
-          <button
+          {whatsappLink && <button
             onClick={handleWhatsAppTrack}
             className="w-full flex items-center justify-center gap-2 py-4 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#128C7E] transition-colors"
           >
             <MessageCircle className="w-5 h-5" />
             {t.trackOnWhatsApp}
-          </button>
+          </button>}
           <Link
             to="/"
             className="w-full flex items-center justify-center gap-2 py-4 border border-[#E7D8F1] text-[#4B1C71] font-medium rounded-xl hover:bg-[#FCF8FF] transition-colors"

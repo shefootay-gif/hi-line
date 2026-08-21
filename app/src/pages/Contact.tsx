@@ -6,12 +6,11 @@ import {
   MessageCircle,
   Phone,
   MapPin,
-  Facebook,
-  Instagram,
   CheckCircle,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
+import { getActiveSocialLinks } from "@/lib/social-links";
 
 export default function Contact() {
   const { lang, isRTL } = useLanguage();
@@ -24,10 +23,9 @@ export default function Contact() {
     message: "",
   });
   const [sent, setSent] = useState(false);
-  const whatsappNumber = (settings?.whatsapp_number || "+201223863092").replace(/[^\d]/g, "");
+  const socialLinks = getActiveSocialLinks(settings);
+  const whatsappLink = socialLinks.find(link => link.key === "whatsapp_number");
   const displayPhone = settings?.phone_number || settings?.whatsapp_number || "+20 122 386 3092";
-  const facebookUrl = settings?.facebook_url || "https://www.facebook.com/profile.php?id=61587944979845";
-  const instagramUrl = settings?.instagram_url || "#";
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -215,8 +213,9 @@ export default function Contact() {
             </div>
 
             {/* WhatsApp CTA */}
+            {whatsappLink && (
             <a
-              href={`https://wa.me/${whatsappNumber}`}
+              href={whatsappLink.href}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 py-4 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#128C7E] transition-colors"
@@ -224,6 +223,7 @@ export default function Contact() {
               <MessageCircle className="w-5 h-5" />
               {t.chatOnWhatsApp}
             </a>
+            )}
 
             {/* Social */}
             <div className="bg-white border border-[#E7D8F1] rounded-2xl p-6">
@@ -231,20 +231,22 @@ export default function Contact() {
                 {t.followUs}
               </h3>
               <div className="flex items-center gap-3">
-                <a
-                  href={facebookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 rounded-xl bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center hover:bg-[#1877F2] hover:text-white transition-colors"
-                >
-                  <Facebook className="w-5 h-5" />
-                </a>
-                <a
-                  href={instagramUrl}
-                  className="w-10 h-10 rounded-xl bg-[#E4405F]/10 text-[#E4405F] flex items-center justify-center hover:bg-[#E4405F] hover:text-white transition-colors"
-                >
-                  <Instagram className="w-5 h-5" />
-                </a>
+                {socialLinks.map(link => {
+                  const SocialIcon = link.icon;
+                  return (
+                    <a
+                      key={link.key}
+                      href={link.href}
+                      target={link.kind === "email" ? undefined : "_blank"}
+                      rel={link.kind === "email" ? undefined : "noopener noreferrer"}
+                      aria-label={lang === "ar" ? link.labelAr : link.labelEn}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center transition-opacity hover:opacity-75"
+                      style={{ color: link.color, backgroundColor: `${link.color}18` }}
+                    >
+                      <SocialIcon className="w-5 h-5" />
+                    </a>
+                  );
+                })}
               </div>
             </div>
           </div>

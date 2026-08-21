@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import { HelmetProvider } from "react-helmet-async";
 import {
   pathForLocale,
+  preferredStorefrontLocale,
 } from "./lib/localeRouting";
 
 const Shop = lazy(() => import("./pages/Shop"));
@@ -67,10 +68,11 @@ function LocaleBoundary() {
 
 function LegacyStorefrontRedirect() {
   const location = useLocation();
+  const savedLocale = typeof window === "undefined" ? null : window.localStorage.getItem("hilang");
   return (
     <Navigate
       to={{
-        pathname: pathForLocale(location.pathname, "ar"),
+        pathname: pathForLocale(location.pathname, preferredStorefrontLocale(savedLocale)),
         search: location.search,
         hash: location.hash,
       }}
