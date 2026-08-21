@@ -33,7 +33,8 @@ import {
   exportJobs,
   backupJobs,
 } from "@db/schema";
-import { eq, desc, and, sql, like } from "drizzle-orm";
+import { eq, desc, and, sql, like, notInArray } from "drizzle-orm";
+import { LEGACY_MARKETING_CATEGORY_SLUGS } from "@contracts/product-category";
 import {
   editableSettingKeys,
   nonNegativeMoney,
@@ -659,6 +660,7 @@ export const adminRouter = createRouter({
     return await db
       .select()
       .from(categories)
+      .where(notInArray(categories.slug, [...LEGACY_MARKETING_CATEGORY_SLUGS]))
       .orderBy(categories.sortOrder);
   }),
 

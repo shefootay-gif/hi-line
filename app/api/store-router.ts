@@ -18,6 +18,10 @@ import {
   calculateVolumeDiscount,
 } from "@contracts/order-pricing";
 import {
+  LEGACY_MARKETING_CATEGORY_SLUGS,
+  PRIMARY_PRODUCT_CATEGORY,
+} from "@contracts/product-category";
+import {
   products,
   categories,
   faqs,
@@ -84,8 +88,8 @@ function calculateOrderFingerprint(input: {
 const categoryAliases: Record<string, string> = {
   all: "all",
   "all-products": "all",
-  "roll-on": "deodorant-roll-on",
-  "deodorant-roll-on": "deodorant-roll-on",
+  "roll-on": PRIMARY_PRODUCT_CATEGORY.slug,
+  [PRIMARY_PRODUCT_CATEGORY.slug]: PRIMARY_PRODUCT_CATEGORY.slug,
   fresh: "fresh-scents",
   "fresh-scents": "fresh-scents",
   fruity: "fruity-scents",
@@ -213,23 +217,13 @@ export const storeRouter = createRouter({
   // Categories
   getCategories: publicQuery.query(async () => {
     const db = getDb();
-    const hiddenMarketingCategories = [
-      "all-products",
-      "fresh-scents",
-      "fruity-scents",
-      "fragrance-free",
-      "summer-collection",
-      "best-sellers",
-      "offers",
-    ];
-
     return db
       .select()
       .from(categories)
       .where(
         and(
           eq(categories.isActive, true),
-          notInArray(categories.slug, hiddenMarketingCategories)
+          notInArray(categories.slug, [...LEGACY_MARKETING_CATEGORY_SLUGS])
         )
       )
       .orderBy(categories.sortOrder);

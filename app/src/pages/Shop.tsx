@@ -5,6 +5,7 @@ import { useCart } from "@/hooks/useCart";
 import { trpc } from "@/providers/trpc";
 import { rollOnProducts } from "@/lib/hiLineCatalog";
 import { productImage } from "@/lib/product-media";
+import { PRIMARY_PRODUCT_CATEGORY } from "@contracts/product-category";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useEffect, useState } from "react";
 import { Search, ShoppingBag } from "lucide-react";
@@ -17,7 +18,7 @@ const categoryFilters = [
 const categoryKeys = new Set(categoryFilters.map((category) => category.key));
 const categoryAliases: Record<string, string> = {
   "all-products": "all",
-  "deodorant-roll-on": "roll-on",
+  [PRIMARY_PRODUCT_CATEGORY.slug]: "roll-on",
   "fresh-scents": "roll-on",
   "fruity-scents": "roll-on",
   "fragrance-free": "roll-on",
