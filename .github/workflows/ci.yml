@@ -32,3 +32,70 @@ jobs:
       - run: npm run build
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
+      - name: Store production build
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-build-${{ github.sha }}
+          path: app/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Namecheap
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+    env:
+      CPANEL_SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
+      CPANEL_SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+      CPANEL_SSH_USER: ${{ secrets.CPANEL_SSH_USER }}
+      CPANEL_APP_ROOT: ${{ secrets.CPANEL_APP_ROOT }}
+      SSH_PRIVATE_KEY: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.CPANEL_SSH_KNOWN_HOSTS }}
+    steps:
+      - name: Download verified production build
+        uses: actions/download-artifact@v4
+        with:
+          name: production-build-${{ github.sha }}
+          path: app/dist
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          install -m 600 /dev/null "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+
+      - name: Upload and activate release
+        shell: bash
+        run: |
+          archive="release-${GITHUB_SHA}.tar.gz"
+          remote="${CPANEL_SSH_USER}@${CPANEL_SSH_HOST}"
+          tar -czf "$archive" -C app dist
+          ssh -p "$CPANEL_SSH_PORT" "$remote" \
+            "mkdir -p '$CPANEL_APP_ROOT/releases' '$CPANEL_APP_ROOT/tmp'"
+          scp -P "$CPANEL_SSH_PORT" "$archive" \
+            "$remote:$CPANEL_APP_ROOT/releases/$archive"
+          ssh -p "$CPANEL_SSH_PORT" "$remote" \
+            "cd '$CPANEL_APP_ROOT' && tar -xzf 'releases/$archive' && touch tmp/restart.txt"
+
+      - name: Verify production health
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error \
+              https://bellorypharma.com/api/health/ready > /dev/null; then
+              curl --fail --silent --show-error \
+                https://bellorypharma.com/ar/shop > /dev/null
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Production health check failed after deployment." >&2
+          exit 1

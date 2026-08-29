@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { seed, seedSingleRollOnSaleProducts } from "../db/seed";
+import { seed, seedCareSaleProducts, seedSingleRollOnSaleProducts } from "../db/seed";
 
 const seedMarker = path.resolve(import.meta.dirname, "../.seed-complete");
 
@@ -10,6 +10,7 @@ async function bootstrap() {
     fs.writeFileSync(seedMarker, new Date().toISOString(), "utf8");
   } else {
     await seedSingleRollOnSaleProducts();
+    await seedCareSaleProducts();
   }
 
   await import("./boot");

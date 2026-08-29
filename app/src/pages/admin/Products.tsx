@@ -13,6 +13,10 @@ import {
   ImagePlus,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import {
+  discountFromSalePrice,
+  salePriceFromDiscount,
+} from "@/lib/product-pricing";
 
 const emptyProduct = {
   id: 0,
@@ -25,6 +29,7 @@ const emptyProduct = {
   shortDescriptionAr: "",
   price: "",
   salePrice: "",
+  discountPercentage: "",
   stock: 0,
   sku: "",
   scent: "",
@@ -45,7 +50,7 @@ const emptyProduct = {
 };
 type ProductForm = typeof emptyProduct;
 
-type AdminProduct = Omit<typeof emptyProduct, "descriptionEn" | "descriptionAr" | "shortDescriptionEn" | "shortDescriptionAr" | "salePrice" | "sku" | "scentColor" | "categoryId" | "images" | "benefits" | "benefitsAr" | "ingredients" | "ingredientsAr" | "usageInstructions" | "usageInstructionsAr" | "seoTitle" | "seoDescription" | "isActive" | "isFeatured" | "isBestSeller"> & {
+type AdminProduct = Omit<typeof emptyProduct, "descriptionEn" | "descriptionAr" | "shortDescriptionEn" | "shortDescriptionAr" | "salePrice" | "discountPercentage" | "sku" | "scentColor" | "categoryId" | "images" | "benefits" | "benefitsAr" | "ingredients" | "ingredientsAr" | "usageInstructions" | "usageInstructionsAr" | "seoTitle" | "seoDescription" | "isActive" | "isFeatured" | "isBestSeller"> & {
   descriptionEn?: string | null;
   descriptionAr?: string | null;
   shortDescriptionEn?: string | null;
@@ -133,8 +138,18 @@ export default function AdminProducts() {
       toast.error(lang === "ar" ? "يرجى ملء الحقول المطلوبة" : "Please fill required fields");
       return;
     }
+    const discount = Number(editing.discountPercentage || 0);
+    if (!Number.isFinite(discount) || discount < 0 || discount >= 100) {
+      toast.error(lang === "ar" ? "نسبة الخصم يجب أن تكون من 0 إلى أقل من 100" : "Discount must be from 0 to less than 100");
+      return;
+    }
+    const { discountPercentage: _discountPercentage, ...product } = editing;
+    void _discountPercentage;
     const payload = {
-      ...editing,
+      ...product,
+      salePrice: discount > 0
+        ? editing.salePrice || salePriceFromDiscount(editing.price, editing.discountPercentage)
+        : "",
       images: editing.images.map(image => image.trim()).filter(Boolean),
     };
     if (editing.id) updateProduct.mutate(payload);
@@ -169,6 +184,7 @@ export default function AdminProducts() {
       shortDescriptionEn: product.shortDescriptionEn ?? "",
       shortDescriptionAr: product.shortDescriptionAr ?? "",
       salePrice: product.salePrice ?? "",
+      discountPercentage: discountFromSalePrice(product.price, product.salePrice),
       sku: product.sku ?? "",
       scentColor: product.scentColor ?? "",
       categoryId: product.categoryId ?? undefined,
@@ -465,30 +481,62 @@ export default function AdminProducts() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.price} *
                   </label>
                   <input
-                    type="text"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
                     value={editing.price}
-                    onChange={(e) =>
-                      setEditing({ ...editing, price: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const price = e.target.value;
+                      setEditing({
+                        ...editing,
+                        price,
+                        salePrice: editing.discountPercentage
+                          ? salePriceFromDiscount(price, editing.discountPercentage)
+                          : "",
+                      });
+                    }}
                     className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] text-sm focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#4B1C71] mb-1">
-                    {t.salePrice}
+                    {lang === "ar" ? "نسبة الخصم" : "Discount percentage"}
                   </label>
                   <input
-                    type="text"
+                    type="number"
+                    min="0"
+                    max="99.99"
+                    step="0.01"
+                    value={editing.discountPercentage}
+                    onChange={(e) => {
+                      const discountPercentage = e.target.value;
+                      setEditing({
+                        ...editing,
+                        discountPercentage,
+                        salePrice: salePriceFromDiscount(editing.price, discountPercentage),
+                      });
+                    }}
+                    placeholder="30"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] text-sm focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                    {lang === "ar" ? "السعر بعد الخصم" : "Price after discount"}
+                  </label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
                     value={editing.salePrice || ""}
-                    onChange={(e) =>
-                      setEditing({ ...editing, salePrice: e.target.value })
-                    }
+                    onChange={(e) => setEditing({ ...editing, salePrice: e.target.value })}
+                    placeholder={salePriceFromDiscount(editing.price, editing.discountPercentage) || editing.price}
                     className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] text-sm focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30"
                   />
                 </div>

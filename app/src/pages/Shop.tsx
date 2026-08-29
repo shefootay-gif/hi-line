@@ -13,6 +13,8 @@ import { Search, ShoppingBag } from "lucide-react";
 const categoryFilters = [
   { key: "all", labelEn: "All", labelAr: "الكل" },
   { key: "roll-on", labelEn: "Deodorant", labelAr: "مزيل العرق" },
+  { key: "body-mist", labelEn: "Body Mist", labelAr: "بادي ميست" },
+  { key: "facial-care", labelEn: "Facial Care", labelAr: "العناية بالوجه" },
 ];
 
 const categoryKeys = new Set(categoryFilters.map((category) => category.key));
@@ -59,7 +61,15 @@ function formatLE(value: string) {
 function matchesCategory(product: ShopProduct, category: string) {
   if (category === "all") return true;
   if (category === "roll-on") return product.section === "Roll On";
+  if (category === "body-mist") return product.section === "Body Mist";
+  if (category === "facial-care") return product.section === "Facial Care";
   return false;
+}
+
+function productSection(slug: string) {
+  if (slug.includes("body-mist")) return "Body Mist";
+  if (slug.includes("facial-cleanser")) return "Facial Care";
+  return "Roll On";
 }
 
 export default function Shop() {
@@ -138,7 +148,7 @@ export default function Shop() {
         images: [productImage(p.images)],
         discountLabel: p.salePrice ? `${Math.round((1 - parseFloat(p.salePrice) / parseFloat(p.price)) * 100)}% OFF` : "NEW",
         brand: "Hi Line",
-        section: "Roll On",
+        section: productSection(p.slug),
       }))
     : rollOnProducts;
 

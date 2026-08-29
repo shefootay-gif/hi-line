@@ -55,6 +55,21 @@ import {
 
 type AdminDb = ReturnType<typeof getDb>;
 
+function assertValidProductPricing(priceValue: string, salePriceValue?: string) {
+  const price = Number(priceValue);
+  const salePrice = salePriceValue ? Number(salePriceValue) : null;
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Product price must be greater than zero" });
+  }
+  if (
+    salePrice !== null &&
+    (!Number.isFinite(salePrice) || salePrice <= 0 || salePrice >= price)
+  ) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Sale price must be greater than zero and lower than the product price" });
+  }
+}
+
 async function logAdminActivity(
   db: AdminDb,
   adminUserId: number | null | undefined,
@@ -136,6 +151,7 @@ export const adminRouter = createRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      assertValidProductPricing(input.price, input.salePrice);
       const db = getDb();
       const baseSlug = slugify(input.nameEn || input.nameAr);
       const matchingSlugs = await db
@@ -201,6 +217,7 @@ export const adminRouter = createRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      assertValidProductPricing(input.price, input.salePrice);
       const db = getDb();
       const { id, ...data } = input;
       const [existing] = await db.select().from(products).where(eq(products.id, id)).limit(1);

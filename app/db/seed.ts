@@ -3,6 +3,11 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { PRIMARY_PRODUCT_CATEGORY } from "../contracts/product-category";
 import { SINGLE_ROLL_ON_SALE_PRODUCTS_WITH_PRICE } from "../contracts/sale-products";
 import {
+  CARE_SALE_CATEGORIES,
+  CARE_SALE_PRICE,
+  CARE_SALE_PRODUCTS,
+} from "../contracts/care-sale-products";
+import {
   products,
   categories,
   faqs,
@@ -66,6 +71,84 @@ export async function seedSingleRollOnSaleProducts() {
     .insert(products)
     .values(buildSingleRollOnSaleProductRows(category.id))
     .onDuplicateKeyUpdate({ set: { slug: sql`VALUES(slug)` } });
+}
+
+export async function seedCareSaleProducts() {
+  const db = getDb();
+
+  await db
+    .insert(categories)
+    .values(CARE_SALE_CATEGORIES.map(category => ({ ...category, isActive: true })))
+    .onDuplicateKeyUpdate({
+      set: {
+        nameEn: sql`VALUES(name_en)`,
+        nameAr: sql`VALUES(name_ar)`,
+        sortOrder: sql`VALUES(sort_order)`,
+        isActive: true,
+      },
+    });
+
+  const categoryRows = await db
+    .select({ id: categories.id, slug: categories.slug })
+    .from(categories)
+    .where(inArray(categories.slug, CARE_SALE_CATEGORIES.map(category => category.slug)));
+  const categoryIds = new Map(categoryRows.map(category => [category.slug, category.id]));
+
+  for (const product of CARE_SALE_PRODUCTS) {
+    const categoryId = categoryIds.get(product.categorySlug);
+    if (!categoryId) throw new Error(`Missing product category: ${product.categorySlug}`);
+
+    const isCleanser = product.categorySlug === "facial-care";
+    const row = {
+      nameEn: product.nameEn,
+      nameAr: product.nameAr,
+      slug: product.slug,
+      descriptionEn: product.descriptionEn,
+      descriptionAr: product.descriptionAr,
+      shortDescriptionEn: isCleanser
+        ? "Deep cleansing and makeup removal for oily and combination skin."
+        : `${product.scent} body mist with instant, long-lasting freshness.`,
+      shortDescriptionAr: isCleanser
+        ? "تنظيف عميق وإزالة للمكياج للبشرة الدهنية والمختلطة."
+        : `بادي ميست ${product.scentAr} لانتعاش فوري يدوم طويلًا.`,
+      price: CARE_SALE_PRICE.price,
+      salePrice: CARE_SALE_PRICE.salePrice,
+      stock: 100,
+      sku: product.sku,
+      barcode: product.barcode,
+      scent: product.scent,
+      scentColor: product.scentColor,
+      categoryId,
+      images: [product.image],
+      benefits: isCleanser
+        ? ["Deep cleansing", "Makeup removal", "For oily and combination skin"]
+        : ["Instant freshness", "Long-lasting fragrance", "Silky skin feel", "250 ml"],
+      benefitsAr: isCleanser
+        ? ["تنظيف عميق", "إزالة المكياج", "للبشرة الدهنية والمختلطة"]
+        : ["انتعاش فوري", "رائحة تدوم طويلًا", "ملمس ناعم كالحرير", "250 مل"],
+      usageInstructions: product.usageInstructions,
+      usageInstructionsAr: product.usageInstructionsAr,
+      isActive: true,
+      isFeatured: true,
+      isBestSeller: false,
+      seoTitle: `${product.nameEn} - 25% Off`,
+      seoDescription: `${product.descriptionEn} Now EGP 224 instead of EGP 299.`,
+    };
+
+    const [existing] = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.slug, product.slug))
+      .limit(1);
+
+    if (existing) {
+      const { stock: _stock, ...updateRow } = row;
+      void _stock;
+      await db.update(products).set(updateRow).where(eq(products.id, existing.id));
+    } else {
+      await db.insert(products).values(row);
+    }
+  }
 }
 
 export async function seed() {
@@ -375,6 +458,9 @@ export async function seed() {
 
   await seedSingleRollOnSaleProducts();
   console.log("Single-piece sale products seeded");
+
+  await seedCareSaleProducts();
+  console.log("Body mist and facial-care products seeded");
 
   // Seed FAQs
   await db
