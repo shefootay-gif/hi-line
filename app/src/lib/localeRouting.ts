@@ -1,5 +1,10 @@
 export type StorefrontLocale = "ar" | "en";
 
+export const storefrontEntryLocale = (
+  pathname: string,
+  savedLocale: string | null | undefined,
+): StorefrontLocale => pathname === "/" ? "en" : preferredStorefrontLocale(savedLocale);
+
 export const preferredStorefrontLocale = (
   savedLocale: string | null | undefined,
 ): StorefrontLocale => savedLocale === "ar" || savedLocale === "en" ? savedLocale : "en";

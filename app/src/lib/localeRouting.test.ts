@@ -4,6 +4,7 @@ import {
   pathForLocale,
   pathWithoutLocale,
   preferredStorefrontLocale,
+  storefrontEntryLocale,
 } from "./localeRouting";
 
 describe("locale routing", () => {
@@ -31,5 +32,12 @@ describe("locale routing", () => {
   it("defaults to English while preserving a valid saved preference", () => {
     expect(preferredStorefrontLocale(null)).toBe("en");
     expect(preferredStorefrontLocale("ar")).toBe("ar");
+  });
+
+  it("opens the bare homepage in English even after an Arabic visit", () => {
+    expect(storefrontEntryLocale("/", "ar")).toBe("en");
+    expect(storefrontEntryLocale("/", null)).toBe("en");
+    expect(storefrontEntryLocale("/shop", "ar")).toBe("ar");
+    expect(localeFromPath("/ar")).toBe("ar");
   });
 });

@@ -16,7 +16,7 @@ import NotFound from "./pages/NotFound";
 import { HelmetProvider } from "react-helmet-async";
 import {
   pathForLocale,
-  preferredStorefrontLocale,
+  storefrontEntryLocale,
 } from "./lib/localeRouting";
 
 const Shop = lazy(() => import("./pages/Shop"));
@@ -72,7 +72,7 @@ function LegacyStorefrontRedirect() {
   return (
     <Navigate
       to={{
-        pathname: pathForLocale(location.pathname, preferredStorefrontLocale(savedLocale)),
+        pathname: pathForLocale(location.pathname, storefrontEntryLocale(location.pathname, savedLocale)),
         search: location.search,
         hash: location.hash,
       }}

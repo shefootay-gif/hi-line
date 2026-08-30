@@ -8,6 +8,15 @@ import { SINGLE_ROLL_ON_SALE_PRICE } from "@contracts/sale-products";
 import { CARE_SALE_PRICE } from "@contracts/care-sale-products";
 import Home from "./Home";
 
+const homepageProducts = [...rollOnProducts, {
+  ...rollOnProducts[0],
+  id: 101,
+  slug: "additional-care-product",
+  nameEn: "Additional care product",
+  price: "299.00",
+  salePrice: "224.00",
+}];
+
 const language = vi.hoisted(() => ({ lang: "ar" as "ar" | "en" }));
 vi.mock("@/hooks/useLanguage", () => ({
   useLanguage: () => ({ lang: language.lang, isRTL: language.lang === "ar" }),
@@ -16,7 +25,7 @@ vi.mock("@/providers/trpc", () => ({
   trpc: { store: {
     getFaqs: { useQuery: () => ({ data: [] }) },
     getSettings: { useQuery: () => ({ data: {} }) },
-    getProducts: { useQuery: () => ({ data: rollOnProducts }) },
+    getProducts: { useQuery: () => ({ data: homepageProducts }) },
   } },
 }));
 vi.mock("gsap", () => ({ gsap: { registerPlugin: vi.fn() } }));
@@ -42,8 +51,10 @@ describe("homepage client content", () => {
     expect(container.querySelectorAll(".benefit-card")).toHaveLength(4);
     expect(container.textContent).toContain(lang === "ar" ? "مكونات فعالة وآمنة" : "Effective, Safe Ingredients");
     expect(container.textContent).toContain(lang === "ar" ? "إشعارات المنتجات الجديدة" : "new product announcements");
-    expect(container.querySelectorAll(".scent-card .line-through")).toHaveLength(5);
-    for (const card of container.querySelectorAll(".scent-card")) {
+    expect(container.querySelectorAll(".scent-card")).toHaveLength(homepageProducts.length);
+    expect(container.querySelector('a[href$="/additional-care-product"]')).not.toBeNull();
+    expect(container.querySelectorAll(".scent-card .line-through")).toHaveLength(homepageProducts.length);
+    for (const card of [...container.querySelectorAll(".scent-card")].slice(0, 5)) {
       expect(card.textContent).toContain("285.00");
       expect(card.textContent).toContain("570.00");
       expect(card.textContent).toContain("50% OFF");

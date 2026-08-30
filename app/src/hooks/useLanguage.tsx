@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router";
 import {
   localeFromPath,
   pathForLocale,
+  storefrontEntryLocale,
   type StorefrontLocale,
 } from "@/lib/localeRouting";
 
@@ -26,10 +27,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [lang, setLang] = useState<Language>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("hilang") as Language) || "en";
-    }
-    return "en";
+    return localeFromPath(location.pathname) ?? storefrontEntryLocale(
+      location.pathname,
+      typeof window === "undefined" ? null : localStorage.getItem("hilang"),
+    );
   });
 
   const isRTL = lang === "ar";
