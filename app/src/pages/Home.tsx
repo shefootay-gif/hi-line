@@ -27,55 +27,31 @@ gsap.registerPlugin(ScrollTrigger);
 const benefitCards = [
   {
     icon: Shield,
-    title: "48h Protection",
-    titleAr: "حماية 48 ساعة",
-    desc: "Stay fresh all day with up to 48 hours of reliable protection",
-    descAr: "ابقَ منتعشاً طوال اليوم مع حماية تصل إلى 48 ساعة",
+    title: "Effective, Safe Ingredients",
+    titleAr: "مكونات فعالة وآمنة",
+    desc: "We choose natural extracts and carefully considered ingredients.",
+    descAr: "لأننا نختار خلاصات طبيعية ومكونات مدروسة.",
   },
   {
     icon: Leaf,
-    title: "0% Aluminum",
-    titleAr: "0% ألمنيوم",
-    desc: "Clean formula with zero aluminum for healthy skin",
-    descAr: "تركيبة نظيفة خالية من الألمنيوم لبشرة صحية",
+    title: "Care for Your Skin Type",
+    titleAr: "عناية مخصصة لنوع بشرتك",
+    desc: "Care focused on real skin concerns and addressing them naturally and effectively.",
+    descAr: "تركز على مشاكل البشرة الحقيقية وحلها بشكل طبيعي وفعال.",
   },
   {
     icon: Award,
-    title: "Lebanese Formula",
-    titleAr: "تركيبة لبنانية",
-    desc: "Premium quality crafted with Lebanese expertise",
-    descAr: "جودة ممتازة مصنوعة بالخبرة اللبنانية",
+    title: "International-Standard Quality",
+    titleAr: "جودة تضاهي المنتجات العالمية",
+    desc: "We combine high manufacturing standards with a price suited to your everyday routine.",
+    descAr: "نمزج بين أعلى معايير الجودة للتصنيع وبين السعر الذي يناسب استخدامك اليومي المستمر.",
   },
   {
     icon: Droplets,
-    title: "Daily Freshness",
-    titleAr: "انتعاش يومي",
-    desc: "Smooth roll-on application for everyday confidence",
-    descAr: "تطبيق سلس بالرول لثقة يومية",
-  },
-];
-
-const howToSteps = [
-  {
-    num: "1",
-    title: "Shake Well",
-    titleAr: "رجّ جيداً",
-    desc: "Shake the bottle before each use",
-    descAr: "رجّ الزجاجة قبل كل استخدام",
-  },
-  {
-    num: "2",
-    title: "Apply",
-    titleAr: "ضع المنتج",
-    desc: "Roll onto clean, dry underarms",
-    descAr: "ادهن على الإبطين النظيفين والجافين",
-  },
-  {
-    num: "3",
-    title: "Let Dry",
-    titleAr: "اتركه يجف",
-    desc: "Wait a moment before dressing",
-    descAr: "انتظر قليلاً قبل ارتداء الملابس",
+    title: "Confidence and Safe Use",
+    titleAr: "ثقة واستخدام آمن",
+    desc: "Our products are free from harmful substances and harsh ingredients, making it easier to enjoy a light, reliable daily care routine.",
+    descAr: "منتجاتنا خالية من المواد الضارة والمكونات القاسية، لنسهل عليك الاستمتاع بروتين عناية يومي خفيف وموثوق.",
   },
 ];
 
@@ -123,7 +99,6 @@ export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null);
   const scentRef = useRef<HTMLDivElement>(null);
   const benefitsRef = useRef<HTMLDivElement>(null);
-  const howToRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -132,11 +107,6 @@ export default function Home() {
         ".hero-text",
         { opacity: 0, y: 30 },
         { opacity: 1, y: 0, duration: 0.8, ease: "power3.out", stagger: 0.1 }
-      );
-      gsap.fromTo(
-        ".hero-product",
-        { opacity: 0, scale: 0.9 },
-        { opacity: 1, scale: 1, duration: 1, delay: 0.2, ease: "power2.out" }
       );
 
       // Scent cards animation
@@ -177,24 +147,6 @@ export default function Home() {
         );
       }
 
-      // How to animation
-      if (howToRef.current) {
-        gsap.fromTo(
-          ".how-step",
-          { opacity: 0, x: -20 },
-          {
-            opacity: 1,
-            x: 0,
-            duration: 0.6,
-            stagger: 0.2,
-            ease: "power2.out",
-            scrollTrigger: {
-              trigger: howToRef.current,
-              start: "top 80%",
-            },
-          }
-        );
-      }
     });
 
     return () => ctx.revert();
@@ -230,19 +182,15 @@ export default function Home() {
       {/* Hero Section */}
       <section
         ref={heroRef}
-        className="relative min-h-[90vh] flex items-center overflow-hidden beauty-section"
+        className="relative flex items-center overflow-hidden beauty-section py-20 sm:py-28"
         style={{
           background: `radial-gradient(ellipse at 80% 100%, rgba(219,182,238,0.34) 0%, transparent 58%), radial-gradient(ellipse at 12% 18%, rgba(181,126,220,0.16) 0%, transparent 42%), linear-gradient(135deg, #FCF8FF 0%, #FFFFFF 52%, #F7ECFF 100%)`,
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div
-            className={`flex flex-col lg:flex-row items-center gap-12 lg:gap-8 ${
-              isRTL ? "lg:flex-row-reverse" : ""
-            }`}
-          >
+          <div className="flex flex-col items-center">
             {/* Text Content */}
-            <div className="flex-1 text-center lg:text-left max-w-xl">
+            <div className="text-center max-w-2xl">
               <p className="hero-text text-xs sm:text-sm uppercase beauty-eyebrow font-semibold mb-4">
                 {lang === "ar" ? "التركيبة اللبنانية" : "Lebanese Formula"}
               </p>
@@ -269,7 +217,7 @@ export default function Home() {
               <div
                 className={`hero-text flex flex-col sm:flex-row gap-4 ${
                   isRTL ? "sm:flex-row-reverse" : ""
-                } justify-center lg:justify-start mb-8`}
+                } justify-center mb-8`}
               >
                 <button
                   onClick={() => navigate(pathForLocale("/shop", lang))}
@@ -293,11 +241,11 @@ export default function Home() {
               </div>
               {/* Feature badges */}
               <div
-                className={`hero-text flex flex-wrap gap-3 justify-center lg:justify-start`}
+                className="hero-text flex flex-wrap gap-3 justify-center"
               >
                 {[
-                  { icon: Shield, label: t.hoursProtection },
-                  { icon: Leaf, label: t.zeroAluminum },
+                  { icon: Leaf, label: t.naturalIngredients },
+                  { icon: Shield, label: t.skinSafeProducts },
                   { icon: Award, label: t.lebaneseFormula },
                 ].map((badge) => (
                   <span
@@ -311,17 +259,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Product Image */}
-            <div className="flex-1 flex justify-center">
-              <div className="hero-product relative beauty-card rounded-[2rem] p-3 sm:p-4 float-soft">
-                <img
-                  src="/campaign/beach-collection.jpg"
-                  alt={lang === "ar" ? "هاي لاين برو كير" : "Hi Line Deodorant"}
-                  loading="eager"
-                  className="w-72 sm:w-96 lg:w-[28rem] aspect-[4/5] object-cover rounded-[1.5rem] drop-shadow-2xl"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -484,6 +421,9 @@ export default function Home() {
             <h2 className="text-3xl sm:text-4xl font-bold text-[#4B1C71] mb-4">
               {t.whyChooseHiLine}
             </h2>
+            <p className="max-w-3xl mx-auto text-base text-[#6F6178] leading-relaxed">
+              {t.whyHiLineIntro}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -503,36 +443,6 @@ export default function Home() {
                 </p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How to Use Section */}
-      <section ref={howToRef} className="py-20 sm:py-28 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="text-xs uppercase beauty-eyebrow font-semibold mb-3">
-              {lang === "ar" ? "دليل الاستخدام" : "GUIDE"}
-            </p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-[#4B1C71] mb-4">
-              {t.howToUse}
-            </h2>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-4">
-            {howToSteps.map((step, idx) => (
-              <div key={idx} className="how-step flex-1 text-center relative">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#B57EDC] text-white flex items-center justify-center text-lg font-bold shadow-[0_12px_28px_rgba(181,126,220,0.22)]">
-                  {step.num}
-                </div>
-                <h3 className="text-lg font-semibold text-[#4B1C71] mb-1">
-                  {lang === "ar" ? step.titleAr : step.title}
-                </h3>
-                <p className="text-sm text-[#6F6178]">
-                  {lang === "ar" ? step.descAr : step.desc}
-                </p>
-                </div>
-              ))}
           </div>
         </div>
       </section>

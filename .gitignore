@@ -28,3 +28,7 @@ app/.chrome-profile/**
 /scripts/
 
 testsprite_tests\tmp\config.json
+
+# Local deployment credentials and release packages must never be committed.
+/.deploy-tmp/
+/app/hiline-release-*.zip

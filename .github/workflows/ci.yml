@@ -4,17 +4,22 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: quality-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Build/tests use mocked queries, never production database credentials.
+      DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ci
     defaults:
       run:
         working-directory: app
@@ -28,12 +33,13 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run lint
-      - run: npm test -- --run
       - run: npm run build
+      # Static-serving tests require the production app shell.
+      - run: npm test -- --run
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
       - name: Store production build
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: production-build-${{ github.sha }}
@@ -43,10 +49,13 @@ jobs:
 
   deploy:
     name: Deploy to Namecheap
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-latest
-    environment: production
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://bellorypharma.com
     concurrency:
       group: production-deployment
       cancel-in-progress: false
@@ -67,35 +76,69 @@ jobs:
       - name: Configure SSH
         shell: bash
         run: |
-          install -d -m 700 "$HOME/.ssh"
-          install -m 600 /dev/null "$HOME/.ssh/id_ed25519"
-          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          set -euo pipefail
+          for required in CPANEL_SSH_HOST CPANEL_SSH_PORT CPANEL_SSH_USER CPANEL_APP_ROOT SSH_PRIVATE_KEY SSH_KNOWN_HOSTS; do
+            if [ -z "${!required}" ]; then
+              echo "Missing required deployment secret: $required" >&2
+              exit 1
+            fi
+          done
+          [[ "$CPANEL_SSH_HOST" == "business199.web-hosting.com" ]]
+          [[ "$CPANEL_SSH_PORT" == "21098" ]]
+          [[ "$CPANEL_SSH_USER" == "belljxna" ]]
+          [[ "$CPANEL_APP_ROOT" == "/home/belljxna/hiline-app" ]]
+          install -d -m 700 ~/.ssh
+          umask 077
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
+          ssh-keygen -F "[$CPANEL_SSH_HOST]:$CPANEL_SSH_PORT" > /dev/null
 
       - name: Upload and activate release
+        id: activate
         shell: bash
         run: |
-          archive="release-${GITHUB_SHA}.tar.gz"
+          set -euo pipefail
+          archive="release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
+          backup="backup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
           remote="${CPANEL_SSH_USER}@${CPANEL_SSH_HOST}"
+          printf '%s\n' "$GITHUB_SHA" > app/dist/public/deployment-version.txt
           tar -czf "$archive" -C app dist
-          ssh -p "$CPANEL_SSH_PORT" "$remote" \
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -p "$CPANEL_SSH_PORT" "$remote" \
             "mkdir -p '$CPANEL_APP_ROOT/releases' '$CPANEL_APP_ROOT/tmp'"
-          scp -P "$CPANEL_SSH_PORT" "$archive" \
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -P "$CPANEL_SSH_PORT" "$archive" \
             "$remote:$CPANEL_APP_ROOT/releases/$archive"
-          ssh -p "$CPANEL_SSH_PORT" "$remote" \
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -p "$CPANEL_SSH_PORT" "$remote" \
+            "cd '$CPANEL_APP_ROOT' && test -f dist/deploy-entry.js && tar -czf 'releases/$backup' dist"
+          echo "backup_ready=true" >> "$GITHUB_OUTPUT"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -p "$CPANEL_SSH_PORT" "$remote" \
             "cd '$CPANEL_APP_ROOT' && tar -xzf 'releases/$archive' && touch tmp/restart.txt"
 
       - name: Verify production health
         shell: bash
         run: |
+          set -euo pipefail
           for attempt in {1..12}; do
-            if curl --fail --silent --show-error \
-              https://bellorypharma.com/api/health/ready > /dev/null; then
-              curl --fail --silent --show-error \
-                https://bellorypharma.com/ar/shop > /dev/null
+            if curl --fail --silent --show-error --max-time 20 \
+                https://bellorypharma.com/api/health/ready > /dev/null \
+              && curl --fail --silent --show-error --max-time 20 -H 'Accept: text/html' \
+                https://bellorypharma.com/ar/shop > /dev/null \
+              && [ "$(curl --fail --silent --show-error --max-time 20 \
+                "https://bellorypharma.com/deployment-version.txt?run=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT")" = "$GITHUB_SHA" ]; then
               exit 0
             fi
             sleep 5
           done
           echo "Production health check failed after deployment." >&2
           exit 1
+
+      - name: Restore previous build on failure
+        if: failure() && steps.activate.outputs.backup_ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="${CPANEL_SSH_USER}@${CPANEL_SSH_HOST}"
+          backup="backup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -p "$CPANEL_SSH_PORT" "$remote" \
+            "cd '$CPANEL_APP_ROOT' && test -s 'releases/$backup' && mv dist 'releases/failed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}' && tar -xzf 'releases/$backup' && touch tmp/restart.txt"
+          echo "Previous build restored; failed release retained for diagnosis. Database changes are not rolled back."

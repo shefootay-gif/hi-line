@@ -14,7 +14,7 @@ export const translations = {
     heroTitle: "Deodorant Roll On",
     heroSubtitle: "Hi Line Pro Care",
     heroDescription:
-      "Discover the freshness that fits every mood. Our Lebanese Formula gives you up to 48 hours of protection with 0% Aluminum.",
+      "Discover Hi Line Pro Care: Lebanese Formula, natural ingredients, and skin-safe products for your daily care.",
     shopNow: "Shop Now",
     orderOnWhatsApp: "Order on WhatsApp",
 
@@ -23,6 +23,9 @@ export const translations = {
     zeroAluminum: "0% Aluminum",
     lebaneseFormula: "Lebanese Formula",
     dailyFreshness: "Daily Freshness",
+    naturalIngredients: "Natural Ingredients",
+    skinSafeProducts: "Skin-safe Products",
+    whyHiLineIntro: "At Hi Line, we offer more than personal care products. We provide solutions tailored to your skin’s daily needs, crafted with care and balance.",
 
     // Sections
     chooseYourScent: "Choose Your Scent",
@@ -33,7 +36,7 @@ export const translations = {
     commonQuestions: "Common Questions",
     stayFresh: "Stay Fresh with Hi Line",
     subscribeText:
-      "Subscribe for exclusive offers and new scent announcements",
+      "Subscribe for exclusive offers and new product announcements",
     yourCart: "Your Cart",
     checkout: "Checkout",
     orderConfirmation: "Order Confirmation",
@@ -324,7 +327,7 @@ export const translations = {
     heroTitle: "رول أون مزيل عرق",
     heroSubtitle: "هاي لاين برو كير",
     heroDescription:
-      "اكتشف الانتعاش الذي يناسب كل مزاج. تركيبتنا اللبنانية تمنحك حماية تصل إلى 48 ساعة مع 0% ألمنيوم.",
+      "اكتشف هاي لاين برو كير: تركيبة لبنانية، ومكونات طبيعية، ومنتجات آمنة على البشرة للعناية اليومية.",
     shopNow: "تسوق الآن",
     orderOnWhatsApp: "اطلب عبر الواتساب",
 
@@ -333,6 +336,9 @@ export const translations = {
     zeroAluminum: "0% ألمنيوم",
     lebaneseFormula: "تركيبة لبنانية",
     dailyFreshness: "انتعاش يومي",
+    naturalIngredients: "مكونات طبيعية",
+    skinSafeProducts: "منتجات آمنة على البشرة",
+    whyHiLineIntro: "في Hi Line، لا نقدم مجرد منتجات للعناية الشخصية، بل نقدم حلولًا ملائمة لاحتياجات بشرتك اليومية، مصممة بحرفية وتوازن.",
 
     // Sections
     chooseYourScent: "اختر رائحتك",
@@ -343,7 +349,7 @@ export const translations = {
     commonQuestions: "الأسئلة الشائعة",
     stayFresh: "ابقَ منتعشاً مع هاي لاين",
     subscribeText:
-      "اشترك للحصول على عروض حصرية وإشعارات الروائح الجديدة",
+      "اشترك للحصول على عروض حصرية وإشعارات المنتجات الجديدة",
     yourCart: "سلة التسوق",
     checkout: "إتمام الشراء",
     orderConfirmation: "تأكيد الطلب",
