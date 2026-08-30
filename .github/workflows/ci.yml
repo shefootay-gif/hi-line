@@ -93,6 +93,25 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
           ssh-keygen -F "[$CPANEL_SSH_HOST]:$CPANEL_SSH_PORT" > /dev/null
+          # Reuse one authenticated connection for upload, activation and rollback.
+          # Shared hosting may throttle repeated fresh SSH connections.
+          printf '%s\n' \
+            "Host $CPANEL_SSH_HOST" \
+            '  ControlMaster auto' \
+            '  ControlPath ~/.ssh/deploy-%C' \
+            '  ControlPersist 120' \
+            '  ServerAliveInterval 15' \
+            '  ServerAliveCountMax 3' > ~/.ssh/config
+
+      - name: Verify hosting SSH connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -v -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+            -o ConnectionAttempts=3 -p "$CPANEL_SSH_PORT" \
+            "${CPANEL_SSH_USER}@${CPANEL_SSH_HOST}" \
+            "test -f '$CPANEL_APP_ROOT/dist/deploy-entry.js' && echo DEPLOYMENT_ACCESS_OK" \
+            | grep -Fx DEPLOYMENT_ACCESS_OK
 
       - name: Upload and activate release
         id: activate
