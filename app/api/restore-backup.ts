@@ -23,7 +23,12 @@ async function main() {
     try {
       for (const table of snapshot.tables) for (const row of table.rows) {
         const keys = Object.keys(row); if (!keys.length) continue;
-        const values = keys.map(key => typeof row[key] === "object" && row[key] !== null ? JSON.stringify(row[key]) : row[key]);
+        const values = keys.map(key => {
+          const value = row[key];
+          if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+          if (typeof value === "object") return JSON.stringify(value);
+          throw new Error("Unsupported value in backup row.");
+        });
         await conn.execute(`INSERT INTO \`${table.name}\` (${keys.map(key=>`\`${key}\``).join(",")}) VALUES (${keys.map(()=>"?").join(",")})`, values);
       }
       await conn.commit();
