@@ -5,6 +5,7 @@ import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
 import { rollOnProducts, type CatalogProduct } from "@/lib/hiLineCatalog";
 import { productImage } from "@/lib/product-media";
+import { sortProducts, type ProductSort } from "@/lib/product-sorting";
 import { Link } from "react-router";
 import { useNavigate } from "react-router";
 import {
@@ -71,6 +72,7 @@ export default function Home() {
   const sourceProducts = (!apiError && apiProducts && apiProducts.length > 0)
     ? apiProducts.map((p) => ({
         id: p.id,
+        createdAt: p.createdAt,
         nameEn: p.nameEn,
         nameAr: p.nameAr ?? p.nameEn,
         slug: p.slug,
@@ -90,6 +92,8 @@ export default function Home() {
       }))
     : rollOnProducts;
 
+  const [productSort, setProductSort] = useState<ProductSort>("oldest");
+  const sortedProducts = sortProducts(sourceProducts, productSort);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [email, setEmail] = useState("");
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
@@ -278,8 +282,25 @@ export default function Home() {
             </p>
           </div>
 
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <label htmlFor="home-product-sort" className="text-sm font-medium text-[#6F6178]">
+              {lang === "ar" ? "ترتيب المنتجات" : "Sort products"}
+            </label>
+            <select
+              id="home-product-sort"
+              value={productSort}
+              onChange={(event) => setProductSort(event.target.value as ProductSort)}
+              className="min-h-11 w-full rounded-xl border border-[#E8D4F5] bg-white px-3 py-2 text-sm text-[#4A2063] focus:outline-none focus:ring-2 focus:ring-[#B57EDC] sm:w-auto"
+            >
+              <option value="oldest">{lang === "ar" ? "الأقدم أولًا" : "Oldest first"}</option>
+              <option value="newest">{lang === "ar" ? "الأحدث أولًا" : "Newest first"}</option>
+              <option value="price-asc">{lang === "ar" ? "السعر: من الأقل للأعلى" : "Price: low to high"}</option>
+              <option value="price-desc">{lang === "ar" ? "السعر: من الأعلى للأقل" : "Price: high to low"}</option>
+            </select>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-            {sourceProducts.map((product) => {
+            {sortedProducts.map((product) => {
               const variant = {
                 id: product.id,
                 name: product.nameEn,

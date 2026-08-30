@@ -1,7 +1,8 @@
 import { createElement } from "react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { rollOnProducts } from "@/lib/hiLineCatalog";
 import { translations } from "@/lib/translations";
 import { SINGLE_ROLL_ON_SALE_PRICE } from "@contracts/sale-products";
@@ -28,10 +29,26 @@ vi.mock("@/providers/trpc", () => ({
     getProducts: { useQuery: () => ({ data: homepageProducts }) },
   } },
 }));
-vi.mock("gsap", () => ({ gsap: { registerPlugin: vi.fn() } }));
+vi.mock("gsap", () => ({ gsap: { registerPlugin: vi.fn(), context: () => ({ revert: vi.fn() }) } }));
 vi.mock("gsap/ScrollTrigger", () => ({ ScrollTrigger: {} }));
 
 describe("homepage client content", () => {
+  afterEach(cleanup);
+  it.each(["ar", "en"] as const)("changes product order in %s", (lang) => {
+    language.lang = lang;
+    const { container, getByLabelText } = render(createElement(MemoryRouter, null, createElement(Home)));
+    const select = getByLabelText(lang === "ar" ? "ترتيب المنتجات" : "Sort products") as HTMLSelectElement;
+    const firstLink = () => container.querySelector(".scent-card a")?.getAttribute("href");
+    expect(select.value).toBe("oldest");
+    expect(firstLink()).toContain(rollOnProducts[0].slug);
+    fireEvent.change(select, { target: { value: "newest" } });
+    expect(firstLink()).toContain("additional-care-product");
+    fireEvent.change(select, { target: { value: "price-asc" } });
+    expect(firstLink()).toContain(rollOnProducts[5].slug);
+    fireEvent.change(select, { target: { value: "price-desc" } });
+    expect(firstLink()).toContain(rollOnProducts[0].slug);
+    expect(container.querySelectorAll(".scent-card")).toHaveLength(homepageProducts.length);
+  });
   it.each(["ar", "en"] as const)("renders the revised %s homepage", (lang) => {
     language.lang = lang;
     const container = document.createElement("div");
