@@ -235,12 +235,14 @@ export default function AdminOrders() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setViewOrder(order)}
+                          aria-label={lang === "ar" ? "عرض تفاصيل الطلب" : "View order details"}
                           className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#B57EDC]/10 text-[#4B1C71]"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleWhatsAppCustomer(order)}
+                          aria-label={lang === "ar" ? "فتح واتساب العميل" : "Open customer WhatsApp"}
                           className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#25D366]/10 text-[#25D366]"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />

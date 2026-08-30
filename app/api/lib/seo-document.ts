@@ -1,3 +1,4 @@
+import { type SeoOverride, safeSeoUrl, publicSeoPath } from "@contracts/seo-settings";
 export type SeoProduct = {
   slug: string;
   nameEn: string;
@@ -82,6 +83,7 @@ export const injectSeoDocument = (
   origin: string,
   pathname: string,
   product?: SeoProduct | null,
+  override?: SeoOverride,
 ) => {
   const { locale, route } = localeDetails(pathname);
   const localizedName = product
@@ -95,16 +97,16 @@ export const injectSeoDocument = (
   const page = product
     ? [`${localizedName} | Hi Line Pro Care`, localizedDescription]
     : pageCopy[locale][route as keyof typeof pageCopy[typeof locale]];
-  const indexable = Boolean(page);
-  const title = page?.[0] || "Hi Line Pro Care";
-  const description = page?.[1] || "Official Hi Line Pro Care online store in Egypt.";
-  const canonical = new URL(pathname, origin).href;
+  const indexable = Boolean(page) && publicSeoPath(route) && override?.isIndexed !== false;
+  const title = (locale === "ar" ? override?.titleAr : override?.titleEn) || page?.[0] || "Hi Line Pro Care";
+  const description = (locale === "ar" ? override?.descriptionAr : override?.descriptionEn) || page?.[1] || "Official Hi Line Pro Care online store in Egypt.";
+  const canonical = safeSeoUrl(override?.canonicalUrl, origin) || new URL(pathname, origin).href;
   const alternateRoute = route === "/" ? "" : route;
   const alternateAr = new URL(`/ar${alternateRoute}`, origin).href;
   const alternateEn = new URL(`/en${alternateRoute}`, origin).href;
   const logo = new URL("/brand/logo.jpg", origin).href;
   const images = imageList(product?.images);
-  const imageUrls = images.length > 0
+  const imageUrls = safeSeoUrl(override?.ogImage, origin) ? [safeSeoUrl(override?.ogImage, origin)!] : images.length > 0
     ? images.map(image => new URL(image, origin).href)
     : [logo];
   const structuredData = product
@@ -174,6 +176,7 @@ export const injectSeoDocument = (
     ? `<article><h1>${escapeHtml(localizedName || "Hi Line Pro Care product")}</h1><p>${escapeHtml(description)}</p><p>${escapeHtml(product.salePrice || product.price)} EGP — ${product.stock > 0 ? "In stock" : "Out of stock"}</p><p><a href="${escapeHtml(new URL(`/${locale}/shop`, origin).href)}">${locale === "ar" ? "تصفح كل المنتجات" : "Browse all products"}</a></p></article>`
     : `<article><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><ul><li>${locale === "ar" ? "الدفع عند الاستلام" : "Cash on delivery"}</li><li>${locale === "ar" ? "التوصيل داخل مصر" : "Delivery across Egypt"}</li><li><a href="${escapeHtml(new URL(`/${locale}/shop`, origin).href)}">${locale === "ar" ? "المنتجات والأسعار" : "Products and prices"}</a></li><li><a href="${escapeHtml(new URL(`/${locale}/faq`, origin).href)}">${locale === "ar" ? "الأسئلة الشائعة" : "Frequently asked questions"}</a></li></ul></article>`;
   const head = [
+    ...(override?.keywords ? [`<meta name="keywords" content="${escapeHtml(override.keywords)}">`] : []),
     `<meta name="description" content="${escapeHtml(description)}">`,
     `<meta name="robots" content="${indexable ? "index, follow, max-image-preview:large, max-snippet:-1" : "noindex, nofollow"}">`,
     `<link rel="canonical" href="${escapeHtml(canonical)}">`,

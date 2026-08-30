@@ -92,7 +92,9 @@ export const editableSettingKeys = new Set([
 ]);
 
 function csvEscape(value: unknown) {
-  const text = value === null || value === undefined ? "" : String(value);
+  const raw = value === null || value === undefined ? "" : String(value);
+  // CSV quoting does not stop spreadsheets interpreting text as formulas.
+  const text = typeof value === "string" && /^[\s\uFEFF]*[=+@-]/u.test(raw) ? `'${raw}` : raw;
   return `"${text.replace(/"/g, '""')}"`;
 }
 
@@ -100,7 +102,7 @@ export function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
   return [
-    headers.join(","),
+    headers.map(csvEscape).join(","),
     ...rows.map(row => headers.map(header => csvEscape(row[header])).join(",")),
   ].join("\n");
 }

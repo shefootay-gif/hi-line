@@ -1,6 +1,5 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { trpc } from "@/providers/trpc";
-import { rollOnProducts } from "@/lib/hiLineCatalog";
 import { Link } from "react-router";
 import {
   AlertTriangle,
@@ -105,6 +104,7 @@ function QuickActionBtn({
 
 export default function AdminDashboard() {
   const { lang, isRTL } = useLanguage();
+  const utils = trpc.useUtils();
   const { data: stats, isError: statsError } = trpc.store.getStats.useQuery(undefined, {
     retry: false,
     throwOnError: false,
@@ -120,46 +120,32 @@ export default function AdminDashboard() {
   });
 
   const dataUnavailable = statsError || ordersError;
-  const localProducts = rollOnProducts.map((product) => ({
-    id: product.id,
-    nameEn: product.nameEn,
-    scent: product.scent,
-    stock: 100,
-  }));
-  const lowStockProducts = dataUnavailable
-    ? localProducts
-    : stats?.lowStockProducts ?? [];
+  const lowStockProducts = stats?.lowStockProducts ?? [];
 
   const ar = lang === "ar";
 
   const metricCards = [
     {
       label: ar ? "إجمالي الطلبات" : "Total Orders",
-      value: stats?.totalOrders ?? 0,
+      value: statsError ? "—" : stats?.totalOrders ?? 0,
       icon: ShoppingBag,
       color: "#7C3AED",
-      trend: 12,
-      trendLabel: ar ? "مقارنة بالشهر الماضي" : "vs. last month",
     },
     {
       label: ar ? "إجمالي المبيعات" : "Total Revenue",
-      value: `${parseFloat(stats?.totalRevenue || "0").toFixed(0)} ${ar ? "جنيه" : "EGP"}`,
+      value: statsError ? "—" : `${parseFloat(stats?.totalRevenue || "0").toFixed(0)} ${ar ? "جنيه" : "EGP"}`,
       icon: DollarSign,
       color: "#059669",
-      trend: 8,
-      trendLabel: ar ? "مقارنة بالشهر الماضي" : "vs. last month",
     },
     {
       label: ar ? "طلبات معلقة" : "Pending Orders",
-      value: stats?.pendingOrders ?? 0,
+      value: statsError ? "—" : stats?.pendingOrders ?? 0,
       icon: Clock,
       color: "#D97706",
-      trend: -3,
-      trendLabel: ar ? "مقارنة بالأمس" : "vs. yesterday",
     },
     {
       label: ar ? "مخزون منخفض" : "Low Stock",
-      value: dataUnavailable ? localProducts.length : stats?.lowStockProducts?.length ?? 0,
+      value: dataUnavailable ? "—" : stats?.lowStockProducts?.length ?? 0,
       icon: AlertTriangle,
       color: "#EF4444",
       trendLabel: ar ? "منتجات تحتاج تجديد" : "products need restocking",
@@ -232,7 +218,7 @@ export default function AdminDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 text-xs text-[#7C3AED] border border-[#D8B4FE] rounded-lg px-3 py-2 hover:bg-[#F3E8FF] transition-colors">
+              <button onClick={() => { void utils.store.getStats.invalidate(); void utils.admin.getRecentOrders.invalidate(); void utils.admin.getSalesByScent.invalidate(); }} className="flex items-center gap-2 text-xs text-[#7C3AED] border border-[#D8B4FE] rounded-lg px-3 py-2 hover:bg-[#F3E8FF] transition-colors">
                 <RefreshCcw className="w-3.5 h-3.5" />
                 {ar ? "تحديث" : "Refresh"}
               </button>
@@ -250,8 +236,8 @@ export default function AdminDashboard() {
           <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 flex items-center gap-3">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
             {ar
-              ? "تعمل اللوحة في وضع المعاينة. بيانات الطلبات الكاملة تحتاج اتصال قاعدة البيانات."
-              : "Dashboard is in preview mode. Full order data requires a database connection."}
+              ? "تعذر تحميل بعض البيانات. أعد المحاولة؛ لم يتم عرض بيانات بديلة وهمية."
+              : "Some data could not be loaded. Retry; no simulated data is displayed."}
           </div>
         )}
 
@@ -350,25 +336,7 @@ export default function AdminDashboard() {
               </h2>
             </div>
             {scentData.length === 0 ? (
-              <div className="space-y-3">
-                {["Tropical Breeze", "Voyage", "Candy Pop", "Sweet Mango"].map((name, i) => (
-                  <div key={name}>
-                    <div className="flex justify-between text-xs text-[#6F6178] mb-1">
-                      <span>{name}</span>
-                      <span>{(100 - i * 18)}%</span>
-                    </div>
-                    <div className="h-2 bg-[#F3E8FF] rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full stat-bar"
-                        style={{
-                          width: `${100 - i * 18}%`,
-                          background: `linear-gradient(90deg, #7C3AED, #B57EDC)`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-sm text-[#6F6178]">{ar ? "لا توجد بيانات مبيعات متاحة بعد" : "No sales data available yet"}</p>
             ) : (
               <div className="space-y-3">
                 {scentData.map((s) => (

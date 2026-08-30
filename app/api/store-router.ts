@@ -26,6 +26,7 @@ import {
   categories,
   faqs,
   storeSettings,
+  seoPages,
   paymentSettings,
   shippingSettings,
   orders,
@@ -259,6 +260,10 @@ export const storeRouter = createRouter({
 
     setCached("settings", settingsMap, 300); // 5 minutes
     return settingsMap;
+  }),
+
+  getSeoPages: publicQuery.query(async () => {
+    return getDb().select().from(seoPages);
   }),
 
   // Payment Settings

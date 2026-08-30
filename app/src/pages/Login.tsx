@@ -85,7 +85,7 @@ export default function Login({ mode = "user" }: { mode?: "user" | "admin" }) {
                 onSubmit={(e) => { e.preventDefault(); adminLogin.mutate({ username: adminUser, password: adminPw }); }}
               >
                 <div>
-                  <label htmlFor="admin-username" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "اسم المستخدم" : "Username"}</label>
+                  <label htmlFor="admin-username" className="block text-sm font-medium text-[#1A0533] mb-1.5">{ar ? "اسم المالك أو بريد موظف الفريق" : "Owner username or staff email"}</label>
                   <input
                     id="admin-username"
                     autoComplete="username"

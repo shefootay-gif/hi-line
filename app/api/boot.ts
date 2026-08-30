@@ -15,6 +15,7 @@ import {
   orderItems,
   coupons,
   inventoryMovements,
+  seoPages,
 } from "../db/schema";
 import { eq, and, asc, sql } from "drizzle-orm";
 import crypto from "crypto";
@@ -61,6 +62,7 @@ app.get("/sitemap.xml", async c => {
   const sitemap = buildSitemap(
     publicOrigin ?? new URL(c.req.url).origin,
     activeProducts,
+    await getDb().select().from(seoPages),
   );
 
   return c.body(sitemap, 200, {

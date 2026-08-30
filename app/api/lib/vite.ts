@@ -4,7 +4,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import fs from "fs";
 import path from "path";
 import { and, eq } from "drizzle-orm";
-import { products } from "../../db/schema";
+import { products, seoPages } from "../../db/schema";
+import { findSeoOverride, publicSeoPath, seoRoute } from "@contracts/seo-settings";
 import { getDb } from "../queries/connection";
 import { env } from "./env";
 import { injectSeoDocument, type SeoProduct } from "./seo-document";
@@ -50,11 +51,13 @@ export function serveStaticFiles(app: App) {
       product = result ?? null;
     }
 
+    const overrides = publicSeoPath(seoRoute(url.pathname)) ? await getDb().select().from(seoPages) : [];
     const content = injectSeoDocument(
       template,
       env.isProduction ? "https://bellorypharma.com" : url.origin,
       url.pathname,
       product,
+      findSeoOverride(overrides, url.pathname),
     );
     return c.html(content);
   });

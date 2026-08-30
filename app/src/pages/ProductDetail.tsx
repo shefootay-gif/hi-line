@@ -1,4 +1,5 @@
 import { useLanguage } from "@/hooks/useLanguage";
+import { findSeoOverride, safeSeoUrl } from "@contracts/seo-settings";
 import { useTranslations } from "@/lib/translations";
 import { findCatalogProductBySlug } from "@/lib/hiLineCatalog";
 import { trpc } from "@/providers/trpc";
@@ -51,6 +52,8 @@ export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { lang, isRTL } = useLanguage();
   const t = useTranslations(lang);
+  const { data: seoPages } = trpc.store.getSeoPages.useQuery();
+  const seoOverride = findSeoOverride(seoPages ?? [], `/${lang}/shop/${slug}`);
   const { data: apiProduct, isLoading } = trpc.store.getProductBySlug.useQuery(
     { slug: slug || "" },
     { enabled: !!slug }
@@ -313,9 +316,9 @@ export default function ProductDetail() {
   return (
     <div className={isRTL ? "font-[Cairo]" : "font-[Inter]"}>
       <Helmet>
-        <title>{`${productName} | Hi Line Pro Care`}</title>
-        <meta name="description" content={productDescription} />
-        <link rel="canonical" href={canonicalUrl} />
+        <title>{(lang === "ar" ? seoOverride?.titleAr : seoOverride?.titleEn) || `${productName} | Hi Line Pro Care`}</title>
+        <meta name="description" content={(lang === "ar" ? seoOverride?.descriptionAr : seoOverride?.descriptionEn) || productDescription} />
+        <link rel="canonical" href={safeSeoUrl(seoOverride?.canonicalUrl) || canonicalUrl} />
         <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
       </Helmet>
       <Toaster position="top-center" />

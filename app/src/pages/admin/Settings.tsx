@@ -63,10 +63,11 @@ function Field({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-[#1A0533] mb-1.5">{label}</label>
+      <label htmlFor={`setting-${fieldKey}`} className="block text-sm font-medium text-[#1A0533] mb-1.5">{label}</label>
       <div className="flex gap-2">
         {multiline ? (
           <textarea
+            id={`setting-${fieldKey}`}
             value={local}
             onChange={(e) => setLocal(e.target.value)}
             placeholder={placeholder}
@@ -75,6 +76,7 @@ function Field({
           />
         ) : (
           <input
+            id={`setting-${fieldKey}`}
             type={type}
             value={local}
             onChange={(e) => setLocal(e.target.value)}
@@ -83,6 +85,7 @@ function Field({
           />
         )}
         <button
+          aria-label={`${label} — حفظ / Save`}
           onClick={save}
           disabled={isPending}
           className={`px-4 py-2.5 rounded-xl flex items-center justify-center min-w-[3rem] gap-1.5 text-sm font-medium transition-all disabled:opacity-50 ${

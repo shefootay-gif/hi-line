@@ -327,12 +327,14 @@ export default function AdminProducts() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => openEdit(product)}
+                          aria-label={lang === "ar" ? "تعديل المنتج" : "Edit product"}
                           className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#B57EDC]/10 text-[#4B1C71]"
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteId(product.id)}
+                          aria-label={lang === "ar" ? "حذف المنتج" : "Delete product"}
                           className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-500"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -367,10 +369,10 @@ export default function AdminProducts() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-1" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.nameEn} *
                   </label>
-                  <input
+                  <input id="product-field-1"
                     type="text"
                     value={editing.nameEn}
                     onChange={(e) =>
@@ -380,10 +382,10 @@ export default function AdminProducts() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-2" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.nameAr} *
                   </label>
-                  <input
+                  <input id="product-field-2"
                     type="text"
                     value={editing.nameAr}
                     onChange={(e) =>
@@ -396,10 +398,10 @@ export default function AdminProducts() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {editing.id > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-3" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.slug}
                   </label>
-                  <input
+                  <input id="product-field-3"
                     type="text"
                     value={editing.slug}
                     readOnly
@@ -411,10 +413,10 @@ export default function AdminProducts() {
                 </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-4" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.sku}
                   </label>
-                  <input
+                  <input id="product-field-4"
                     type="text"
                     value={editing.sku || ""}
                     onChange={(e) =>
@@ -426,10 +428,10 @@ export default function AdminProducts() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-5" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.scent} *
                   </label>
-                  <input
+                  <input id="product-field-5"
                     type="text"
                     value={editing.scent}
                     onChange={(e) =>
@@ -439,10 +441,10 @@ export default function AdminProducts() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-6" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {lang === "ar" ? "القسم" : "Category"}
                   </label>
-                  <select
+                  <select id="product-field-6"
                     value={editing.categoryId ?? ""}
                     onChange={(e) =>
                       setEditing({
@@ -467,10 +469,10 @@ export default function AdminProducts() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
-                    {t.scent} Color
+                  <label htmlFor="product-field-7" className="block text-sm font-medium text-[#4B1C71] mb-1">
+                    {lang === "ar" ? "لون الرائحة" : "Scent color"}
                   </label>
-                  <input
+                  <input id="product-field-7"
                     type="text"
                     value={editing.scentColor || ""}
                     onChange={(e) =>
@@ -483,10 +485,10 @@ export default function AdminProducts() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-8" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.price} *
                   </label>
-                  <input
+                  <input id="product-field-8"
                     type="number"
                     min="0.01"
                     step="0.01"
@@ -505,10 +507,10 @@ export default function AdminProducts() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-9" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {lang === "ar" ? "نسبة الخصم" : "Discount percentage"}
                   </label>
-                  <input
+                  <input id="product-field-9"
                     type="number"
                     min="0"
                     max="99.99"
@@ -527,10 +529,10 @@ export default function AdminProducts() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-10" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {lang === "ar" ? "السعر بعد الخصم" : "Price after discount"}
                   </label>
-                  <input
+                  <input id="product-field-10"
                     type="number"
                     min="0.01"
                     step="0.01"
@@ -541,10 +543,10 @@ export default function AdminProducts() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                  <label htmlFor="product-field-11" className="block text-sm font-medium text-[#4B1C71] mb-1">
                     {t.stock}
                   </label>
-                  <input
+                  <input id="product-field-11"
                     type="number"
                     value={editing.stock}
                     onChange={(e) =>
@@ -560,7 +562,7 @@ export default function AdminProducts() {
               <div className="space-y-3 rounded-xl border border-[#E7D8F1] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-[#4B1C71]">
+                    <label htmlFor="product-field-12" className="block text-sm font-medium text-[#4B1C71]">
                       {lang === "ar" ? "صور المنتج" : "Product images"}
                     </label>
                     <p className="text-xs text-[#8D7A97]">
@@ -623,7 +625,7 @@ export default function AdminProducts() {
                 <label className="block text-sm font-medium text-[#4B1C71] mb-1">
                   {t.description}
                 </label>
-                <textarea
+                <textarea id="product-field-12"
                   value={editing.descriptionEn || ""}
                   onChange={(e) =>
                     setEditing({ ...editing, descriptionEn: e.target.value })
@@ -633,10 +635,10 @@ export default function AdminProducts() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#4B1C71] mb-1">
+                <label htmlFor="product-field-13" className="block text-sm font-medium text-[#4B1C71] mb-1">
                   {t.descriptionAr}
                 </label>
-                <textarea
+                <textarea id="product-field-13"
                   value={editing.descriptionAr || ""}
                   onChange={(e) =>
                     setEditing({ ...editing, descriptionAr: e.target.value })

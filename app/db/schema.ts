@@ -36,7 +36,7 @@ export const users = mysqlTable("users", {
 });
 
 export type User = typeof users.$inferSelect;
-export type SafeUser = Omit<User, "passwordHash">;
+export type SafeUser = Omit<User, "passwordHash"> & { adminAccess?: import("../contracts/admin-access").AdminAccess };
 export type InsertUser = typeof users.$inferInsert;
 
 // Categories table

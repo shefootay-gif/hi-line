@@ -91,8 +91,8 @@ export default function FulfillmentCenter() {
             </form>
             <form onSubmit={(e) => { e.preventDefault(); createShipment.mutate({ orderId: Number(shipmentForm.orderId), providerId: shipmentForm.providerId ? Number(shipmentForm.providerId) : undefined, trackingNumber: shipmentForm.trackingNumber || undefined, status: shipmentForm.status, shippingCost: shipmentForm.shippingCost }); }} className="rounded-2xl border bg-white p-5 space-y-3">
               <h2 className="font-bold text-[#1A0533]">{ar ? "إنشاء شحنة" : "Create shipment"}</h2>
-              <input className={inputClass} required placeholder="Order ID" value={shipmentForm.orderId} onChange={(e) => setShipmentForm({ ...shipmentForm, orderId: e.target.value })} />
-              <input className={inputClass} placeholder="Provider ID" value={shipmentForm.providerId} onChange={(e) => setShipmentForm({ ...shipmentForm, providerId: e.target.value })} />
+              <input className={inputClass} required aria-label={ar ? "رقم الطلب الداخلي" : "Order ID"} placeholder={ar ? "رقم الطلب الداخلي" : "Order ID"} value={shipmentForm.orderId} onChange={(e) => setShipmentForm({ ...shipmentForm, orderId: e.target.value })} />
+              <input className={inputClass} aria-label={ar ? "رقم شركة الشحن" : "Provider ID"} placeholder={ar ? "رقم شركة الشحن" : "Provider ID"} value={shipmentForm.providerId} onChange={(e) => setShipmentForm({ ...shipmentForm, providerId: e.target.value })} />
               <input className={inputClass} placeholder={ar ? "رقم التتبع" : "Tracking number"} value={shipmentForm.trackingNumber} onChange={(e) => setShipmentForm({ ...shipmentForm, trackingNumber: e.target.value })} />
               <select className={inputClass} value={shipmentForm.status} onChange={(e) => setShipmentForm({ ...shipmentForm, status: e.target.value as typeof shipmentForm.status })}><option value="pending">Pending</option><option value="ready">Ready</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option><option value="returned">Returned</option></select>
               <button className={buttonClass}>{ar ? "إنشاء" : "Create"}</button>
@@ -107,7 +107,7 @@ export default function FulfillmentCenter() {
         <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
           <form onSubmit={(e) => { e.preventDefault(); createInvoice.mutate({ orderId: Number(invoiceForm.orderId), taxAmount: invoiceForm.taxAmount }); }} className="rounded-2xl border bg-white p-5 space-y-3">
             <h2 className="font-bold text-[#1A0533]">{ar ? "إنشاء فاتورة" : "Create invoice"}</h2>
-            <input className={inputClass} required placeholder="Order ID" value={invoiceForm.orderId} onChange={(e) => setInvoiceForm({ ...invoiceForm, orderId: e.target.value })} />
+            <input className={inputClass} required aria-label={ar ? "رقم الطلب الداخلي" : "Order ID"} placeholder={ar ? "رقم الطلب الداخلي" : "Order ID"} value={invoiceForm.orderId} onChange={(e) => setInvoiceForm({ ...invoiceForm, orderId: e.target.value })} />
             <input className={inputClass} placeholder={ar ? "الضريبة" : "Tax"} value={invoiceForm.taxAmount} onChange={(e) => setInvoiceForm({ ...invoiceForm, taxAmount: e.target.value })} />
             <button className={buttonClass}>{ar ? "إنشاء" : "Create"}</button>
           </form>

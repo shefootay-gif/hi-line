@@ -31,7 +31,6 @@ import {
   seoPages,
   adminStaffUsers,
   exportJobs,
-  backupJobs,
 } from "@db/schema";
 import { eq, desc, and, sql, like, notInArray } from "drizzle-orm";
 import { LEGACY_MARKETING_CATEGORY_SLUGS } from "@contracts/product-category";
@@ -48,6 +47,10 @@ import {
   validateCampaignMetrics,
 } from "./lib/admin-utils";
 import { getAffectedRows } from "./lib/db-result";
+import { staffInput, saveStaff } from "./lib/staff-users";
+import { publicSeoPath } from "@contracts/seo-settings";
+import { buildSitemap } from "./lib/sitemap";
+import { createStoreBackup, listStoreBackups, readStoreBackup } from "./lib/store-backup";
 import {
   restoreOrderInventory,
   reverseOrderEffects,
@@ -1599,7 +1602,7 @@ export const adminRouter = createRouter({
   listSeoPages: adminQuery.query(async () => { const db = getDb(); return db.select().from(seoPages).orderBy(desc(seoPages.createdAt)); }),
 
   upsertSeoPage: adminQuery
-    .input(z.object({ path: z.string().min(1), titleEn: z.string().optional(), titleAr: z.string().optional(), descriptionEn: z.string().optional(), descriptionAr: z.string().optional(), keywords: z.string().optional(), ogImage: z.string().optional(), canonicalUrl: z.string().optional(), isIndexed: z.boolean().default(true) }))
+    .input(z.object({ path: z.string().trim().max(255).refine(publicSeoPath, "Choose an existing public storefront path."), titleEn: z.string().max(255).optional(), titleAr: z.string().max(255).optional(), descriptionEn: z.string().max(5000).optional(), descriptionAr: z.string().max(5000).optional(), keywords: z.string().max(1000).optional(), ogImage: z.string().optional(), canonicalUrl: z.string().optional(), isIndexed: z.boolean().default(true) }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
       await db.insert(seoPages).values(input).onDuplicateKeyUpdate({ set: { ...input, updatedAt: new Date() } });
@@ -1611,23 +1614,21 @@ export const adminRouter = createRouter({
     const db = getDb();
     const pages = await db.select().from(seoPages);
     const productRows = await db.select({ slug: products.slug, updatedAt: products.updatedAt }).from(products).where(eq(products.isActive, true));
-    const staticPaths = ["/", "/shop", "/about", "/contact", "/faq", "/track-order"];
-    const urls = [...staticPaths, ...productRows.map((p) => `/shop/${p.slug}`), ...pages.map((p) => p.path)];
-    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${Array.from(new Set(urls)).map((u) => `  <url><loc>${u}</loc></url>`).join("\n")}\n</urlset>`;
-    const robots = "User-agent: *\nAllow: /\nSitemap: /sitemap.xml\n";
-    return { sitemap, robots, urlsCount: urls.length };
+    const sitemap = buildSitemap("https://bellorypharma.com", productRows, pages);
+    const robots = "User-agent: *\nAllow: /\nSitemap: https://bellorypharma.com/sitemap.xml\n";
+    return { sitemap, robots, urlsCount: (sitemap.match(/<loc>/g) ?? []).length };
   }),
 
   // Admin staff permissions registry
   listAdminStaffUsers: adminQuery.query(async () => { const db = getDb(); return db.select().from(adminStaffUsers).orderBy(desc(adminStaffUsers.createdAt)); }),
 
   createAdminStaffUser: adminQuery
-    .input(z.object({ name: z.string().min(1), email: z.string().optional(), role: z.enum(["owner", "admin", "orders", "inventory", "marketing", "support", "viewer"]).default("viewer"), permissions: z.array(z.string()).default([]), isActive: z.boolean().default(true), notes: z.string().optional() }))
-    .mutation(async ({ input, ctx }) => { const db = getDb(); const result = await db.insert(adminStaffUsers).values(input); await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_admin_staff", entityType: "admin_staff", entityId: Number(result[0].insertId), details: input }); return { id: Number(result[0].insertId) }; }),
+    .input(staffInput)
+    .mutation(({ input, ctx }) => saveStaff(input, ctx.user.id)),
 
   updateAdminStaffUser: adminQuery
-    .input(z.object({ id: z.number(), name: z.string().min(1), email: z.string().optional(), role: z.enum(["owner", "admin", "orders", "inventory", "marketing", "support", "viewer"]).default("viewer"), permissions: z.array(z.string()).default([]), isActive: z.boolean().default(true), notes: z.string().optional() }))
-    .mutation(async ({ input, ctx }) => { const db = getDb(); const { id, ...data } = input; await db.update(adminStaffUsers).set(data).where(eq(adminStaffUsers.id, id)); await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "update_admin_staff", entityType: "admin_staff", entityId: id, details: data }); return { success: true }; }),
+    .input(staffInput.extend({ id: z.number().int().positive() }))
+    .mutation(({ input, ctx }) => saveStaff(input, ctx.user.id)),
 
   // Export center
   createExportJob: adminQuery
@@ -1652,25 +1653,16 @@ export const adminRouter = createRouter({
 
   // Backup center
   createBackupJob: adminQuery
-    .input(z.object({ label: z.string().min(1), notes: z.string().optional() }))
+    .input(z.object({ label: z.string().min(1).max(255), passphrase: z.string().min(12).max(256) }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const content = {
-        createdAt: new Date().toISOString(),
-        products: await db.select().from(products),
-        categories: await db.select().from(categories),
-        orders: await db.select().from(orders),
-        customers: await db.select().from(customers),
-        storeSettings: await db.select().from(storeSettings),
-        shippingSettings: await db.select().from(shippingSettings),
-        paymentSettings: await db.select().from(paymentSettings),
-      };
-      const result = await db.insert(backupJobs).values({ label: input.label, notes: input.notes, content, status: "ready" });
-      await db.insert(adminActivityLogs).values({ adminUserId: ctx.user.id, action: "create_backup", entityType: "backup_job", entityId: Number(result[0].insertId), details: { label: input.label } });
-      return { id: Number(result[0].insertId), content };
+      const result = await createStoreBackup(input.passphrase);
+      await logAdminActivity(db, ctx.user.id, "create_encrypted_backup", "backup_file", null, { fileName: result.fileName, label: input.label });
+      return result;
     }),
 
-  listBackupJobs: adminQuery.query(async () => { const db = getDb(); return db.select().from(backupJobs).orderBy(desc(backupJobs.createdAt)); }),
+  listBackupJobs: adminQuery.query(() => listStoreBackups()),
+  downloadBackup: adminQuery.input(z.object({ fileName: z.string().max(100) })).query(({ input }) => readStoreBackup(input.fileName)),
 
   // Sales analytics
   getSalesByDate: adminQuery

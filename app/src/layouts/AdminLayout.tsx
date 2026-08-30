@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
+import { canVisitAdmin } from "@contracts/admin-access";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -75,11 +76,11 @@ export default function AdminLayout() {
   className={`min-h-screen w-full overflow-x-hidden bg-[#F7ECFF] ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}
 >      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[#4B1C71] text-white h-16 flex items-center justify-between px-4">
-        <button onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <button aria-label={lang === "ar" ? "قائمة الإدارة" : "Admin menu"} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(!sidebarOpen)}>
           {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
         <span className="font-bold text-[#B57EDC]">Hi Line Admin</span>
-        <Link to="/" className="text-white/70">
+        <Link to="/" aria-label={lang === "ar" ? "عرض المتجر" : "View store"} className="text-white/70">
           <Store className="w-5 h-5" />
         </Link>
       </div>
@@ -98,7 +99,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-          {adminNav.map((item) => {
+          {adminNav.filter(item => !user.adminAccess || canVisitAdmin(user.adminAccess, item.href)).map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
@@ -150,7 +151,9 @@ export default function AdminLayout() {
       {/* Main Content */}
       <main className={`min-h-screen min-w-0 overflow-x-hidden pt-16 lg:pt-0 ${isRTL ? "lg:mr-64" : "lg:ml-64"}`}>
   <div className="w-full min-w-0 max-w-full overflow-x-hidden">
-        <Outlet />
+        {user.adminAccess && (location.pathname === "/admin" || !canVisitAdmin(user.adminAccess, location.pathname))
+          ? <p className="p-8">{lang === "ar" ? "اختر القسم المتاح لك من القائمة. الأقسام الأخرى مخصصة للمالك." : "Choose an authorized section from the menu. Other sections are owner-only."}</p>
+          : <Outlet />}
         </div>
 </main>
 

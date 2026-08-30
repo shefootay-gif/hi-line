@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router";
+import { findSeoOverride, safeSeoUrl } from "@contracts/seo-settings";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTranslations } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
@@ -34,6 +35,8 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: settings } = trpc.store.getSettings.useQuery();
+  const { data: seoPages } = trpc.store.getSeoPages.useQuery();
+  const seoOverride = findSeoOverride(seoPages ?? [], location.pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [lastScroll, setLastScroll] = useState(0);
@@ -105,7 +108,7 @@ export default function MainLayout() {
   const privatePath = ["/cart", "/checkout", "/account", "/order-confirmation", "/track-order"].some(
     path => storefrontPath.startsWith(path),
   );
-  const canonicalUrl = `${window.location.origin}${location.pathname}`;
+  const canonicalUrl = safeSeoUrl(seoOverride?.canonicalUrl) || `${window.location.origin}${location.pathname}`;
   const arabicUrl = `${window.location.origin}${pathForLocale(location.pathname, "ar")}`;
   const englishUrl = `${window.location.origin}${pathForLocale(location.pathname, "en")}`;
 
@@ -113,13 +116,15 @@ export default function MainLayout() {
     <div className={`min-h-screen flex flex-col beauty-shell ${isRTL ? "font-[Cairo]" : "font-[Inter]"}`}>
       <Helmet>
         <html lang={lang} dir={isRTL ? "rtl" : "ltr"} />
-        <title>{seo.title}</title>
-        <meta name="description" content={seo.description} />
+        <title>{(lang === "ar" ? seoOverride?.titleAr : seoOverride?.titleEn) || seo.title}</title>
+        <meta name="description" content={(lang === "ar" ? seoOverride?.descriptionAr : seoOverride?.descriptionEn) || seo.description} />
+        {seoOverride?.keywords && <meta name="keywords" content={seoOverride.keywords} />}
+        {safeSeoUrl(seoOverride?.ogImage) && <meta property="og:image" content={safeSeoUrl(seoOverride?.ogImage)} />}
         <link rel="canonical" href={canonicalUrl} />
         <link rel="alternate" hrefLang="ar" href={arabicUrl} />
         <link rel="alternate" hrefLang="en" href={englishUrl} />
         <link rel="alternate" hrefLang="x-default" href={englishUrl} />
-        {privatePath && <meta name="robots" content="noindex, nofollow" />}
+        <meta name="robots" content={privatePath || seoOverride?.isIndexed === false ? "noindex, nofollow" : "index, follow"} />
         {storefrontPath === "/" && (
           <script type="application/ld+json">
             {JSON.stringify({

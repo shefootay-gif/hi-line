@@ -1,3 +1,4 @@
+import { findSeoOverride, type SeoOverride } from "@contracts/seo-settings";
 type SitemapProduct = {
   slug: string;
   updatedAt: Date | null;
@@ -25,10 +26,11 @@ const sitemapUrl = (
 ) =>
   `<url><loc>${xmlText(location)}</loc><xhtml:link rel="alternate" hreflang="ar" href="${xmlText(alternates.ar)}"/><xhtml:link rel="alternate" hreflang="en" href="${xmlText(alternates.en)}"/><xhtml:link rel="alternate" hreflang="x-default" href="${xmlText(alternates.en)}"/>${lastModified ? `<lastmod>${lastModified.toISOString()}</lastmod>` : ""}</url>`;
 
-export const buildSitemap = (origin: string, products: SitemapProduct[]) => {
+export const buildSitemap = (origin: string, products: SitemapProduct[], overrides: SeoOverride[] = []) => {
   const staticUrls = locales.flatMap(locale =>
     publicPaths.map(path => {
       const suffix = path === "/" ? "" : path;
+      if (findSeoOverride(overrides, `/${locale}${suffix}`)?.isIndexed === false) return "";
       return sitemapUrl(
         new URL(`/${locale}${suffix}`, origin).href,
         {
@@ -41,6 +43,7 @@ export const buildSitemap = (origin: string, products: SitemapProduct[]) => {
   const productUrls = locales.flatMap(locale =>
     products.map(product => {
       const encodedSlug = encodeURIComponent(product.slug);
+      if (findSeoOverride(overrides, `/${locale}/shop/${encodedSlug}`)?.isIndexed === false) return "";
       return sitemapUrl(
         new URL(`/${locale}/shop/${encodedSlug}`, origin).href,
         {

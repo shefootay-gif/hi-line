@@ -2,6 +2,7 @@ import { ErrorMessages } from "@contracts/constants";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { canCallAdmin } from "@contracts/admin-access";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -32,6 +33,13 @@ function requireRole(role: string) {
         code: "FORBIDDEN",
         message: ErrorMessages.insufficientRole,
       });
+    }
+
+    if (ctx.user.adminAccess && !canCallAdmin(ctx.user.adminAccess, opts.path, opts.type)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.insufficientRole });
+    }
+    if (ctx.user.unionId.startsWith("local:staff:") && !ctx.user.adminAccess) {
+      throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.insufficientRole });
     }
 
     return next({ ctx: { ...ctx, user: ctx.user } });

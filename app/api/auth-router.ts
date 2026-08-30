@@ -8,7 +8,7 @@ import { createRouter, adminQuery, authedQuery, publicQuery } from "./middleware
 import { env } from "./lib/env";
 import { signSessionToken } from "./lib/session";
 import { getDb } from "./queries/connection";
-import { adminActivityLogs, users, passwordResetTokens } from "@db/schema";
+import { adminActivityLogs, adminStaffUsers, users, passwordResetTokens } from "@db/schema";
 import {
   hashPasswordResetToken,
   sendPasswordResetEmail,
@@ -47,7 +47,7 @@ const verifyLocalAdminPassword = async (password: string) => {
     && safePasswordEqual(password, env.localAdminPassword);
 };
 
-const strongAdminPassword = z.string()
+export const strongAdminPassword = z.string()
   .min(12, "Password must be at least 12 characters.")
   .max(100, "Password is too long.")
   .regex(/[A-Z]/, "Password must contain an uppercase letter.")
@@ -89,6 +89,18 @@ export const authRouter = createRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
+      if (input.username.trim() !== env.localAdminUsername) {
+        const [user] = await getDb().select().from(users).where(eq(users.email, input.username.trim().toLowerCase())).limit(1);
+        const { default: bcrypt } = await import("bcryptjs");
+        if (!user?.unionId.startsWith("local:staff:") || !user.passwordHash || !(await bcrypt.compare(input.password, user.passwordHash))) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid username or password." });
+        }
+        const [staff] = await getDb().select().from(adminStaffUsers).where(eq(adminStaffUsers.id, Number(user.unionId.slice(12)))).limit(1);
+        if (!staff?.isActive) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid username or password." });
+        const token = await signSessionToken({ unionId: user.unionId, clientId: "local-staff" });
+        ctx.resHeaders.append("set-cookie", serializeSessionCookie(ctx.req.headers, token));
+        return { success: true };
+      }
       if (!env.localAdminUsername) {
         throw new Error("Local admin login is not configured.");
       }

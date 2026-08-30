@@ -5,6 +5,10 @@ import { env } from "./env";
 import { verifySessionToken } from "./session";
 import type { SafeUser } from "@db/schema";
 import { findUserById, findUserByUnionId } from "../queries/users";
+import { getDb } from "../queries/connection";
+import { adminStaffUsers } from "@db/schema";
+import { eq } from "drizzle-orm";
+import { staffRoles, type StaffRole } from "@contracts/admin-access";
 
 export async function authenticateRequest(headers: Headers): Promise<SafeUser> {
   const cookies = cookie.parse(headers.get("cookie") || "");
@@ -55,7 +59,15 @@ export async function authenticateRequest(headers: Headers): Promise<SafeUser> {
     throw Errors.forbidden("User not found. Please re-login.");
   }
 
-  const safeUser = { ...user };
+  const safeUser: SafeUser & { passwordHash?: string | null } = { ...user };
   delete (safeUser as { passwordHash?: string }).passwordHash;
+  if (claim.unionId.startsWith("local:staff:")) {
+    const id = Number(claim.unionId.slice("local:staff:".length));
+    const [staff] = await getDb().select().from(adminStaffUsers).where(eq(adminStaffUsers.id, id)).limit(1);
+    if (!staff?.isActive || !staffRoles.includes(staff.role as StaffRole)) {
+      throw Errors.forbidden("Staff account is disabled.");
+    }
+    safeUser.adminAccess = { role: staff.role as StaffRole, permissions: staff.permissions ?? [] };
+  }
   return safeUser;
 }
