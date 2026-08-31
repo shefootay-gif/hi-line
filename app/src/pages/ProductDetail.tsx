@@ -28,6 +28,8 @@ import { Helmet } from "react-helmet-async";
 import { productStructuredData } from "@/lib/productSeo";
 import { pathForLocale } from "@/lib/localeRouting";
 import { productImage } from "@/lib/product-media";
+import { ProductPackshot } from "@/components/ProductPackshot";
+import { isBundleOffer, productScentLabel } from "@/lib/product-presentation";
 import {
   isRecentlyViewedProduct,
   listValue,
@@ -352,14 +354,14 @@ export default function ProductDetail() {
           }`}
         >
           {/* Product Image */}
-          <div className="flex-1 max-w-xl mx-auto lg:mx-0">
+          <div className="flex-1 w-full max-w-xl mx-auto lg:mx-0">
             <div
-              className="beauty-card rounded-3xl p-8 flex items-center justify-center beauty-image"
+              className="beauty-card rounded-3xl flex items-center justify-center beauty-image"
               style={{
                 background: `linear-gradient(145deg, ${product.scentColor || "#B57EDC"}12, #fcf8ff)`,
               }}
             >
-              <img
+              <ProductPackshot
                 src={primaryImage}
                 alt={
                   lang === "ar" && product.nameAr
@@ -367,19 +369,19 @@ export default function ProductDetail() {
                     : product.nameEn
                 }
                 loading="eager"
-                className="w-full max-w-md object-contain transition-transform duration-700 hover:scale-[1.03]"
               />
             </div>
           </div>
 
           {/* Product Info */}
           <div className="flex-1">
-            <span
+            {isBundleOffer(product.slug) && <span dir="ltr" className="mb-4 me-2 inline-block rounded-full bg-[#D71920] px-3 py-1 text-sm font-bold text-white">1+1</span>}
+            {productScentLabel(product.slug, product.scent, lang) && <span
               className="inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider text-white mb-4"
               style={{ backgroundColor: product.scentColor || "#8D7A97" }}
             >
-              {product.scent}
-            </span>
+              {productScentLabel(product.slug, product.scent, lang)}
+            </span>}
 
             <h1 className="text-3xl sm:text-4xl font-bold text-[#4B1C71] mb-4">
               {lang === "ar" && product.nameAr

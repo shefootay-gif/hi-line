@@ -10,6 +10,8 @@ import { CARE_SALE_PRICE } from "@contracts/care-sale-products";
 import Home from "./Home";
 
 const homepageProducts = [...rollOnProducts, {
+  ...rollOnProducts[0], id: 100, slug: "hi-line-cica-facial-cleanser", nameEn: "Hi Line Cica Facial Cleanser", nameAr: "غسول السيكا للوجه", scent: "Cica", images: ["/products/hi-line-cica-facial-cleanser.webp"], price: "299.00", salePrice: "224.00",
+}, {
   ...rollOnProducts[0],
   id: 101,
   slug: "additional-care-product",
@@ -71,6 +73,10 @@ describe("homepage client content", () => {
     expect(container.querySelectorAll(".scent-card")).toHaveLength(homepageProducts.length);
     expect(container.querySelector('a[href$="/additional-care-product"]')).not.toBeNull();
     expect(container.querySelectorAll(".scent-card .line-through")).toHaveLength(homepageProducts.length);
+    expect([...container.querySelectorAll(".scent-card")].filter(card => card.textContent?.includes("1+1"))).toHaveLength(5);
+    const cleanserCard = container.querySelector('a[href$="/hi-line-cica-facial-cleanser"]')?.closest(".scent-card");
+    expect(cleanserCard?.querySelector("p")).toBeNull();
+    expect(cleanserCard?.querySelector('[data-packshot="normalized"]')).not.toBeNull();
     for (const card of [...container.querySelectorAll(".scent-card")].slice(0, 5)) {
       expect(card.textContent).toContain("285.00");
       expect(card.textContent).toContain("570.00");

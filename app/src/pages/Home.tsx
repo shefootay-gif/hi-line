@@ -5,6 +5,8 @@ import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
 import { rollOnProducts, type CatalogProduct } from "@/lib/hiLineCatalog";
 import { productImage } from "@/lib/product-media";
+import { ProductPackshot } from "@/components/ProductPackshot";
+import { isBundleOffer, productScentLabel } from "@/lib/product-presentation";
 import { sortProducts, type ProductSort } from "@/lib/product-sorting";
 import { Link } from "react-router";
 import { useNavigate } from "react-router";
@@ -318,21 +320,20 @@ export default function Home() {
                 >
                   <Link to={pathForLocale(`/shop/${variant.slug}`, lang)} className="block">
                     <div
-                      className="aspect-square relative flex items-center justify-center bg-white p-5"
+                      className="aspect-square relative flex items-center justify-center bg-white"
                       style={{
                         background: `linear-gradient(145deg, ${variant.color}12, #fcf8ff)`,
                       }}
                     >
                       {product.discountLabel && (
-                        <span className="absolute left-3 top-3 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
-                          {product.discountLabel}
+                        <span dir="ltr" className="absolute left-3 top-3 z-10 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                          {isBundleOffer(product.slug) ? `1+1 · ${product.discountLabel}` : product.discountLabel}
                         </span>
                       )}
-                      <img
+                      <ProductPackshot
                         src={variant.image}
                         alt={lang === "ar" ? variant.nameAr : variant.name}
                         loading="lazy"
-                        className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
                       />
                     </div>
                   </Link>
@@ -353,9 +354,9 @@ export default function Home() {
                         </>
                       )}
                     </h3>
-                    <p className="mt-1 text-xs font-medium text-[#7F4CA5]">
-                      {lang === "ar" ? `برائحة ${variant.scentAr}` : variant.scent}
-                    </p>
+                    {productScentLabel(product.slug, product.scent, lang) && <p className="mt-1 text-xs font-medium text-[#7F4CA5]">
+                      {productScentLabel(product.slug, product.scent, lang)}
+                    </p>}
                     <div className="mt-3 flex flex-wrap items-baseline justify-center gap-2">
                       <span className="text-base font-black text-[#D71920]">
                         {product.salePrice ? product.salePrice : product.price} {lang === "ar" ? "ج.م" : "LE"}

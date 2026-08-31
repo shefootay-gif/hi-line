@@ -1,10 +1,12 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { pathForLocale } from "@/lib/localeRouting";
-import { useTranslations, getArabicScentName } from "@/lib/translations";
+import { useTranslations } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
 import { trpc } from "@/providers/trpc";
 import { rollOnProducts } from "@/lib/hiLineCatalog";
 import { productImage } from "@/lib/product-media";
+import { ProductPackshot } from "@/components/ProductPackshot";
+import { isBundleOffer, productScentLabel } from "@/lib/product-presentation";
 import { PRIMARY_PRODUCT_CATEGORY } from "@contracts/product-category";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useEffect, useState } from "react";
@@ -311,15 +313,14 @@ export default function Shop() {
                   className="overflow-hidden rounded-lg border border-[#E7D8F1]/80 bg-white shadow-[0_10px_30px_rgba(75,28,113,0.07)]"
                 >
                   <Link to={pathForLocale(`/shop/${product.slug}`, lang)} className="block">
-                    <div className="relative flex aspect-square items-center justify-center bg-white p-4 sm:p-5">
-                      <span className="absolute left-3 top-3 z-10 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm sm:text-xs">
-                        {product.discountLabel}
+                    <div className="relative flex aspect-square items-center justify-center bg-white">
+                      <span dir="ltr" className="absolute left-3 top-3 z-10 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm sm:text-xs">
+                        {isBundleOffer(product.slug) ? `1+1 · ${product.discountLabel}` : product.discountLabel}
                       </span>
-                      <img
+                      <ProductPackshot
                         src={product.images[0]}
-                        alt={`${product.nameEn} ${product.scent}`}
+                        alt={lang === "ar" ? product.nameAr : product.nameEn}
                         loading="lazy"
-                        className="max-h-full max-w-full object-contain"
                       />
                     </div>
                   </Link>
@@ -327,7 +328,7 @@ export default function Shop() {
                   <div className="p-4 pt-3">
                     <h3 className="min-h-[3.25rem] text-sm font-semibold leading-snug text-[#241A2E] sm:text-base">
                       <span className="block">{lang === "ar" && product.nameAr ? product.nameAr : product.nameEn}</span>
-                      <span className="block">{lang === "ar" ? getArabicScentName(product.scent) : product.scent}</span>
+                      {productScentLabel(product.slug, product.scent, lang) && <span className="block">{productScentLabel(product.slug, product.scent, lang)}</span>}
                     </h3>
 
                     <div className="mt-3 flex flex-wrap items-baseline gap-2">
