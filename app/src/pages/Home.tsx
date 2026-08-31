@@ -3,7 +3,7 @@ import { pathForLocale } from "@/lib/localeRouting";
 import { useTranslations } from "@/lib/translations";
 import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
-import { rollOnProducts, type CatalogProduct } from "@/lib/hiLineCatalog";
+import { type CatalogProduct } from "@/lib/hiLineCatalog";
 import { productImage } from "@/lib/product-media";
 import { ProductPackshot } from "@/components/ProductPackshot";
 import { isBundleOffer, productScentLabel } from "@/lib/product-presentation";
@@ -69,10 +69,9 @@ export default function Home() {
   const { addItem } = useCart();
   const { data: faqs } = trpc.store.getFaqs.useQuery();
   const { data: settings } = trpc.store.getSettings.useQuery();
-  const { data: apiProducts, error: apiError } = trpc.store.getProducts.useQuery();
+  const { data: apiProducts } = trpc.store.getProducts.useQuery();
 
-  const sourceProducts = (!apiError && apiProducts && apiProducts.length > 0)
-    ? apiProducts.map((p) => ({
+  const sourceProducts = (apiProducts ?? []).map((p) => ({
         id: p.id,
         createdAt: p.createdAt,
         nameEn: p.nameEn,
@@ -91,8 +90,7 @@ export default function Home() {
         shortDescriptionEn: "",
         shortDescriptionAr: "",
         descriptionEn: "",
-      }))
-    : rollOnProducts;
+      }));
 
   const [productSort, setProductSort] = useState<ProductSort>("oldest");
   const sortedProducts = sortProducts(sourceProducts, productSort);

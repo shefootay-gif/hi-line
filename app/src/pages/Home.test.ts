@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { rollOnProducts } from "@/lib/hiLineCatalog";
 import { translations } from "@/lib/translations";
 import { SINGLE_ROLL_ON_SALE_PRICE } from "@contracts/sale-products";
@@ -21,6 +21,7 @@ const homepageProducts = [...rollOnProducts, {
 }];
 
 const language = vi.hoisted(() => ({ lang: "ar" as "ar" | "en" }));
+const productQuery = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/useLanguage", () => ({
   useLanguage: () => ({ lang: language.lang, isRTL: language.lang === "ar" }),
 }));
@@ -28,14 +29,20 @@ vi.mock("@/providers/trpc", () => ({
   trpc: { store: {
     getFaqs: { useQuery: () => ({ data: [] }) },
     getSettings: { useQuery: () => ({ data: {} }) },
-    getProducts: { useQuery: () => ({ data: homepageProducts }) },
+    getProducts: { useQuery: productQuery },
   } },
 }));
 vi.mock("gsap", () => ({ gsap: { registerPlugin: vi.fn(), context: () => ({ revert: vi.fn() }) } }));
 vi.mock("gsap/ScrollTrigger", () => ({ ScrollTrigger: {} }));
 
 describe("homepage client content", () => {
+  beforeEach(() => productQuery.mockReturnValue({ data: homepageProducts }));
   afterEach(cleanup);
+  it("does not resurrect catalog products when the saved catalog is empty", () => {
+    productQuery.mockReturnValue({ data: [] });
+    const { container } = render(createElement(MemoryRouter, null, createElement(Home)));
+    expect(container.querySelectorAll(".scent-card")).toHaveLength(0);
+  });
   it.each(["ar", "en"] as const)("changes product order in %s", (lang) => {
     language.lang = lang;
     const { container, getByLabelText } = render(createElement(MemoryRouter, null, createElement(Home)));

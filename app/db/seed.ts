@@ -70,7 +70,7 @@ export async function seedSingleRollOnSaleProducts() {
   await db
     .insert(products)
     .values(buildSingleRollOnSaleProductRows(category.id))
-    .onDuplicateKeyUpdate({ set: { slug: sql`VALUES(slug)` } });
+    .onDuplicateKeyUpdate({ set: { id: sql`${products.id}` } });
 }
 
 export async function seedCareSaleProducts() {
@@ -80,12 +80,7 @@ export async function seedCareSaleProducts() {
     .insert(categories)
     .values(CARE_SALE_CATEGORIES.map(category => ({ ...category, isActive: true })))
     .onDuplicateKeyUpdate({
-      set: {
-        nameEn: sql`VALUES(name_en)`,
-        nameAr: sql`VALUES(name_ar)`,
-        sortOrder: sql`VALUES(sort_order)`,
-        isActive: true,
-      },
+      set: { id: sql`${categories.id}` },
     });
 
   const categoryRows = await db
@@ -135,24 +130,28 @@ export async function seedCareSaleProducts() {
       seoDescription: `${product.descriptionEn} Now EGP 224 instead of EGP 299.`,
     };
 
-    const [existing] = await db
-      .select({ id: products.id })
-      .from(products)
-      .where(eq(products.slug, product.slug))
-      .limit(1);
-
-    if (existing) {
-      const { stock: _stock, ...updateRow } = row;
-      void _stock;
-      await db.update(products).set(updateRow).where(eq(products.id, existing.id));
-    } else {
-      await db.insert(products).values(row);
-    }
+    await db.insert(products).values(row)
+      .onDuplicateKeyUpdate({ set: { id: sql`${products.id}` } });
   }
 }
 
 export async function seed() {
   const db = getDb();
+
+  // The filesystem marker can be lost during migration or deployment. The
+  // database remains authoritative: never reset an existing or partial store.
+  const existingRows = await Promise.all([
+    db.select({ id: products.id }).from(products).limit(1),
+    db.select({ id: categories.id }).from(categories).limit(1),
+    db.select({ id: storeSettings.id }).from(storeSettings).limit(1),
+    db.select({ id: shippingSettings.id }).from(shippingSettings).limit(1),
+    db.select({ id: paymentSettings.id }).from(paymentSettings).limit(1),
+    db.select({ id: faqs.id }).from(faqs).limit(1),
+  ]);
+  if (existingRows.some(rows => rows.length > 0)) {
+    console.log("Existing store detected; keeping admin-managed data unchanged.");
+    return;
+  }
 
   console.log("Seeding database...");
 

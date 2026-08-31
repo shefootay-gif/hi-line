@@ -1,11 +1,10 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { findSeoOverride, safeSeoUrl } from "@contracts/seo-settings";
 import { useTranslations } from "@/lib/translations";
-import { findCatalogProductBySlug } from "@/lib/hiLineCatalog";
 import { trpc } from "@/providers/trpc";
 import { useCart } from "@/hooks/useCart";
 import { useParams, Link } from "react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   ChevronRight,
   Minus,
@@ -56,7 +55,7 @@ export default function ProductDetail() {
   const t = useTranslations(lang);
   const { data: seoPages } = trpc.store.getSeoPages.useQuery();
   const seoOverride = findSeoOverride(seoPages ?? [], `/${lang}/shop/${slug}`);
-  const { data: apiProduct, isLoading } = trpc.store.getProductBySlug.useQuery(
+  const { data: apiProduct, isLoading, isError } = trpc.store.getProductBySlug.useQuery(
     { slug: slug || "" },
     { enabled: !!slug }
   );
@@ -72,39 +71,7 @@ export default function ProductDetail() {
   );
   const addReview = trpc.store.addReview.useMutation();
   
-  const catalogProduct = findCatalogProductBySlug(slug);
-  const product = useMemo(() => {
-    return apiProduct
-      ? catalogProduct
-        ? {
-          ...apiProduct,
-          ...catalogProduct,
-          id: apiProduct.id,
-          relatedProductsList: apiProduct.relatedProductsList,
-          benefits: apiProduct.benefits ?? [],
-          benefitsAr: apiProduct.benefitsAr ?? [],
-          ingredients: apiProduct.ingredients,
-          ingredientsAr: apiProduct.ingredientsAr,
-          usageInstructions: apiProduct.usageInstructions,
-          usageInstructionsAr: apiProduct.usageInstructionsAr,
-          }
-        : apiProduct
-      : catalogProduct
-        ? {
-          ...catalogProduct,
-          descriptionAr: catalogProduct.shortDescriptionAr,
-          benefits: [],
-          benefitsAr: [],
-          ingredients: null,
-          ingredientsAr: null,
-          usageInstructions: null,
-          usageInstructionsAr: null,
-          flashSalePrice: null,
-          flashSaleEndsAt: null,
-          relatedProductsList: [],
-          }
-        : null;
-  }, [apiProduct, catalogProduct]);
+  const product = apiProduct ?? null;
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -281,7 +248,9 @@ export default function ProductDetail() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-lg text-[#6F6178]">
-          {lang === "ar" ? "المنتج غير موجود" : "Product not found"}
+          {isError
+            ? (lang === "ar" ? "تعذر تحميل المنتج. حاول مرة أخرى." : "Unable to load this product. Please try again.")
+            : (lang === "ar" ? "المنتج غير موجود" : "Product not found")}
         </p>
         <Link
           to={pathForLocale("/shop", lang)}

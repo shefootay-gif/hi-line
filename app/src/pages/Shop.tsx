@@ -3,7 +3,6 @@ import { pathForLocale } from "@/lib/localeRouting";
 import { useTranslations } from "@/lib/translations";
 import { useCart } from "@/hooks/useCart";
 import { trpc } from "@/providers/trpc";
-import { rollOnProducts } from "@/lib/hiLineCatalog";
 import { productImage } from "@/lib/product-media";
 import { ProductPackshot } from "@/components/ProductPackshot";
 import { isBundleOffer, productScentLabel } from "@/lib/product-presentation";
@@ -86,7 +85,7 @@ export default function Shop() {
   );
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") || "");
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
-  const { data: apiProducts, isError: apiError, isLoading } = trpc.store.getProducts.useQuery(
+  const { data: apiProducts, isLoading } = trpc.store.getProducts.useQuery(
     activeCategory !== "all" ? { category: activeCategory } : undefined,
     { retry: false, throwOnError: false }
   );
@@ -135,9 +134,8 @@ export default function Shop() {
     }, 1500);
   };
 
-  // Use API products when available, fall back to local catalog
-  const sourceProducts = (!apiError && apiProducts && apiProducts.length > 0)
-    ? apiProducts.map((p) => ({
+  // Never substitute seed products for the admin-managed catalog.
+  const sourceProducts = (apiProducts ?? []).map((p) => ({
         id: p.id,
         nameEn: p.nameEn,
         nameAr: p.nameAr ?? p.nameEn,
@@ -151,8 +149,7 @@ export default function Shop() {
         discountLabel: p.salePrice ? `${Math.round((1 - parseFloat(p.salePrice) / parseFloat(p.price)) * 100)}% OFF` : "NEW",
         brand: "Hi Line",
         section: productSection(p.slug),
-      }))
-    : rollOnProducts;
+      }));
 
   const filteredProducts = sourceProducts.filter((product) => {
     const q = searchQuery.trim().toLowerCase();
