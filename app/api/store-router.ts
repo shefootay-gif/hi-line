@@ -12,6 +12,7 @@ import crypto from "crypto";
 import { sendWhatsAppMessage } from "./whatsapp-service";
 import { sendMetaCAPIEvent } from "./meta-capi";
 import { getAffectedRows } from "./lib/db-result";
+import { relatedProductIds } from "./lib/product-relations";
 import { reverseOrderEffects } from "./lib/order-effects";
 import {
   calculateOrderPricing,
@@ -190,14 +191,12 @@ export const storeRouter = createRouter({
 
       // Get related products
       let relatedProductsList: typeof result = [];
-      if (product.relatedProducts) {
-        const relatedIds = product.relatedProducts;
-        if (relatedIds.length > 0) {
-          relatedProductsList = await db
-            .select()
-            .from(products)
-            .where(inArray(products.id, relatedIds));
-        }
+      const relatedIds = relatedProductIds(product.relatedProducts);
+      if (relatedIds.length > 0) {
+        relatedProductsList = await db
+          .select()
+          .from(products)
+          .where(inArray(products.id, relatedIds));
       }
 
       return { ...product, relatedProductsList };
