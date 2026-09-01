@@ -12,6 +12,7 @@ import { TRPCProvider } from "./providers/trpc";
 import MainLayout from "./layouts/MainLayout";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
+import { MetaPixelPageView } from "./components/MetaPixelPageView";
 
 import { HelmetProvider } from "react-helmet-async";
 import {
@@ -86,6 +87,7 @@ export default function App() {
     <HelmetProvider>
       <TRPCProvider>
         <LanguageProvider>
+        <MetaPixelPageView />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
           <Route path="/:locale" element={<LocaleBoundary />}>
