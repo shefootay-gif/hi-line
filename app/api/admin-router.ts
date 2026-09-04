@@ -32,7 +32,7 @@ import {
   adminStaffUsers,
   exportJobs,
 } from "@db/schema";
-import { eq, desc, and, sql, like, notInArray } from "drizzle-orm";
+import { eq, desc, and, sql, like, notInArray, inArray } from "drizzle-orm";
 import { LEGACY_MARKETING_CATEGORY_SLUGS } from "@contracts/product-category";
 import {
   editableSettingKeys,
@@ -47,6 +47,7 @@ import {
   validateCampaignMetrics,
 } from "./lib/admin-utils";
 import { getAffectedRows } from "./lib/db-result";
+import { groupOrderItems } from "./lib/admin-order-items";
 import { staffInput, saveStaff } from "./lib/staff-users";
 import { publicSeoPath } from "@contracts/seo-settings";
 import { buildSitemap } from "./lib/sitemap";
@@ -285,7 +286,19 @@ export const adminRouter = createRouter({
               .orderBy(desc(orders.createdAt))
           : db.select().from(orders).orderBy(desc(orders.createdAt));
 
-      return query;
+      const orderRows = await query;
+      if (orderRows.length === 0) return [];
+
+      const itemRows = await db
+        .select()
+        .from(orderItems)
+        .where(inArray(orderItems.orderId, orderRows.map(order => order.id)));
+      const itemsByOrder = groupOrderItems(itemRows);
+
+      return orderRows.map(order => ({
+        ...order,
+        items: itemsByOrder.get(order.id) ?? [],
+      }));
     }),
 
   getOrderDetails: adminQuery

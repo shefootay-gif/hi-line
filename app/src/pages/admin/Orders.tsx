@@ -18,6 +18,7 @@ import {
   buildInvoiceDocument,
   buildShippingLabelDocument,
 } from "@/lib/printDocuments";
+import { OrderItemsList, type AdminOrderItem } from "@/components/admin/OrderItemsList";
 
 const statusColors: Record<string, string> = {
   pending: "#B57EDC",
@@ -41,6 +42,7 @@ type AdminOrder = {
   total: string;
   notes: string | null;
   createdAt: Date;
+  items: AdminOrderItem[];
 };
 
 function orderStatus(status: string | null): OrderStatus {
@@ -64,7 +66,7 @@ export default function AdminOrders() {
     { retry: false, throwOnError: false }
   );
 
-  const { data: orderDetails } = trpc.admin.getOrderDetails.useQuery(
+  const { data: orderDetails, isLoading: orderDetailsLoading, isError: orderDetailsError } = trpc.admin.getOrderDetails.useQuery(
     { id: viewOrder?.id || 0 },
     { enabled: !!viewOrder }
   );
@@ -172,6 +174,9 @@ export default function AdminOrders() {
                     {t.customerName}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[#6F6178]">
+                    {lang === "ar" ? "المنتجات" : "Products"}
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6F6178]">
                     {t.total}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[#6F6178]">
@@ -199,6 +204,9 @@ export default function AdminOrders() {
                         {order.customerName}
                       </p>
                       <p className="text-xs text-[#8D7A97]">{order.customerPhone}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <OrderItemsList items={order.items} lang={lang} currency={t.currency} compact />
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-[#4B1C71]">
                       {parseFloat(order.total).toFixed(0)} {t.currency}
@@ -312,6 +320,22 @@ export default function AdminOrders() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="border-t border-[#E7D8F1] pt-4">
+                <h3 className="mb-3 text-sm font-semibold text-[#4B1C71]">
+                  {lang === "ar" ? "محتويات الطلب" : "Order items"}
+                </h3>
+                {orderDetailsLoading ? (
+                  <div className="flex justify-center py-4" role="status">
+                    <Loader2 className="h-5 w-5 animate-spin text-[#B57EDC]" />
+                  </div>
+                ) : orderDetailsError ? (
+                  <p className="text-sm text-red-600">
+                    {lang === "ar" ? "تعذر تحميل محتويات الطلب" : "Could not load order items"}
+                  </p>
+                ) : (
+                  <OrderItemsList items={orderDetails?.items ?? []} lang={lang} currency={t.currency} />
+                )}
               </div>
               <div className="border-t border-[#E7D8F1] pt-4">
                 <div className="flex justify-between text-lg font-bold">
