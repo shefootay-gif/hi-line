@@ -81,6 +81,9 @@ WHATSAPP_TOKEN=your-meta-whatsapp-token
 WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
 # Recipient for automatic new-order alerts (use a number different from the API sender)
 WHATSAPP_ADMIN_NUMBER=201000000000
+# Approved utility template with one body variable containing the order details
+WHATSAPP_ORDER_TEMPLATE=new_order_alert
+WHATSAPP_ORDER_TEMPLATE_LANGUAGE=ar
 
 # ── Server Networking ──────────────────────────────────────────
 # Set to true only when requests pass through a trusted reverse proxy (Nginx, Cloudflare)

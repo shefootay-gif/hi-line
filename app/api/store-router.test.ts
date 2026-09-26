@@ -9,6 +9,7 @@ const { sendWhatsAppMessageMock } = vi.hoisted(() => ({
 
 vi.mock("./whatsapp-service", () => ({
   sendWhatsAppMessage: sendWhatsAppMessageMock,
+  sendWhatsAppTemplateMessage: vi.fn(),
 }));
 
 interface MockProduct {
@@ -248,6 +249,7 @@ vi.mock("./queries/connection", () => ({
 describe("tRPC store.createOrder behaviors", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    delete process.env.WHATSAPP_ORDER_TEMPLATE;
     mockDbInstance = new MockDbInstance();
   });
 

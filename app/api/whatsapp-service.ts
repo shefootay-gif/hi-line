@@ -52,3 +52,51 @@ export const sendWhatsAppMessage = async (
     return false;
   }
 };
+
+export const sendWhatsAppTemplateMessage = async (
+  toPhone: string,
+  templateName: string,
+  bodyParameters: string[],
+  languageCode = "ar"
+): Promise<boolean> => {
+  try {
+    const config = getWhatsAppConfig();
+    if (!config.token || !config.phoneNumberId) {
+      console.warn("WhatsApp configuration missing. Template message not sent.");
+      return false;
+    }
+
+    const response = await fetch(`${config.apiUrl}/${config.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${config.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: toPhone.replace(/\D/g, ""),
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: [{
+            type: "body",
+            parameters: bodyParameters.map(text => ({ type: "text", text })),
+          }],
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("WhatsApp Template API Error:", err);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Failed to send WhatsApp template message:", error);
+    return false;
+  }
+};

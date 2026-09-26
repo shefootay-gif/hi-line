@@ -9,7 +9,10 @@ import { getDb } from "./queries/connection";
 import { getCached, setCached } from "./cache";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import { sendWhatsAppMessage } from "./whatsapp-service";
+import {
+  sendWhatsAppMessage,
+  sendWhatsAppTemplateMessage,
+} from "./whatsapp-service";
 import { formatSellerOrderNotification } from "./order-notification";
 import { sendMetaCAPIEvent } from "./meta-capi";
 import { getAffectedRows } from "./lib/db-result";
@@ -726,23 +729,31 @@ export const storeRouter = createRouter({
         const sellerWhatsApp =
           process.env.WHATSAPP_ADMIN_NUMBER || sellerWhatsAppSetting?.value;
         if (sellerWhatsApp) {
-          void sendWhatsAppMessage(
-            sellerWhatsApp,
-            formatSellerOrderNotification({
-              orderNumber: result.orderNumber,
-              customerName: result.input.customerName,
-              customerPhone: result.input.customerPhone,
-              shippingAddress: result.input.shippingAddress,
-              governorate: result.input.governorate,
-              city: result.input.city,
-              notes: result.input.notes,
-              subtotal: result.subtotal,
-              shippingFee: result.shippingFee,
-              discountAmount: result.discountAmount,
-              total: result.total,
-              items: result.orderItems,
-            })
-          );
+          const sellerMessage = formatSellerOrderNotification({
+            orderNumber: result.orderNumber,
+            customerName: result.input.customerName,
+            customerPhone: result.input.customerPhone,
+            shippingAddress: result.input.shippingAddress,
+            governorate: result.input.governorate,
+            city: result.input.city,
+            notes: result.input.notes,
+            subtotal: result.subtotal,
+            shippingFee: result.shippingFee,
+            discountAmount: result.discountAmount,
+            total: result.total,
+            items: result.orderItems,
+          });
+          const templateName = process.env.WHATSAPP_ORDER_TEMPLATE?.trim();
+          if (templateName) {
+            void sendWhatsAppTemplateMessage(
+              sellerWhatsApp,
+              templateName,
+              [sellerMessage],
+              process.env.WHATSAPP_ORDER_TEMPLATE_LANGUAGE || "ar"
+            );
+          } else {
+            void sendWhatsAppMessage(sellerWhatsApp, sellerMessage);
+          }
         }
       } catch (error) {
         console.error("Failed to prepare seller WhatsApp notification:", error);
