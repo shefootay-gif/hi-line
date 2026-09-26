@@ -621,12 +621,24 @@ export default function MainLayout() {
               <p>
                 {lang === "ar" ? "تصميم وتطوير: شريف عبود" : "Designed & developed by Sherif Aboud"}
                 {" · "}
-                <a className="transition-colors hover:text-white" href="tel:+201120285001" dir="ltr">
-                  {lang === "ar" ? "مصر: +20 112 028 5001" : "Egypt: +20 112 028 5001"}
+                <a
+                  className="transition-colors hover:text-[#25D366]"
+                  href="https://wa.me/201120285001"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  dir="ltr"
+                >
+                  {lang === "ar" ? "واتساب مصر: +20 112 028 5001" : "Egypt WhatsApp: +20 112 028 5001"}
                 </a>
                 {" · "}
-                <a className="transition-colors hover:text-white" href="tel:+966537544481" dir="ltr">
-                  {lang === "ar" ? "السعودية: +966 53 754 4481" : "Saudi Arabia: +966 53 754 4481"}
+                <a
+                  className="transition-colors hover:text-[#25D366]"
+                  href="https://wa.me/966537544481"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  dir="ltr"
+                >
+                  {lang === "ar" ? "واتساب السعودية: +966 53 754 4481" : "Saudi Arabia WhatsApp: +966 53 754 4481"}
                 </a>
               </p>
             </div>
