@@ -83,6 +83,7 @@ export default function Home() {
         salePrice: p.salePrice,
         originalPrice: p.price,
         images: [productImage(p.images)],
+        stock: p.stock,
         discountLabel: p.salePrice ? `${Math.round((1 - parseFloat(p.salePrice) / parseFloat(p.price)) * 100)}% OFF` : "NEW",
         brand: "Hi Line" as const,
         section: "Roll On" as const,
@@ -157,6 +158,7 @@ export default function Home() {
   }, []);
 
   const handleAddToCart = (product: HomeProduct) => {
+    if ((product.stock ?? 0) <= 0) return;
     addItem({
       productId: product.id,
       name: product.nameEn,
@@ -166,6 +168,7 @@ export default function Home() {
       price: product.price,
       salePrice: product.salePrice,
       image: product.images[0] ?? null,
+      stock: product.stock,
     });
     setAddedIds((prev) => new Set(prev).add(product.id));
     setTimeout(() => {
@@ -328,6 +331,11 @@ export default function Home() {
                           {isBundleOffer(product.slug) ? `1+1 · ${product.discountLabel}` : product.discountLabel}
                         </span>
                       )}
+                      {(product.stock ?? 0) <= 0 && (
+                        <span className="absolute right-3 top-3 z-10 rounded-full bg-[#241A2E] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                          {lang === "ar" ? "غير متوفر" : "Out of stock"}
+                        </span>
+                      )}
                       <ProductPackshot
                         src={variant.image}
                         alt={lang === "ar" ? variant.nameAr : variant.name}
@@ -368,18 +376,23 @@ export default function Home() {
                   </div>
                   <div className="px-4 pb-4">
                     <button
+                      disabled={(product.stock ?? 0) <= 0}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         if (product) handleAddToCart(product);
                       }}
                       className={`w-full py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                        addedIds.has(product?.id || 0)
+                        (product.stock ?? 0) <= 0
+                          ? "cursor-not-allowed bg-gray-200 text-gray-500"
+                          : addedIds.has(product?.id || 0)
                           ? "bg-green-500 text-white"
                             : "beauty-button"
                       }`}
                     >
-                      {addedIds.has(product?.id || 0)
+                      {(product.stock ?? 0) <= 0
+                        ? (lang === "ar" ? "غير متوفر" : "Out of stock")
+                        : addedIds.has(product?.id || 0)
                         ? t.added
                         : t.addToCart}
                     </button>

@@ -79,6 +79,8 @@ PASSWORD_RESET_BASE_URL=https://yourdomain.com
 WHATSAPP_API_URL=https://graph.facebook.com/v17.0
 WHATSAPP_TOKEN=your-meta-whatsapp-token
 WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
+# Recipient for automatic new-order alerts (use a number different from the API sender)
+WHATSAPP_ADMIN_NUMBER=201000000000
 
 # ── Server Networking ──────────────────────────────────────────
 # Set to true only when requests pass through a trusted reverse proxy (Nginx, Cloudflare)

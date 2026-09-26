@@ -310,7 +310,11 @@ export default function AdminProducts() {
                       {parseFloat(product.price).toFixed(0)} {t.currency}
                     </td>
                     <td className="px-6 py-4 text-sm text-[#4B1C71]">
-                      {product.stock}
+                      {product.stock > 0 ? product.stock : (
+                        <span className="font-semibold text-red-600">
+                          {lang === "ar" ? "غير متوفر" : "Out of stock"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -548,6 +552,7 @@ export default function AdminProducts() {
                   </label>
                   <input id="product-field-11"
                     type="number"
+                    min="0"
                     value={editing.stock}
                     onChange={(e) =>
                       setEditing({
@@ -557,6 +562,18 @@ export default function AdminProducts() {
                     }
                     className="w-full px-4 py-2.5 rounded-xl border border-[#E7D8F1] text-sm focus:outline-none focus:ring-2 focus:ring-[#B57EDC]/30"
                   />
+                  <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-medium text-[#6F6178]">
+                    <input
+                      type="checkbox"
+                      checked={editing.stock <= 0}
+                      onChange={(e) => setEditing({
+                        ...editing,
+                        stock: e.target.checked ? 0 : Math.max(1, editing.stock),
+                      })}
+                      className="h-4 w-4 rounded border-[#E7D8F1] text-[#B57EDC] focus:ring-[#B57EDC]"
+                    />
+                    {lang === "ar" ? "عرض المنتج: غير متوفر" : "Mark as out of stock"}
+                  </label>
                 </div>
               </div>
               <div className="space-y-3 rounded-xl border border-[#E7D8F1] p-4">

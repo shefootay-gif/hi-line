@@ -188,7 +188,7 @@ export default function ProductDetail() {
   };
 
   const handleAddToCart = () => {
-    if (!product) return;
+    if (!product || (product.stock ?? 0) <= 0) return;
     for (let i = 0; i < quantity; i++) {
       addItem({
         productId: product.id,
@@ -208,7 +208,7 @@ export default function ProductDetail() {
   };
 
   const handleWhatsAppOrder = () => {
-    if (!product) return;
+    if (!product || (product.stock ?? 0) <= 0) return;
     const productName =
       lang === "ar" && product.nameAr ? product.nameAr : product.nameEn;
     const message =
@@ -409,8 +409,9 @@ export default function ProductDetail() {
                   {quantity}
                 </span>
                 <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="text-[#B57EDC] hover:text-[#4B1C71] p-1"
+                  onClick={() => setQuantity(Math.min(productStock, quantity + 1))}
+                  disabled={productStock === 0 || quantity >= productStock}
+                  className="text-[#B57EDC] hover:text-[#4B1C71] p-1 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Plus className="w-5 h-5" />
                 </button>
@@ -428,7 +429,9 @@ export default function ProductDetail() {
                     productStock === 0 ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
-                  {added ? (
+                  {productStock === 0 ? (
+                    lang === "ar" ? "غير متوفر" : "Out of stock"
+                  ) : added ? (
                     <>
                       <Check className="w-5 h-5 animate-in zoom-in" />
                       {lang === "ar" ? "تمت الإضافة" : "Added"}
@@ -456,7 +459,8 @@ export default function ProductDetail() {
             <div className="space-y-3 mb-8">
               <button
                 onClick={handleWhatsAppOrder}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-[#25D366] text-[#25D366] font-semibold hover:bg-[#25D366] hover:text-white transition-all"
+                disabled={productStock === 0}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-[#25D366] text-[#25D366] font-semibold hover:bg-[#25D366] hover:text-white transition-all disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
               >
                 <MessageCircle className="w-5 h-5" />
                 {t.orderOnWhatsApp}
@@ -842,7 +846,9 @@ export default function ProductDetail() {
               } ${productStock === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {added ? <Check className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
-              {added ? (lang === "ar" ? "تم" : "Added") : (lang === "ar" ? "إضافة" : "Add")}
+              {productStock === 0
+                ? (lang === "ar" ? "غير متوفر" : "Out of stock")
+                : added ? (lang === "ar" ? "تم" : "Added") : (lang === "ar" ? "إضافة" : "Add")}
             </button>
           </div>
         </div>

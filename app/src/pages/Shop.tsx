@@ -44,6 +44,7 @@ type ShopProduct = {
   originalPrice: string;
   images: string[];
   discountLabel: string;
+  stock: number;
   brand: string;
   section: string;
 };
@@ -114,6 +115,7 @@ export default function Shop() {
   };
 
   const handleAddToCart = (product: ShopProduct) => {
+    if (product.stock <= 0) return;
     addItem({
       productId: product.id,
       name: product.nameEn,
@@ -123,6 +125,7 @@ export default function Shop() {
       price: product.price,
       salePrice: product.salePrice,
       image: product.images[0] ?? null,
+      stock: product.stock,
     });
     setAddedIds((prev) => new Set(prev).add(product.id));
     setTimeout(() => {
@@ -147,6 +150,7 @@ export default function Shop() {
         originalPrice: p.price,
         images: [productImage(p.images)],
         discountLabel: p.salePrice ? `${Math.round((1 - parseFloat(p.salePrice) / parseFloat(p.price)) * 100)}% OFF` : "NEW",
+        stock: p.stock,
         brand: "Hi Line",
         section: productSection(p.slug),
       }));
@@ -314,6 +318,11 @@ export default function Shop() {
                       <span dir="ltr" className="absolute left-3 top-3 z-10 rounded-full bg-[#D71920] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm sm:text-xs">
                         {isBundleOffer(product.slug) ? `1+1 · ${product.discountLabel}` : product.discountLabel}
                       </span>
+                      {product.stock <= 0 && (
+                        <span className="absolute right-3 top-3 z-10 rounded-full bg-[#241A2E] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm sm:text-xs">
+                          {lang === "ar" ? "غير متوفر" : "Out of stock"}
+                        </span>
+                      )}
                       <ProductPackshot
                         src={product.images[0]}
                         alt={lang === "ar" ? product.nameAr : product.nameEn}
@@ -340,12 +349,17 @@ export default function Shop() {
                     </div>
 
                     <button
+                      disabled={product.stock <= 0}
                       onClick={() => handleAddToCart(product)}
                       className={`mt-4 w-full rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                        addedIds.has(product.id) ? "bg-green-500 text-white" : "beauty-button"
+                        product.stock <= 0
+                          ? "cursor-not-allowed bg-gray-200 text-gray-500"
+                          : addedIds.has(product.id) ? "bg-green-500 text-white" : "beauty-button"
                       }`}
                     >
-                      {addedIds.has(product.id) ? t.added : t.addToCart}
+                      {product.stock <= 0
+                        ? (lang === "ar" ? "غير متوفر" : "Out of stock")
+                        : addedIds.has(product.id) ? t.added : t.addToCart}
                     </button>
                   </div>
                 </article>

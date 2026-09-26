@@ -2,26 +2,23 @@ import { describe, expect, it } from "vitest";
 import { calculateOrderPricing } from "./order-pricing";
 
 describe("calculateOrderPricing", () => {
-  it("applies one 15% volume discount when the cart has at least three items", () => {
-    expect(calculateOrderPricing({ subtotal: 150, itemCount: 3 })).toEqual({
+  it("does not apply an automatic discount based on item quantity", () => {
+    expect(calculateOrderPricing({ subtotal: 150 })).toEqual({
       subtotal: 150,
-      volumeDiscount: 22.5,
       couponDiscount: 0,
-      discountAmount: 22.5,
+      discountAmount: 0,
       shippingFee: 0,
-      total: 127.5,
+      total: 150,
     });
   });
 
-  it("caps stacked coupons so the products total cannot become negative", () => {
+  it("caps coupons so the products total cannot become negative", () => {
     expect(calculateOrderPricing({
       subtotal: 100,
-      itemCount: 3,
       couponDiscount: 100,
       shippingFee: 20,
     })).toMatchObject({
-      volumeDiscount: 15,
-      couponDiscount: 85,
+      couponDiscount: 100,
       discountAmount: 100,
       total: 20,
     });

@@ -24,7 +24,6 @@ interface CartState {
   getTotalItems: () => number;
   getSubtotal: () => number;
   getTotalPrice: () => number;
-  getDiscountAmount: () => number;
 }
 
 type NormalizedCartItem = Omit<CartItem, "stock"> & { stock: number };
@@ -140,14 +139,7 @@ export const useCart = create<CartState>()(
       getTotalPrice: () => {
         return calculateOrderPricing({
           subtotal: get().getSubtotal(),
-          itemCount: get().getTotalItems(),
         }).total;
-      },
-      getDiscountAmount: () => {
-        return calculateOrderPricing({
-          subtotal: get().getSubtotal(),
-          itemCount: get().getTotalItems(),
-        }).volumeDiscount;
       },
     }),
     {

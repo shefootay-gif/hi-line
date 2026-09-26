@@ -3,6 +3,14 @@ import { appRouter } from "./router";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 
+const { sendWhatsAppMessageMock } = vi.hoisted(() => ({
+  sendWhatsAppMessageMock: vi.fn(),
+}));
+
+vi.mock("./whatsapp-service", () => ({
+  sendWhatsAppMessage: sendWhatsAppMessageMock,
+}));
+
 interface MockProduct {
   id: number;
   nameEn: string;
@@ -401,7 +409,7 @@ describe("tRPC store.createOrder behaviors", () => {
     expect(mockDbInstance.orders).toHaveLength(0);
   });
 
-  it("applies the same three-item volume discount stored on the order", async () => {
+  it("does not apply a volume discount when an order has three items", async () => {
     const caller = appRouter.createCaller({
       req: new Request("https://localhost/api/trpc"),
       resHeaders: new Headers(),
@@ -416,10 +424,34 @@ describe("tRPC store.createOrder behaviors", () => {
       items: [{ productId: 1, quantity: 3 }],
     });
 
-    expect(result.discountAmount).toBe("22.50");
-    expect(result.total).toBe("127.50");
+    expect(result.discountAmount).toBe("0.00");
+    expect(result.total).toBe("150.00");
     expect(mockDbInstance.orders[0].subtotal).toBe("150.00");
-    expect(mockDbInstance.orders[0].discountAmount).toBe("22.50");
+    expect(mockDbInstance.orders[0].discountAmount).toBe("0.00");
+  });
+
+  it("sends the seller a WhatsApp alert after creating an order", async () => {
+    mockDbInstance.storeSettings = [
+      { key: "whatsapp_number", value: "+201223863092" },
+    ];
+    const caller = appRouter.createCaller({
+      req: new Request("https://localhost/api/trpc"),
+      resHeaders: new Headers(),
+    });
+
+    await caller.store.createOrder({
+      idempotencyKey: "607735bd-00be-48d6-8e99-ebf256393974",
+      customerName: "Ahmed Ali",
+      customerPhone: "01000000000",
+      shippingAddress: "Cairo",
+      paymentMethod: "cash_on_delivery",
+      items: [{ productId: 1, quantity: 1 }],
+    });
+
+    expect(sendWhatsAppMessageMock).toHaveBeenCalledWith(
+      "+201223863092",
+      expect.stringContaining("طلب جديد من الموقع")
+    );
   });
 });
 

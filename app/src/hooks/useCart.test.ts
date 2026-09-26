@@ -97,7 +97,7 @@ describe('useCart', () => {
     expect(useCart.getState().getSubtotal()).toBe(250);
   });
 
-  it('keeps the subtotal separate from the three-item discount', () => {
+  it('does not discount a cart when it reaches three items', () => {
     useCart.getState().addItem({
       productId: 1,
       name: 'Item 1',
@@ -112,7 +112,6 @@ describe('useCart', () => {
     useCart.getState().updateQuantity(1, 3);
 
     expect(useCart.getState().getSubtotal()).toBe(150);
-    expect(useCart.getState().getDiscountAmount()).toBe(22.5);
-    expect(useCart.getState().getTotalPrice()).toBe(127.5);
+    expect(useCart.getState().getTotalPrice()).toBe(150);
   });
 });

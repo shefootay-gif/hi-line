@@ -122,11 +122,10 @@ export default function Checkout() {
       : shippingFee;
   const pricing = calculateOrderPricing({
     subtotal,
-    itemCount,
     couponDiscount: appliedCoupon?.discountAmount,
     shippingFee: effectiveShipping,
   });
-  const { volumeDiscount, couponDiscount, total } = pricing;
+  const { couponDiscount, total } = pricing;
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -717,16 +716,6 @@ export default function Checkout() {
                     {subtotal.toFixed(0)} {t.currency}
                   </span>
                 </div>
-                {volumeDiscount > 0 && (
-                  <div className="flex justify-between text-sm text-[#D71920]">
-                    <span className="font-medium">
-                      {lang === "ar" ? "خصم باقة التوفير" : "Volume Discount"}
-                    </span>
-                    <span>
-                      -{volumeDiscount.toFixed(0)} {t.currency}
-                    </span>
-                  </div>
-                )}
                 {appliedCoupon && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span className="font-medium">

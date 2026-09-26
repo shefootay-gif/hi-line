@@ -10,14 +10,12 @@ import { getCached, setCached } from "./cache";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { sendWhatsAppMessage } from "./whatsapp-service";
+import { formatSellerOrderNotification } from "./order-notification";
 import { sendMetaCAPIEvent } from "./meta-capi";
 import { getAffectedRows } from "./lib/db-result";
 import { relatedProductIds } from "./lib/product-relations";
 import { reverseOrderEffects } from "./lib/order-effects";
-import {
-  calculateOrderPricing,
-  calculateVolumeDiscount,
-} from "@contracts/order-pricing";
+import { calculateOrderPricing } from "@contracts/order-pricing";
 import {
   LEGACY_MARKETING_CATEGORY_SLUGS,
   PRIMARY_PRODUCT_CATEGORY,
@@ -483,10 +481,6 @@ export const storeRouter = createRouter({
             if (subtotal >= threshold) shippingFee = 0;
           }
 
-          const totalItems = input.items.reduce(
-            (sum, item) => sum + item.quantity,
-            0
-          );
           let couponDiscountAmount = 0;
           let appliedCouponId: number | null = null;
           const normalizedCouponCode = input.couponCode?.trim().toUpperCase();
@@ -520,7 +514,6 @@ export const storeRouter = createRouter({
 
           const pricing = calculateOrderPricing({
             subtotal,
-            itemCount: totalItems,
             couponDiscount: couponDiscountAmount,
             shippingFee,
           });
@@ -666,6 +659,9 @@ export const storeRouter = createRouter({
             total: total.toFixed(2),
             discountAmount: discountAmount.toFixed(2),
             totalNumber: total,
+            subtotal: subtotal.toFixed(2),
+            shippingFee: shippingFee.toFixed(2),
+            orderItems: orderItemsData,
             input,
             appliedCouponId,
           };
@@ -716,10 +712,41 @@ export const storeRouter = createRouter({
         throw err;
       }
 
-      sendWhatsAppMessage(
+      void sendWhatsAppMessage(
         result.input.customerPhone,
         `Hi ${result.input.customerName}, your order #${result.orderNumber} has been received successfully! Total: ${result.total} EGP.`
       );
+
+      try {
+        const [sellerWhatsAppSetting] = await db
+          .select()
+          .from(storeSettings)
+          .where(eq(storeSettings.key, "whatsapp_number"))
+          .limit(1);
+        const sellerWhatsApp =
+          process.env.WHATSAPP_ADMIN_NUMBER || sellerWhatsAppSetting?.value;
+        if (sellerWhatsApp) {
+          void sendWhatsAppMessage(
+            sellerWhatsApp,
+            formatSellerOrderNotification({
+              orderNumber: result.orderNumber,
+              customerName: result.input.customerName,
+              customerPhone: result.input.customerPhone,
+              shippingAddress: result.input.shippingAddress,
+              governorate: result.input.governorate,
+              city: result.input.city,
+              notes: result.input.notes,
+              subtotal: result.subtotal,
+              shippingFee: result.shippingFee,
+              discountAmount: result.discountAmount,
+              total: result.total,
+              items: result.orderItems,
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Failed to prepare seller WhatsApp notification:", error);
+      }
 
       // Send to Meta CAPI
       sendMetaCAPIEvent(
@@ -811,14 +838,7 @@ export const storeRouter = createRouter({
         discountAmount = val;
       }
 
-      const volumeDiscount = calculateVolumeDiscount(
-        input.subtotal,
-        input.itemCount
-      );
-      const maximumCouponDiscount = Math.max(
-        0,
-        input.subtotal - volumeDiscount
-      );
+      const maximumCouponDiscount = Math.max(0, input.subtotal);
       if (discountAmount > maximumCouponDiscount) {
         discountAmount = maximumCouponDiscount;
       }

@@ -18,6 +18,7 @@ export type CatalogProduct = {
   shortDescriptionAr: string;
   descriptionEn: string;
   images: string[];
+  stock?: number;
 };
 
 export const rollOnProducts: CatalogProduct[] = [
