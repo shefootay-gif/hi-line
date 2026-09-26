@@ -610,13 +610,26 @@ export default function MainLayout() {
 
         {/* Bottom Bar */}
         <div className="border-t border-white/10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-start">
             <p className="text-sm text-white/50">
               &copy; {new Date().getFullYear()} Bellory Pharma. {t.allRightsReserved}
             </p>
-            <p className="flex items-center gap-1 text-sm text-white/50">
-              {t.madeWithCare} <Heart className="w-3.5 h-3.5 text-red-400" />
-            </p>
+            <div className="flex flex-col items-center gap-1 text-sm text-white/50 sm:items-end">
+              <p className="flex items-center gap-1">
+                {t.madeWithCare} <Heart className="w-3.5 h-3.5 text-red-400" />
+              </p>
+              <p>
+                {lang === "ar" ? "تصميم وتطوير: شريف عبود" : "Designed & developed by Sherif Aboud"}
+                {" · "}
+                <a className="transition-colors hover:text-white" href="tel:+201120285001" dir="ltr">
+                  {lang === "ar" ? "مصر: +20 112 028 5001" : "Egypt: +20 112 028 5001"}
+                </a>
+                {" · "}
+                <a className="transition-colors hover:text-white" href="tel:+966537544481" dir="ltr">
+                  {lang === "ar" ? "السعودية: +966 53 754 4481" : "Saudi Arabia: +966 53 754 4481"}
+                </a>
+              </p>
+            </div>
           </div>
         </div>
       </footer>
